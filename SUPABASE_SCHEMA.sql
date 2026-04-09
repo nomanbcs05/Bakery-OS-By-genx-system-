@@ -1,0 +1,219 @@
+-- Supabase SQL Schema for Bakewise ERP (Fixed for Snake Case compatibility)
+
+-- Cleanup existing tables (uncomment if you want to completely reset)
+-- DROP TABLE IF EXISTS audit_logs CASCADE;
+-- DROP TABLE IF EXISTS expenses CASCADE;
+-- DROP TABLE IF EXISTS sales CASCADE;
+-- DROP TABLE IF EXISTS dispatches CASCADE;
+-- DROP TABLE IF EXISTS production_batches CASCADE;
+-- DROP TABLE IF EXISTS products CASCADE;
+
+-- 1. Products Table
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  price DECIMAL NOT NULL,
+  unit TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at DATE DEFAULT CURRENT_DATE
+);
+
+-- 2. Production Batches Table
+CREATE TABLE IF NOT EXISTS production_batches (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NOT NULL,
+  product_id TEXT REFERENCES products(id),
+  quantity INTEGER NOT NULL,
+  date DATE NOT NULL,
+  notes TEXT,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 3. Dispatches Table
+CREATE TABLE IF NOT EXISTS dispatches (
+  id TEXT PRIMARY KEY,
+  destination TEXT NOT NULL, -- 'branch_1', 'branch_2', 'walkin'
+  date DATE NOT NULL,
+  status TEXT DEFAULT 'confirmed',
+  items JSONB NOT NULL, -- Array of {productId, quantity}
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 4. Sales Table
+CREATE TABLE IF NOT EXISTS sales (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL, -- 'branch', 'factory_walkin'
+  branch TEXT, -- 'branch_1', 'branch_2'
+  items JSONB NOT NULL, -- Array of {productId, quantity, unitPrice}
+  total DECIMAL NOT NULL,
+  payment_method TEXT NOT NULL,
+  date DATE NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 5. Expenses Table
+CREATE TABLE IF NOT EXISTS expenses (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  amount DECIMAL NOT NULL,
+  category TEXT NOT NULL,
+  date DATE NOT NULL,
+  branch_id TEXT, -- 'branch_1', 'branch_2', 'factory'
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 6. Audit Logs Table
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id TEXT PRIMARY KEY,
+  action TEXT NOT NULL,
+  entity TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  details TEXT,
+  user_id TEXT NOT NULL,
+  timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. Profiles Table (Auth integration - Multi-profile support like Netflix)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT, -- Optional, used for identification
+  role TEXT NOT NULL CHECK (role IN ('admin', 'production_manager', 'branch_staff', 'accountant')),
+  branch_id TEXT CHECK (branch_id IN ('branch_1', 'branch_2')),
+  pin_code TEXT DEFAULT '0000',
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Check if account_id column exists (in case table was created previously without it)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='account_id') THEN
+    ALTER TABLE profiles ADD COLUMN account_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for Profiles
+DROP POLICY IF EXISTS "Users can view profiles linked to their account." ON profiles;
+CREATE POLICY "Users can view profiles linked to their account." ON profiles
+  FOR SELECT USING (auth.uid() = account_id);
+
+DROP POLICY IF EXISTS "Users can manage profiles linked to their account." ON profiles;
+CREATE POLICY "Users can manage profiles linked to their account." ON profiles
+  FOR ALL USING (auth.uid() = account_id);
+
+-- Handle primary admin profile creation on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (account_id, name, email, role, pin_code)
+  VALUES (
+    new.id, 
+    'Bakery Admin', 
+    new.email, 
+    'admin',
+    '0000'
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Enable Realtime for Sales and Production
+-- Note: These are now idempotent and won't fail if already enabled.
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+
+  -- Add tables individually if they are not already in the publication
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sales') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE sales;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'production_batches') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE production_batches;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'products') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE products;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'dispatches') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE dispatches;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'expenses') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE expenses;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'audit_logs') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE audit_logs;
+  END IF;
+END $$;
+
+-- 8. Raw Materials Table
+CREATE TABLE IF NOT EXISTS raw_materials (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  current_stock DECIMAL NOT NULL DEFAULT 0,
+  min_stock_level DECIMAL NOT NULL DEFAULT 0,
+  cost_per_unit DECIMAL,
+  supplier_name TEXT,
+  is_active BOOLEAN DEFAULT true,
+  last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. Raw Material Adjustments Table
+CREATE TABLE IF NOT EXISTS raw_material_adjustments (
+  id TEXT PRIMARY KEY,
+  material_id TEXT REFERENCES raw_materials(id),
+  type TEXT NOT NULL, -- 'in', 'out'
+  quantity DECIMAL NOT NULL,
+  reason TEXT,
+  date DATE NOT NULL,
+  user_id TEXT NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 10. Branch Stock Adjustments Table
+CREATE TABLE IF NOT EXISTS branch_stock_adjustments (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL REFERENCES products(id),
+  branch TEXT NOT NULL,
+  quantity DECIMAL NOT NULL,
+  reason TEXT,
+  date DATE NOT NULL,
+  user_id TEXT NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- Add to Realtime
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'raw_materials') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE raw_materials;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'raw_material_adjustments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE raw_material_adjustments;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'branch_stock_adjustments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE branch_stock_adjustments;
+  END IF;
+END $$;
+
