@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS products (
   created_at DATE DEFAULT CURRENT_DATE
 );
 
+-- Safely add missing columns to products if they were created previously
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='is_active') THEN
+    ALTER TABLE products ADD COLUMN is_active BOOLEAN DEFAULT true;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='created_at') THEN
+    ALTER TABLE products ADD COLUMN created_at DATE DEFAULT CURRENT_DATE;
+  END IF;
+END $$;
+
+
 -- 2. Production Batches Table
 CREATE TABLE IF NOT EXISTS production_batches (
   id TEXT PRIMARY KEY,
