@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote } from 'lucide-react';
-import ReceiptDialog from '@/components/ReceiptDialog';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 
@@ -18,13 +17,6 @@ export default function POS({ branch }: POSProps) {
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);
-  const [receipt, setReceipt] = useState<{
-    items: { name: string; quantity: number; unitPrice: number }[];
-    total: number;
-    paymentMethod: string;
-    saleId: string;
-    date: string;
-  } | null>(null);
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
   const availableProducts = products.filter(p => (stock[p.id]?.[branch] || 0) > 0);
@@ -58,23 +50,114 @@ export default function POS({ branch }: POSProps) {
 
   const total = cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
+  const printDirectly = (items: any[], total: number, paymentMethod: string, saleId: string, date: string) => {
+    // Generate simple receipt layout
+    let itemsHtml = '';
+    items.forEach(item => {
+      itemsHtml += `
+        <div class="row">
+          <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name} x${item.quantity}</span>
+          <span style="font-weight: 500;">Rs. ${(item.quantity * item.unitPrice).toFixed(2)}</span>
+        </div>
+      `;
+    });
+
+    const receiptHtml = `
+      <html>
+        <head>
+          <title>Receipt</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 280px; margin: 0 auto; color: #000; }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .line { border-top: 1px dashed #000; margin: 8px 0; }
+            .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 12px; }
+            .total-row { font-size: 14px; font-weight: bold; justify-content: space-between; display: flex; margin-top: 6px; }
+            .text-muted { color: #555; }
+            .text-xs { font-size: 10px; margin: 2px 0; }
+            .title { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+            @media print { body { margin: 0; padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            <div class="title">🍞 BakeryOS</div>
+            <div class="text-muted text-xs">${branchLabel}</div>
+            <div class="text-muted text-xs">${date}</div>
+            <div class="text-muted text-xs">Receipt #${saleId}</div>
+          </div>
+          <div class="line"></div>
+          <div class="row bold text-muted text-xs">
+            <span>Item</span>
+            <span>Amount</span>
+          </div>
+          ${itemsHtml}
+          <div class="line"></div>
+          <div class="total-row">
+            <span>TOTAL</span>
+            <span>Rs. ${total.toFixed(2)}</span>
+          </div>
+          <div class="row text-muted" style="margin-top: 4px;">
+            <span>Payment</span>
+            <span style="text-transform: capitalize;">${paymentMethod}</span>
+          </div>
+          <div class="line"></div>
+          <div class="center text-muted text-xs" style="margin-top: 8px;">
+            Thank you for your purchase!
+          </div>
+          <script>
+             window.onload = () => {
+               window.print();
+             };
+          </script>
+        </body>
+      </html>
+    `;
+
+    // Create a hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    // Write content to iframe and trigger print
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(receiptHtml);
+      doc.close();
+
+      // Ensure removal after printing process starts or user cancels
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 5000);
+    }
+  };
+
   const checkout = async (method: PaymentMethod) => {
     if (cart.length === 0) return;
+    
+    // Create copy for receipt variables before clearing cart
+    const receiptItems = cart.map(i => ({
+      name: getProductById(i.productId)?.name || 'Unknown',
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+    }));
+    const receiptTotal = total;
+
     const success = await createSale('branch', branch, cart, method);
     if (success) {
       const saleId = `RCP-${Date.now().toString(36).toUpperCase()}`;
-      setReceipt({
-        items: cart.map(i => ({
-          name: getProductById(i.productId)?.name || 'Unknown',
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-        })),
-        total,
-        paymentMethod: method,
-        saleId,
-        date: new Date().toLocaleString(),
-      });
       setCart([]);
+      
+      // Directly trigger print
+      printDirectly(receiptItems, receiptTotal, method, saleId, new Date().toLocaleString());
     }
   };
 
@@ -165,19 +248,6 @@ export default function POS({ branch }: POSProps) {
           </CardContent>
         </Card>
       </div>
-
-      {receipt && (
-        <ReceiptDialog
-          open={!!receipt}
-          onClose={() => setReceipt(null)}
-          items={receipt.items}
-          total={receipt.total}
-          paymentMethod={receipt.paymentMethod}
-          branch={branchLabel}
-          saleId={receipt.saleId}
-          date={receipt.date}
-        />
-      )}
     </div>
   );
 }
