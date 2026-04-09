@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, typ
 import type {
   User, Product, ProductionBatch, Dispatch, DispatchDestination,
   DispatchItem, Sale, SaleItem, SaleType, PaymentMethod, Expense, AuditLog, InventorySnapshot, UserRole,
-  RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment,
+  RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment
 } from '@/types';
 import { toast } from 'sonner';
@@ -60,6 +60,7 @@ interface AppState {
   isOnline: boolean;
   lastSyncTime: string | null;
   isLoading: boolean;
+  receiptSettings: ReceiptSettings;
 }
 
 interface AppContextType extends AppState {
@@ -98,6 +99,7 @@ interface AppContextType extends AppState {
   logout: () => Promise<void>;
   forceSync: () => Promise<void>;
   seedDatabase: () => Promise<void>;
+  updateReceiptSettings: (settings: Partial<ReceiptSettings>) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -240,6 +242,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(initialState.lastSyncTime || null);
+  
+  const defaultReceiptSettings: ReceiptSettings = {
+    brandName: 'Sultan-E-Libas by Elegance',
+    tagline: 'Premium Fabric',
+    address: 'Nawabshah, Pakistan',
+    phone: '03111855990',
+    footerMessage1: 'Thank you for shopping with elegance.',
+    footerMessage2: 'For quality assurance, cut pieces cannot be returned or exchanged.',
+    printedBy: 'GENX CLOUD, NAWABSHAH +923342826675'
+  };
+
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
+    (initialState as any).receiptSettings || defaultReceiptSettings
+  );
 
   const hasLoaded = React.useRef(false);
   useEffect(() => {
@@ -570,7 +586,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       expenses, 
       auditLogs, 
       stock, 
-      lastSyncTime
+      lastSyncTime,
+      receiptSettings
     };
     
     try {
@@ -578,7 +595,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to save business data to localStorage:', e);
     }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings]);
 
   // Persist AUTH data separately
   useEffect(() => {
@@ -1258,6 +1275,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Logged out successfully');
   };
 
+  const updateReceiptSettings = useCallback((settings: Partial<ReceiptSettings>) => {
+    setReceiptSettings(prev => ({ ...prev, ...settings }));
+    toast.success('Receipt settings updated');
+  }, []);
+
   return (
     <AppContext.Provider value={{
       currentUser,
@@ -1310,7 +1332,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createStaffMember,
       forceSync,
       seedDatabase,
-      logout
+      logout,
+      receiptSettings,
+      updateReceiptSettings
     }}>
       {children}
     </AppContext.Provider>

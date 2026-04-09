@@ -227,3 +227,13 @@ export interface DBBranchStockAdjustment {
   user_id: string;
   sync_status: 'synced' | 'pending';
 }
+
+export interface ReceiptSettings {
+  brandName: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  footerMessage1: string;
+  footerMessage2: string;
+  printedBy: string;
+}

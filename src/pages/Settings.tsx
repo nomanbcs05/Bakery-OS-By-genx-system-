@@ -1,7 +1,7 @@
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock } from 'lucide-react';
+import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Navigate } from 'react-router-dom';
@@ -27,7 +27,9 @@ export default function SettingsPage() {
     seedDatabase, 
     logout,
     lockProfile,
-    auditLogs
+    auditLogs,
+    receiptSettings,
+    updateReceiptSettings
   } = useApp();
 
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -36,6 +38,11 @@ export default function SettingsPage() {
 
   const [editingPinId, setEditingPinId] = useState<string | null>(null);
   const [tempPin, setTempPin] = useState('');
+
+  const [formReceiptSettings, setFormReceiptSettings] = useState(receiptSettings);
+  const handleSaveReceiptSettings = () => {
+    updateReceiptSettings(formReceiptSettings);
+  };
 
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.role !== 'admin') return <Navigate to="/" replace />;
@@ -159,7 +166,49 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2"><Printer className="h-4 w-4" /> Receipt Information</span>
+              <Button size="sm" onClick={handleSaveReceiptSettings} className="h-8 flex items-center gap-1.5">
+                <Save className="h-3.5 w-3.5" /> Save
+              </Button>
+            </CardTitle>
+            <CardDescription>Customize business details printed on customer receipts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Brand Name</Label>
+                <Input value={formReceiptSettings.brandName} onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} placeholder="Sultan-E-Libas by Elegance" />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Tagline</Label>
+                <Input value={formReceiptSettings.tagline} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} placeholder="Premium Fabric" />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input value={formReceiptSettings.address} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} placeholder="Nawabshah, Pakistan" />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={formReceiptSettings.phone} onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} placeholder="03111855990" />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Footer Message 1</Label>
+                <Input value={formReceiptSettings.footerMessage1} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} placeholder="Thank you for shopping with elegance." />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Footer Message 2</Label>
+                <Input value={formReceiptSettings.footerMessage2} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} placeholder="For quality assurance, cut pieces cannot be returned or exchanged." />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Printed By (Software credits)</Label>
+                <Input value={formReceiptSettings.printedBy} onChange={e => setFormReceiptSettings(s => ({ ...s, printedBy: e.target.value }))} placeholder="GENX CLOUD, NAWABSHAH +923342826675" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card className="md:col-span-2">
           <CardHeader>

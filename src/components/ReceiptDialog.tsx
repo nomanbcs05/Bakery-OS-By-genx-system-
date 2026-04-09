@@ -1,9 +1,8 @@
 import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Printer } from 'lucide-react';
-import type { SaleItem } from '@/types';
+import { useApp } from '@/context/AppContext';
 
 interface ReceiptDialogProps {
   open: boolean;
@@ -18,6 +17,7 @@ interface ReceiptDialogProps {
 
 export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date }: ReceiptDialogProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const { receiptSettings, currentUser } = useApp();
 
   const handlePrint = () => {
     const content = receiptRef.current;
@@ -27,74 +27,146 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     win.document.write(`
       <html><head><title>Receipt</title>
       <style>
-        body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 280px; margin: 0 auto; }
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .line { border-top: 1px dashed #000; margin: 8px 0; }
-        .row { display: flex; justify-content: space-between; margin: 2px 0; }
-        .total-row { font-size: 14px; font-weight: bold; }
-        @media print { body { margin: 0; } }
+        body { 
+          font-family: 'Courier New', Courier, monospace; 
+          font-size: 13px; 
+          color: #000; 
+          background: #fff;
+          margin: 0; 
+          padding: 10px; 
+          width: 280px; 
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .dashed-line { 
+          border-top: 1px dashed #000; 
+          margin: 8px 0; 
+        }
+        .flex-between { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: flex-start;
+          margin-bottom: 3px;
+        }
+        .block-item { margin-bottom: 6px; }
+        .title { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+        .subtitle { font-weight: bold; font-size: 13px; margin-bottom: 2px; }
+        .info-lines { line-height: 1.3; font-size: 12px; }
       </style></head><body>
-      ${content.innerHTML}
+      \${content.innerHTML}
       <script>window.print(); window.close();</script>
       </body></html>
     `);
     win.document.close();
   };
 
+  const formattedDate = new Date(date).toLocaleString();
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-center">Sale Receipt</DialogTitle>
+          <DialogTitle className="text-center">Print Receipt</DialogTitle>
         </DialogHeader>
 
-        <div ref={receiptRef} className="space-y-2 text-sm font-mono">
-          <div className="text-center">
-            <p className="font-bold text-base">🍞 BakeryOS</p>
-            <p className="text-muted-foreground text-xs">{branch}</p>
-            <p className="text-muted-foreground text-xs">{date}</p>
-            <p className="text-muted-foreground text-xs">Receipt #{saleId}</p>
+        <div className="bg-white text-black p-4 mx-auto w-[280px] font-mono text-[13px] border shadow-sm" ref={receiptRef}>
+          {/* Header */}
+          <div className="text-center info-lines mb-2">
+            <div className="title" style={{ fontFamily: 'monospace' }}>{receiptSettings?.brandName || 'BakeryPOS'}</div>
+            <div className="subtitle">{receiptSettings?.tagline || 'Premium Quality'}</div>
+            <div>{receiptSettings?.address || 'City, Country'}</div>
+            <div>{receiptSettings?.phone || '000-0000000'}</div>
           </div>
 
-          <Separator className="my-2" />
+          <div className="dashed-line"></div>
 
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs font-semibold text-muted-foreground">
-              <span>Item</span>
-              <span>Amount</span>
+          {/* Metadata */}
+          <div className="info-lines mb-2">
+            <div className="flex-between">
+              <span>Invoice:</span>
+              <span className="font-bold">{saleId.toUpperCase().slice(0, 12)}</span>
             </div>
+            <div className="flex-between">
+              <span>Date:</span>
+              <span>{formattedDate}</span>
+            </div>
+            <div className="flex-between">
+              <span>Cashier:</span>
+              <span>{currentUser?.name || branch}</span>
+            </div>
+            <div className="flex-between">
+              <span>Customer:</span>
+              <span>Walk-in</span>
+            </div>
+          </div>
+
+          <div className="dashed-line"></div>
+
+          {/* Items */}
+          <div className="mb-2">
             {items.map((item, i) => (
-              <div key={i} className="flex justify-between text-sm">
-                <span className="flex-1 truncate pr-2">
-                  {item.name} x{item.quantity}
-                </span>
-                <span className="font-medium">Rs. {(item.quantity * item.unitPrice).toFixed(2)}</span>
+              <div key={i} className="block-item">
+                <div className="font-bold">{item.name}</div>
+                <div className="flex-between text-[12px]">
+                  <span>{item.quantity} x Rs.{item.unitPrice.toLocaleString()}</span>
+                  <span>Rs.{(item.quantity * item.unitPrice).toLocaleString()}</span>
+                </div>
               </div>
             ))}
           </div>
 
-          <Separator className="my-2" />
+          <div className="dashed-line"></div>
 
-          <div className="flex justify-between font-bold text-base">
-            <span>TOTAL</span>
-            <span className="text-primary">Rs. {total.toFixed(2)}</span>
+          {/* Totals */}
+          <div className="info-lines mb-2">
+            <div className="flex-between">
+              <span>Subtotal:</span>
+              <span>Rs.{total.toLocaleString()}</span>
+            </div>
+            <div className="flex-between">
+              <span>Discount:</span>
+              <span>-Rs.0</span>
+            </div>
+            <div className="flex-between font-bold" style={{ fontSize: '14px', marginTop: '4px' }}>
+              <span>TOTAL:</span>
+              <span>Rs.{total.toLocaleString()}</span>
+            </div>
           </div>
 
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Payment</span>
-            <span className="capitalize">{paymentMethod}</span>
+          <div className="dashed-line"></div>
+
+          {/* Payment */}
+          <div className="info-lines mb-2">
+            <div className="font-bold mb-1 uppercase tracking-wider text-[12px]">{paymentMethod}</div>
+            <div className="flex-between">
+              <span>Received:</span>
+              <span>Rs.{total.toLocaleString()}</span>
+            </div>
+            <div className="flex-between">
+              <span>Change:</span>
+              <span>Rs.0</span>
+            </div>
           </div>
 
-          <Separator className="my-2" />
+          <div className="dashed-line"></div>
 
-          <p className="text-center text-xs text-muted-foreground">Thank you for your purchase!</p>
+          {/* Footer */}
+          <div className="text-center mt-3">
+            <div className="font-bold mb-2" style={{ fontSize: '13px' }}>
+              {receiptSettings?.footerMessage1 || 'Thank you for shopping!'}
+            </div>
+            <div style={{ fontSize: '10px', lineHeight: '1.2', color: '#333' }}>
+              <div>{receiptSettings?.footerMessage2 || 'Items cannot be returned.'}</div>
+              <div className="mt-2 text-[#666]">{receiptSettings?.printedBy || 'Software by GenX'}</div>
+            </div>
+          </div>
         </div>
 
-        <DialogFooter className="flex gap-2 sm:gap-2">
+        <DialogFooter className="flex gap-2 sm:gap-2 mt-4">
           <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
-          <Button onClick={handlePrint} className="flex-1">
-            <Printer className="h-4 w-4 mr-1" /> Print
+          <Button onClick={handlePrint} className="flex-1 shrink-0">
+            <Printer className="h-4 w-4 mr-1" /> Print Receipt
           </Button>
         </DialogFooter>
       </DialogContent>
