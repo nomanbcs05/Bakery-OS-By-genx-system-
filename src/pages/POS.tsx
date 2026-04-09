@@ -13,13 +13,17 @@ interface POSProps {
 }
 
 export default function POS({ branch }: POSProps) {
-  const { currentUser, products, stock, createSale, getProductById } = useApp();
+  const { currentUser, products, stock, createSale, getProductById, getBranchStock } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
-  const availableProducts = products.filter(p => (stock[p.id]?.[branch] || 0) > 0);
+  const branchStockItems = getBranchStock(branch);
+  const availableProducts = branchStockItems.map(s => {
+    const p = getProductById(s.productId);
+    return { ...p!, stock: s.stock };
+  }).filter(p => p !== undefined);
 
   const addToCart = (productId: string) => {
     const product = getProductById(productId);
@@ -343,16 +347,20 @@ export default function POS({ branch }: POSProps) {
         <div className="lg:col-span-2">
           <div className="pos-grid">
             {availableProducts.map(p => {
-              const avail = stock[p.id]?.[branch] || 0;
+              const avail = p.stock;
+              const isOutOfStock = avail <= 0;
               return (
                 <button
                   key={p.id}
                   onClick={() => addToCart(p.id)}
-                  className="bg-card border border-border rounded-xl p-4 text-left hover:border-primary hover:shadow-md transition-all active:scale-[0.97]"
+                  disabled={isOutOfStock}
+                  className={`bg-card border border-border rounded-xl p-4 text-left hover:border-primary hover:shadow-md transition-all active:scale-[0.97] ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <p className="font-semibold text-sm text-foreground">{p.name}</p>
                   <p className="text-primary font-bold mt-1">Rs. {p.price.toFixed(2)}</p>
-                  <Badge variant="secondary" className="mt-2 text-xs">{avail} in stock</Badge>
+                  <Badge variant={isOutOfStock ? "destructive" : "secondary"} className="mt-2 text-xs">
+                    {avail} in stock
+                  </Badge>
                 </button>
               );
             })}

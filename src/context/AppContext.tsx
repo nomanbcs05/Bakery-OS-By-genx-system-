@@ -1256,8 +1256,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [sales]);
 
   const getBranchStock = useCallback((branch: 'branch_1' | 'branch_2') => {
-    return products.map(p => ({ productId: p.id, stock: stock[p.id]?.[branch] || 0 })).filter(s => s.stock > 0);
-  }, [products, stock]);
+    const dispatchedProductIds = new Set<string>();
+    dispatches.forEach(d => {
+      if (d.destination === branch) {
+        d.items.forEach(i => dispatchedProductIds.add(i.productId));
+      }
+    });
+    return products
+      .filter(p => dispatchedProductIds.has(p.id) || (stock[p.id]?.[branch] || 0) !== 0)
+      .map(p => ({ productId: p.id, stock: stock[p.id]?.[branch] || 0 }));
+  }, [products, stock, dispatches]);
 
   const getProductionStock = useCallback(() => {
     return products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })).filter(s => s.stock > 0);
