@@ -159,42 +159,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Database className="h-4 w-4" /> Data Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              All data is synced with Supabase and stored locally for offline access.
-            </p>
-            <div className="grid grid-cols-1 gap-3">
-              <Button 
-                variant="outline" 
-                className="w-full flex items-center gap-2"
-                onClick={() => {
-                  if (confirm('This will seed the initial products and batches into Supabase. Continue?')) {
-                    seedDatabase();
-                  }
-                }}
-              >
-                <Database className="h-4 w-4" /> Seed Initial Data
-              </Button>
-              <Button 
-                variant="destructive" 
-                className="w-full flex items-center gap-2"
-                onClick={() => {
-                  if (confirm('Are you sure? This will delete all local sales, production, and expense data.')) {
-                    clearAllReportData();
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4" /> Reset All System Data
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
 
         <Card className="md:col-span-2">
           <CardHeader>
