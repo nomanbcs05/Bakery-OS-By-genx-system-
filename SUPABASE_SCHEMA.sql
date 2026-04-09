@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS production_batches (
   sync_status TEXT DEFAULT 'synced'
 );
 
+-- Safely add missing batch_id to production_batches
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='production_batches' AND column_name='batch_id') THEN
+    ALTER TABLE production_batches ADD COLUMN batch_id TEXT;
+    UPDATE production_batches SET batch_id = 'BCH-' || substring(md5(random()::text) from 1 for 6) WHERE batch_id IS NULL;
+    ALTER TABLE production_batches ALTER COLUMN batch_id SET NOT NULL;
+  END IF;
+END $$;
+
 -- 3. Dispatches Table
 CREATE TABLE IF NOT EXISTS dispatches (
   id TEXT PRIMARY KEY,
@@ -229,3 +239,5 @@ BEGIN
   END IF;
 END $$;
 
+-- Forcefully refresh the PostgREST API schema cache so frontend fetches don't fail!
+NOTIFY pgrst, 'reload schema';
