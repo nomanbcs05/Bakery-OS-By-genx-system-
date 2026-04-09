@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bakewise-v3'; // Bump version
+const CACHE_NAME = 'bakewise-v4'; // Bump version
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
