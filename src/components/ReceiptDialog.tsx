@@ -27,14 +27,13 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 280px; 
+      width: 290px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .font-bold { font-weight: bold; }
     .uppercase { text-transform: uppercase; }
     
-    /* Boxes and Borders for Thermal Printing */
     .receipt-box { 
       border: 1.5pt solid #000 !important; 
       padding: 6px; 
@@ -50,17 +49,12 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       display: block;
     }
     .receipt-divider { 
-      border-top: 1pt dashed #000; 
+      border-top: 1.5pt dashed #000; 
       margin: 4px 0; 
     }
     .receipt-line { 
       border-top: 1.5pt solid #000; 
       margin: 4px 0; 
-    }
-    .receipt-line-b { 
-      border-bottom: 1pt solid #000; 
-      margin-bottom: 4px; 
-      padding-bottom: 2px;
     }
     
     .flex-row { display: flex; justify-content: space-between; }
@@ -86,6 +80,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     .w-item { flex: 1; padding: 0 4px; }
     .w-rate { width: 60px; text-align: right; }
     .w-amount { width: 70px; text-align: right; }
+    
+    .phone-pill {
+      background: #000 !important;
+      color: #fff !important;
+      padding: 1px 4px;
+      font-weight: bold;
+      -webkit-print-color-adjust: exact;
+    }
   `;
 
   const handlePrint = () => {
@@ -109,7 +111,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <style>
           @page { size: auto; margin: 0; }
           \${commonStyles}
-          body { padding: 10px; }
+          body { padding: 8px; }
         </style></head>
         <body>
           \${content.innerHTML}
@@ -141,14 +143,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
         <style>{commonStyles}</style>
-        <div className="bg-white text-black p-4 mx-auto w-full max-w-[300px] shadow-sm" ref={receiptRef}>
+        <div className="bg-white text-black p-4 mx-auto w-full max-w-[320px] shadow-sm" ref={receiptRef}>
           
           {/* Header Box */}
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
-              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[180px] mx-auto mb-2 object-contain filter grayscale" />
+              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[200px] mx-auto mb-2 object-contain filter grayscale" />
             ) : (
                <div className="flex justify-center mb-1">
                  <svg width="60" height="40" viewBox="0 0 100 60" fill="currentColor">
@@ -239,8 +241,22 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          {/* Footer Box */}
-          <div className="receipt-box text-center mt-3">
+          {/* New Locations Footer Section */}
+          <div className="receipt-divider !mt-4"></div>
+          <div className="text-[7.5pt] space-y-1 py-1 uppercase leading-tight">
+            <div className="flex-row items-center">
+              <span>BRANCH 1: <span className="font-bold underline">DHAMRA ROAD</span></span>
+              <span>ORDER: <span className="phone-pill">03297040402</span></span>
+            </div>
+            <div className="flex-row items-center">
+              <span>BRANCH 2: <span className="font-bold underline">JAM SAHAB RD</span></span>
+              <span>ORDER: <span className="phone-pill">03093660360</span></span>
+            </div>
+          </div>
+          <div className="receipt-divider"></div>
+
+          {/* Tagline Footer */}
+          <div className="receipt-box text-center mt-2">
             <div className="font-bold text-[10pt] mb-1">
               {receiptSettings?.footerMessage1}
             </div>
