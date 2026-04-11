@@ -20,6 +20,74 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const receiptRef = useRef<HTMLDivElement>(null);
   const { receiptSettings, currentUser } = useApp();
 
+  const commonStyles = `
+    body { 
+      font-family: 'Courier New', Courier, monospace; 
+      font-size: 11px; 
+      color: #000; 
+      margin: 0; 
+      padding: 0; 
+      width: 280px; 
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-bold { font-weight: bold; }
+    .uppercase { text-transform: uppercase; }
+    
+    /* Boxes and Borders for Thermal Printing */
+    .receipt-box { 
+      border: 1.5pt solid #000 !important; 
+      padding: 6px; 
+      margin-bottom: 8px; 
+    }
+    .receipt-order-num { 
+      border: 2pt solid #000 !important; 
+      padding: 6px; 
+      margin: 8px 0; 
+      font-size: 22pt; 
+      font-weight: bold; 
+      text-align: center; 
+      display: block;
+    }
+    .receipt-divider { 
+      border-top: 1pt dashed #000; 
+      margin: 4px 0; 
+    }
+    .receipt-line { 
+      border-top: 1.5pt solid #000; 
+      margin: 4px 0; 
+    }
+    .receipt-line-b { 
+      border-bottom: 1pt solid #000; 
+      margin-bottom: 4px; 
+      padding-bottom: 2px;
+    }
+    
+    .flex-row { display: flex; justify-content: space-between; }
+    .highlight-bill { 
+      border-top: 1pt solid #000; 
+      border-bottom: 2pt solid #000; 
+      padding: 4px 2px; 
+      font-size: 14pt; 
+      font-weight: bold; 
+      display: flex; 
+      justify-content: space-between; 
+      background: #eee !important;
+      -webkit-print-color-adjust: exact;
+    }
+    .item-table-header { 
+      border-bottom: 1.5pt solid #000; 
+      font-weight: bold; 
+      display: flex; 
+      margin-bottom: 4px; 
+      padding-bottom: 2px;
+    }
+    .w-qty { width: 40px; }
+    .w-item { flex: 1; padding: 0 4px; }
+    .w-rate { width: 60px; text-align: right; }
+    .w-amount { width: 70px; text-align: right; }
+  `;
+
   const handlePrint = () => {
     const content = receiptRef.current;
     if (!content) return;
@@ -36,53 +104,18 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     const doc = iframe.contentWindow?.document;
     if (doc) {
       doc.open();
-      doc.write(`
+      doc.write(\`
         <html><head><title>Receipt</title>
         <style>
           @page { size: auto; margin: 0; }
-          body { 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 11px; 
-            color: #000; 
-            background: #fff;
-            margin: 0; 
-            padding: 10px; 
-            width: 260px; 
-          }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .font-bold { font-weight: bold; }
-          .uppercase { text-transform: uppercase; }
-          .border-full { border: 1.5px solid #000; padding: 6px; margin-bottom: 8px; }
-          .border-b { border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 4px; }
-          .dashed-t { border-top: 1px dashed #000; padding-top: 4px; margin-top: 4px; }
-          .flex-between { display: flex; justify-content: space-between; align-items: start; }
-          .order-num-box { border: 2px solid #000; padding: 4px; margin: 8px 0; font-size: 24px; font-weight: bold; text-align: center; }
-          
-          .meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-          .meta-label { font-weight: bold; }
-          
-          .table-header { display: flex; border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; font-weight: bold; }
-          .w-qty { width: 30px; }
-          .w-item { flex: 1; padding: 0 4px; }
-          .w-rate { width: 50px; text-align: right; }
-          .w-amount { width: 60px; text-align: right; }
-          
-          .item-row { display: flex; align-items: start; margin-bottom: 4px; line-height: 1.2; }
-          
-          .totals-section { margin-top: 8px; border-top: 1px solid #000; padding-top: 4px; }
-          .highlight-row { background: #f0f0f0; margin: 4px 0; padding: 2px 0; font-size: 14px; display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000; }
-          
-          @media print { 
-            body { padding: 0; width: 100%; } 
-            .highlight-row { -webkit-print-color-adjust: exact; background: #eee !important; }
-          }
+          \${commonStyles}
+          body { padding: 10px; }
         </style></head>
         <body>
-          ${content.innerHTML}
+          \${content.innerHTML}
           <script>window.onload = () => { window.print(); };</script>
         </body></html>
-      `);
+      \`);
       doc.close();
 
       setTimeout(() => {
@@ -101,20 +134,21 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
   }, [open, autoPrint]);
 
-  const shortId = saleId.slice(-2).padStart(2, '0');
+  const shortId = saleId.slice(-4).toUpperCase();
   const dDate = new Date(date);
-  const formattedDate = dDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+  const formattedDate = dDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = dDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
-        <div className="bg-white text-black p-4 mx-auto w-full max-w-[280px] shadow-sm border border-stone-200" ref={receiptRef} style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+        <style>{commonStyles}</style>
+        <div className="bg-white text-black p-4 mx-auto w-full max-w-[300px] shadow-sm" ref={receiptRef}>
           
           {/* Header Box */}
-          <div className="border-[1.5px] border-black p-2 text-center mb-2">
+          <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
-              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[150px] mx-auto mb-2 object-contain filter grayscale" />
+              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[180px] mx-auto mb-2 object-contain filter grayscale" />
             ) : (
                <div className="flex justify-center mb-1">
                  <svg width="60" height="40" viewBox="0 0 100 60" fill="currentColor">
@@ -124,93 +158,93 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
                </div>
             )}
             
-            <div className="text-[10px] leading-tight whitespace-pre-line mb-1">
+            <div className="text-[10pt] leading-tight whitespace-pre-line mb-1">
               {receiptSettings?.address}
             </div>
-            <div className="text-[10px] font-bold mb-1">
+            <div className="text-[10pt] font-bold">
               {receiptSettings?.phone}
             </div>
             
-            <div className="border-t border-black border-dotted my-1"></div>
-            <div className="text-[9px] font-bold">
+            <div className="receipt-divider"></div>
+            <div className="text-[9pt] font-bold">
               {receiptSettings?.printedBy}
             </div>
           </div>
 
           {/* Large Order Number Box */}
-          <div className="border-[1.5px] border-black py-1 text-center text-2xl font-bold mb-2">
-            {shortId}
+          <div className="receipt-order-num">
+            {shortId.slice(-2)}
           </div>
 
           {/* Metadata Section */}
-          <div className="space-y-0.5 text-[11px] mb-2">
-            <div className="flex justify-between">
-              <span>Invoice #: <span className="font-bold">{shortId}</span></span>
-              <span>DAY-{(parseInt(shortId) + 1000).toString().padStart(4, '0')}</span>
+          <div className="text-[11pt] space-y-0.5 mb-2">
+            <div className="flex-row">
+              <span>Invoice #: <span className="font-bold">{shortId.slice(-2)}</span></span>
+              <span>DAY-{shortId}</span>
             </div>
-            <div className="flex justify-between items-start">
-              <span className="font-bold">Restaurant:</span>
-              <span className="font-bold text-right uppercase">{receiptSettings?.brandName}</span>
+            <div className="flex-row font-bold">
+              <span>Restaurant:</span>
+              <span className="uppercase">{receiptSettings?.brandName}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex-row">
               <span>Cashier:</span>
               <span>{currentUser?.name || 'SYS_ADMIN'}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex-row">
               <span>Type:</span>
               <span className="font-bold uppercase">WALK IN</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex-row">
               <span>{formattedDate}</span>
               <span>{formattedTime}</span>
             </div>
           </div>
 
           {/* Table */}
-          <div className="border-t-[1.5px] border-black pt-1">
-            <div className="flex font-bold text-[11px] border-b border-black pb-0.5 mb-1">
-              <div className="w-[30px]">Qty</div>
-              <div className="flex-1 px-1">Item</div>
-              <div className="w-[50px] text-right">Rate</div>
-              <div className="w-[60px] text-right">Amount</div>
-            </div>
-            
-            <div className="space-y-1 min-h-[40px]">
-              {items.map((item, i) => (
-                <div key={i} className="flex items-start text-[10px] leading-[1.1]">
-                  <div className="w-[30px] font-bold">{item.quantity}</div>
-                  <div className="flex-1 px-1 uppercase">{item.name}</div>
-                  <div className="w-[50px] text-right">{item.unitPrice}</div>
-                  <div className="w-[60px] text-right font-bold">{(item.quantity * item.unitPrice)}</div>
-                </div>
-              ))}
-            </div>
+          <div className="receipt-line"></div>
+          <div className="item-table-header">
+            <div className="w-qty">Qty</div>
+            <div className="w-item">Item</div>
+            <div className="w-rate">Rate</div>
+            <div className="w-amount">Amount</div>
+          </div>
+          
+          <div className="space-y-1 min-h-[40px]">
+            {items.map((item, i) => (
+              <div key={i} className="flex text-[10pt] leading-[1.2]">
+                <div className="w-qty font-bold">{item.quantity}</div>
+                <div className="w-item uppercase">{item.name}</div>
+                <div className="w-rate">{item.unitPrice}</div>
+                <div className="w-amount font-bold">{(item.quantity * item.unitPrice)}</div>
+              </div>
+            ))}
           </div>
 
           {/* Totals Section */}
-          <div className="mt-4 space-y-0.5 text-[11px]">
-            <div className="flex justify-between">
+          <div className="receipt-line mt-4"></div>
+          <div className="text-[11pt] space-y-1">
+            <div className="flex-row">
               <span>SubTotal :</span>
               <span className="font-bold">{total}</span>
             </div>
             
-            <div className="bg-gray-100 border-y border-black font-bold flex justify-between py-0.5 px-1 items-center my-1">
-              <span className="text-sm">Net Bill :</span>
-              <span className="text-lg">{total}</span>
+            <div className="highlight-bill">
+              <span>Net Bill :</span>
+              <span>{total}</span>
             </div>
             
-            <div className="flex justify-between">
+            <div className="flex-row">
               <span>TIP :</span>
               <span></span>
             </div>
           </div>
 
           {/* Footer Box */}
-          <div className="border-[1.5px] border-black p-1 text-center mt-3">
-            <div className="font-bold text-[10px] mb-0.5">
+          <div className="receipt-box text-center mt-3">
+            <div className="font-bold text-[10pt] mb-1">
               {receiptSettings?.footerMessage1}
             </div>
-            <div className="text-[8px] leading-tight">
+            <div className="text-[9pt] leading-tight font-bold">
               {receiptSettings?.footerMessage2}
             </div>
           </div>
