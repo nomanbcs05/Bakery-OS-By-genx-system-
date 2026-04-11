@@ -301,5 +301,27 @@ BEGIN
   END IF;
 END $$;
 
+-- 15. Purchases Table (Raw Material Procurement)
+CREATE TABLE IF NOT EXISTS purchases (
+  id TEXT PRIMARY KEY,
+  material_id TEXT REFERENCES raw_materials(id),
+  quantity DECIMAL NOT NULL,
+  total_cost DECIMAL NOT NULL,
+  amount_paid DECIMAL NOT NULL,
+  payment_method TEXT NOT NULL, -- 'cash', 'credit'
+  vendor_name TEXT NOT NULL,
+  vendor_city TEXT,
+  date DATE NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- Add to Realtime
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'purchases') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE purchases;
+  END IF;
+END $$;
+
 -- Forcefully refresh the PostgREST API schema cache
 NOTIFY pgrst, 'reload schema';

@@ -152,6 +152,8 @@ interface AppContextType extends AppState {
   deleteSalaryVoucher: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<boolean>;
   payCreditSale: (id: string) => Promise<void>;
+  purchases: Purchase[];
+  addPurchase: (p: Omit<Purchase, 'id' | 'syncStatus'>) => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -199,6 +201,10 @@ const fromDBDeduction = (d: DBStaffDeduction): StaffDeduction => ({
 const fromDBVoucher = (v: DBSalaryVoucher): SalaryVoucher => ({
   id: v.id, staffId: v.staff_id, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, syncStatus: v.sync_status || 'synced'
 });
+const fromDBPurchase = (p: DBPurchase): Purchase => ({
+  id: p.id, materialId: p.material_id, quantity: p.quantity, totalCost: p.total_cost, amountPaid: p.amount_paid, paymentMethod: p.payment_method, 
+  vendorName: p.vendor_name, vendorCity: p.vendor_city, date: p.date, syncStatus: p.sync_status || 'synced'
+});
 
 // Helper to convert frontend objects to DB snake_case
 const toDBProduct = (p: Product): DBProduct => ({
@@ -238,6 +244,10 @@ const toDBDeduction = (d: StaffDeduction): DBStaffDeduction => ({
 });
 const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
   id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
+});
+const toDBPurchase = (p: Purchase): DBPurchase => ({
+  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
+  vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -322,6 +332,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [staff, setStaff] = useState<StaffMember[]>(initialState.staff || []);
   const [staffDeductions, setStaffDeductions] = useState<StaffDeduction[]>(initialState.staffDeductions || []);
   const [salaryVouchers, setSalaryVouchers] = useState<SalaryVoucher[]>(initialState.salaryVouchers || []);
+  const [purchases, setPurchases] = useState<Purchase[]>(initialState.purchases || []);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialState.auditLogs || []);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -515,7 +526,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           supabase.from('branch_stock_adjustments').select('*'),
           supabase.from('staff_members').select('*'),
           supabase.from('staff_deductions').select('*'),
-          supabase.from('salary_vouchers').select('*')
+          supabase.from('salary_vouchers').select('*'),
+          supabase.from('purchases').select('*')
         ]);
 
         // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
@@ -630,6 +642,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSalaryVouchers(prev => {
             const merged = [...prev];
             remoteVouchers.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
+          });
+        }
+
+        if (purchasesData && purchasesData.length > 0) {
+          const remotePurchases = purchasesData.map(fromDBPurchase);
+          setPurchases(prev => {
+            const merged = [...prev];
+            remotePurchases.forEach(r => {
               const idx = merged.findIndex(l => l.id === r.id);
               if (idx !== -1) merged[idx] = r; else merged.push(r);
             });
@@ -909,6 +933,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           syncCount += pendingVouchers.length;
         }
       } catch (err) { console.error('Salary vouchers sync error:', err); }
+    }
+
+    // 7. Sync Purchases
+    const pendingPurchases = purchases.filter(p => p.syncStatus === 'pending');
+    if (pendingPurchases.length > 0) {
+      try {
+        const { error } = await supabase.from('purchases').insert(
+          pendingPurchases.map(p => toDBPurchase({ ...p, syncStatus: 'synced' }))
+        );
+        if (!error) {
+          setPurchases(prev => prev.map(p => p.syncStatus === 'pending' ? { ...p, syncStatus: 'synced' } : p));
+          syncCount += pendingPurchases.length;
+        }
+      } catch (err) { console.error('Purchase sync error:', err); }
     }
 
     if (syncCount > 0) {
@@ -1368,6 +1406,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success(`Expense deleted successfully`);
   }, [addLog, isOnline]);
 
+  const addPurchase = useCallback(async (p: Omit<Purchase, 'id' | 'syncStatus'>) => {
+    const id = `pur${Date.now()}`;
+    const newPurchase: Purchase = {
+      ...p,
+      id,
+      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
+    };
+
+    // 1. Add to purchases state
+    setPurchases(prev => [...prev, newPurchase]);
+
+    // 2. Update material stock automatically
+    setRawMaterials(prev => prev.map(m => 
+      m.id === p.materialId 
+        ? { ...m, currentStock: m.currentStock + p.quantity, lastUpdated: new Date().toISOString() } 
+        : m
+    ));
+
+    // 3. Sync to DB if online
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        const { error } = await supabase.from('purchases').insert([toDBPurchase(newPurchase)]);
+        if (error) throw error;
+
+        // Also update material stock in DB
+        const material = rawMaterials.find(m => m.id === p.materialId);
+        if (material) {
+          await supabase.from('raw_materials')
+            .update({ current_stock: material.currentStock + p.quantity, last_updated: new Date().toISOString() })
+            .eq('id', p.materialId);
+        }
+      } catch (err) {
+        console.error('Purchase sync error:', err);
+        setPurchases(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
+      }
+    }
+
+    addLog('create', 'purchase', id, `Purchased ${p.quantity} from ${p.vendorName}`);
+    toast.success(`Purchase recorded and stock updated!`);
+  }, [addLog, isOnline, hasSupabaseConfig, rawMaterials]);
+
   const addRawMaterial = useCallback(async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
     const id = `rm${Date.now()}`;
     const newRM: RawMaterial = {
@@ -1666,6 +1745,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createSalaryVoucher,
       deleteSalaryVoucher,
       payCreditSale,
+      purchases,
+      addPurchase,
       hasSupabaseConfig
     }}>
       {children}

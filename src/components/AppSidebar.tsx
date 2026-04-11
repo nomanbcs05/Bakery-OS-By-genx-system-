@@ -1,6 +1,6 @@
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
-  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard, Cloud, CloudOff
+  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard, Cloud, CloudOff, ShoppingBag
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 const mainNav = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Raw Materials', url: '/raw-materials', icon: Layers },
+  { title: 'Purchases', url: '/purchases', icon: ShoppingBag },
   { title: 'Production', url: '/production', icon: Factory },
   { title: 'Production Stock', url: '/production-stock', icon: Package },
   { title: 'Dispatch', url: '/dispatch', icon: Truck },
@@ -53,8 +54,8 @@ export function AppSidebar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Production', 'Production Stock', 'Dispatch'].includes(item.title);
-    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Production Stock', 'Dispatch'].includes(item.title);
+    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
     if (isRole(['branch_staff'])) return false; // No main nav items for branch staff
     return false;
   });

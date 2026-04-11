@@ -281,6 +281,19 @@ export interface SalaryVoucher {
   syncStatus: 'synced' | 'pending';
 }
 
+export interface Purchase {
+  id: string;
+  materialId: string;
+  quantity: number;
+  totalCost: number;
+  amountPaid: number;
+  paymentMethod: 'cash' | 'credit';
+  vendorName: string;
+  vendorCity: string;
+  date: string;
+  syncStatus: 'synced' | 'pending';
+}
+
 export interface DBStaffMember {
   id: string;
   name: string;
@@ -307,5 +320,18 @@ export interface DBSalaryVoucher {
   year: number;
   date: string;
   status: 'paid';
+  sync_status: 'synced' | 'pending';
+}
+
+export interface DBPurchase {
+  id: string;
+  material_id: string;
+  quantity: number;
+  total_cost: number;
+  amount_paid: number;
+  payment_method: 'cash' | 'credit';
+  vendor_name: string;
+  vendor_city: string;
+  date: string;
   sync_status: 'synced' | 'pending';
 }
