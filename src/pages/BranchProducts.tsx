@@ -10,7 +10,7 @@ import { Navigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function BranchProducts() {
-  const { currentUser, selectedProfile, products, getBranchStock, adjustBranchStock } = useApp();
+  const { currentUser, selectedProfile, products, stock, getBranchStock, adjustBranchStock } = useApp();
 
   if (!currentUser || !selectedProfile) return <Navigate to="/login" replace />;
 
