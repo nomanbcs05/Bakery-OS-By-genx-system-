@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search } from 'lucide-react';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
 
 interface POSProps {
   branch: 'branch_1' | 'branch_2';
@@ -17,12 +18,21 @@ export default function POS({ branch }: POSProps) {
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
-  const availableProducts = products.filter(p => p.isActive).map(p => {
-    const s = stock[p.id]?.[branch] || 0;
-    return { ...p, stock: s };
-  });
+  
+  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
+
+  const availableProducts = products
+    .filter(p => p.isActive)
+    .filter(p => selectedCategory === 'All' || p.category === selectedCategory)
+    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .map(p => {
+      const s = stock[p.id]?.[branch] || 0;
+      return { ...p, stock: s };
+    });
 
   const addToCart = (productId: string) => {
     const product = getProductById(productId);
@@ -340,7 +350,30 @@ export default function POS({ branch }: POSProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Grid */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search products..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 bg-background"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide items-center">
+              {categories.map(c => (
+                <Badge 
+                  key={c}
+                  variant={selectedCategory === c ? "default" : "outline"}
+                  className="cursor-pointer whitespace-nowrap bg-background"
+                  onClick={() => setSelectedCategory(c)}
+                >
+                  {c}
+                </Badge>
+              ))}
+            </div>
+          </div>
           <div className="pos-grid">
             {availableProducts.map(p => {
               const avail = p.stock;

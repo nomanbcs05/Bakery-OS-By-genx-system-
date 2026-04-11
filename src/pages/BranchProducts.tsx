@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { PackageMinus, Settings2 } from 'lucide-react';
+import { PackageMinus, Settings2, Search } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -27,8 +27,13 @@ export default function BranchProducts() {
   // But we can fallback to branch_1 so it renders gracefully for admin preview.
   const branchView = targetBranch || 'branch_1';
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
   // Get current stock for the branch (only items where stock > 0)
   const branchStockItems = getBranchStock(branchView);
+
+  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
 
   // Map to detailed product and group by category
   const groupedProducts = useMemo(() => {
@@ -38,6 +43,9 @@ export default function BranchProducts() {
       const product = products.find(p => p.id === item.productId);
       if (!product) return;
       
+      if (selectedCategory !== 'All' && product.category !== selectedCategory) return;
+      if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) return;
+
       const category = product.category || 'Uncategorized';
       if (!groups[category]) groups[category] = [];
       
@@ -48,7 +56,7 @@ export default function BranchProducts() {
     });
     
     return groups;
-  }, [branchStockItems, products]);
+  }, [branchStockItems, products, selectedCategory, searchQuery]);
 
   const handleAdjust = () => {
     if (!selectedProductId || !adjustQuantity || parseFloat(adjustQuantity) <= 0) return;
@@ -90,6 +98,30 @@ export default function BranchProducts() {
           <p className="text-sm text-muted-foreground">
             Current stock received at {branchView === 'branch_1' ? 'Branch 1' : 'Branch 2'}. Adjust stock for wastage or counting errors.
           </p>
+        </div>
+      </div>
+      
+      <div className="flex flex-col sm:flex-row gap-4 mb-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search products..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 bg-background"
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide items-center">
+          {categories.map(c => (
+            <Badge 
+              key={c}
+              variant={selectedCategory === c ? "default" : "outline"}
+              className="cursor-pointer whitespace-nowrap bg-background"
+              onClick={() => setSelectedCategory(c)}
+            >
+              {c}
+            </Badge>
+          ))}
         </div>
       </div>
 
