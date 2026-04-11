@@ -137,6 +137,15 @@ export default function SettingsPage() {
                 >
                   <Lock className="h-3.5 w-3.5" /> Lock Profiles
                 </Button>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="h-8 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700" 
+                  onClick={seedDatabase}
+                  title="Seed Default Content"
+                >
+                  <Database className="h-3.5 w-3.5" /> Seed Menu
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => forceSync()} disabled={!isOnline} title="Force Sync">
                   <Globe className={`h-4 w-4 ${!isOnline ? 'text-muted-foreground' : 'text-primary'}`} />
                 </Button>

@@ -19,18 +19,15 @@ export default function POS({ branch }: POSProps) {
   const [cart, setCart] = useState<SaleItem[]>([]);
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
-  const branchStockItems = getBranchStock(branch);
-  const availableProducts = branchStockItems.map(s => {
-    const p = getProductById(s.productId);
-    return { ...p!, stock: s.stock };
-  }).filter(p => p !== undefined);
+  const availableProducts = products.filter(p => p.isActive).map(p => {
+    const s = stock[p.id]?.[branch] || 0;
+    return { ...p, stock: s };
+  });
 
   const addToCart = (productId: string) => {
     const product = getProductById(productId);
     if (!product) return;
-    const available = stock[productId]?.[branch] || 0;
-    const inCart = cart.find(i => i.productId === productId)?.quantity || 0;
-    if (inCart >= available) return;
+    // Removed strict stock check to ensure products are always available for selling
 
     setCart(prev => {
       const existing = prev.find(i => i.productId === productId);
@@ -44,8 +41,7 @@ export default function POS({ branch }: POSProps) {
       if (i.productId !== productId) return i;
       const newQty = i.quantity + delta;
       if (newQty <= 0) return i;
-      const available = stock[productId]?.[branch] || 0;
-      if (newQty > available) return i;
+      // if (newQty > available) return i; // removed limit
       return { ...i, quantity: newQty };
     }));
   };
@@ -348,17 +344,16 @@ export default function POS({ branch }: POSProps) {
           <div className="pos-grid">
             {availableProducts.map(p => {
               const avail = p.stock;
-              const isOutOfStock = avail <= 0;
+              const isOutOfStock = false; // Bypass stock ui disabling
               return (
                 <button
                   key={p.id}
                   onClick={() => addToCart(p.id)}
-                  disabled={isOutOfStock}
-                  className={`bg-card border border-border rounded-xl p-4 text-left hover:border-primary hover:shadow-md transition-all active:scale-[0.97] ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`bg-card border border-border rounded-xl p-4 text-left hover:border-primary hover:shadow-md transition-all active:scale-[0.97]`}
                 >
                   <p className="font-semibold text-sm text-foreground">{p.name}</p>
                   <p className="text-primary font-bold mt-1">Rs. {p.price.toFixed(2)}</p>
-                  <Badge variant={isOutOfStock ? "destructive" : "secondary"} className="mt-2 text-xs">
+                  <Badge variant={avail <= 0 ? "destructive" : "secondary"} className="mt-2 text-xs">
                     {avail} in stock
                   </Badge>
                 </button>

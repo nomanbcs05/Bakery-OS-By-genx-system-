@@ -10,14 +10,50 @@ import { supabase, hasSupabaseConfig } from '@/lib/supabase';
 
 // Sample data (used as initial state if local storage and Supabase are empty)
 const sampleProducts: Product[] = [
-  { id: 'p1', name: 'White Bread', category: 'Bread', price: 350, unit: 'loaf', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p2', name: 'Whole Wheat Bread', category: 'Bread', price: 400, unit: 'loaf', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p3', name: 'Croissant', category: 'Pastry', price: 250, unit: 'piece', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p4', name: 'Chocolate Cake', category: 'Cake', price: 2500, unit: 'piece', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p5', name: 'Baguette', category: 'Bread', price: 300, unit: 'piece', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p6', name: 'Cinnamon Roll', category: 'Pastry', price: 350, unit: 'piece', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p7', name: 'Sourdough Loaf', category: 'Bread', price: 550, unit: 'loaf', isActive: true, createdAt: '2026-04-01' },
-  { id: 'p8', name: 'Muffin', category: 'Pastry', price: 200, unit: 'piece', isActive: true, createdAt: '2026-04-01' },
+  // CAKES
+  { id: 'p1', name: 'Black Forest cake', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p2', name: 'Pineapple ice cake', category: 'Cakes', price: 550, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p3', name: 'Dry fruit cake', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p4', name: 'Three milky cake', category: 'Cakes', price: 1300, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p5', name: 'Bombay Chocolate', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p6', name: 'Bombay Coffee', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p7', name: 'Brownie Cake', category: 'Cakes', price: 700, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  
+  // M.A FROZEN ITEMS
+  { id: 'p8', name: 'Plain Paratha (5 PC)', category: 'M.A Frozen Items', price: 180, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p9', name: 'Plain Paratha (30 PC)', category: 'M.A Frozen Items', price: 850, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p10', name: 'Malai Boti Samosa (12 PC)', category: 'M.A Frozen Items', price: 500, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p11', name: 'Tikka Samosa (12 PC)', category: 'M.A Frozen Items', price: 500, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p12', name: 'Chicken Pocket (6 PC)', category: 'M.A Frozen Items', price: 300, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p13', name: 'Chinese Roll (6 PC)', category: 'M.A Frozen Items', price: 300, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p14', name: 'Macroni Samosa (12 PC)', category: 'M.A Frozen Items', price: 300, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  
+  // TEA TIME MUNCHIES
+  { id: 'p15', name: 'Khaaray', category: 'Tea Time Munchies', price: 660, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p16', name: 'Biscuits', category: 'Tea Time Munchies', price: 1100, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p17', name: 'Sugar free Biscuits', category: 'Tea Time Munchies', price: 1200, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p18', name: 'Rusks', category: 'Tea Time Munchies', price: 560, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p19', name: 'Slice cake', category: 'Tea Time Munchies', price: 150, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p20', name: 'Vegetable patties', category: 'Tea Time Munchies', price: 40, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p21', name: 'Chicken patties', category: 'Tea Time Munchies', price: 50, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p22', name: 'Rusk Cake', category: 'Tea Time Munchies', price: 1200, unit: 'kg', isActive: true, createdAt: '2026-04-11' },
+  
+  // CUPCAKES & BREADS
+  { id: 'p23', name: 'Cupcakes', category: 'Cupcakes & Breads', price: 50, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p24', name: 'Bakery bread', category: 'Cupcakes & Breads', price: 160, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p25', name: 'Pita bread', category: 'Cupcakes & Breads', price: 100, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p26', name: 'Burger buns', category: 'Cupcakes & Breads', price: 25, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  
+  // PASTERIES
+  { id: 'p27', name: 'Bombay Chocolate pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p28', name: 'Bombay Coffee pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p29', name: 'Sundae Small', category: 'Pasteries', price: 130, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p30', name: 'Sundae Large', category: 'Pasteries', price: 180, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p31', name: 'Red velvet pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p32', name: 'Black Forest pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p33', name: 'Pineapple pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p34', name: 'Brownie', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p35', name: 'Chocolate cream puff', category: 'Pasteries', price: 80, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
 ];
 
 const sampleRawMaterials: RawMaterial[] = [
@@ -215,11 +251,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isProfileLocked, setIsProfileLocked] = useState(true);
 
   // BUSINESS DATA — these persist FOREVER until user explicitly clears
-  const [products, setProducts] = useState<Product[]>(
-    initialState.products && initialState.products.length > 0 
-      ? initialState.products 
-      : sampleProducts
-  );
+  const [products, setProducts] = useState<Product[]>(() => {
+    const defaultMenu = [...sampleProducts];
+    if (initialState.products && initialState.products.length > 0) {
+      initialState.products.forEach(p => {
+        if (!defaultMenu.find(m => m.id === p.id)) {
+          defaultMenu.push(p);
+        }
+      });
+    }
+    return defaultMenu;
+  });
   
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(
     initialState.rawMaterials && initialState.rawMaterials.length > 0 
