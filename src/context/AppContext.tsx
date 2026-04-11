@@ -152,6 +152,7 @@ interface AppContextType extends AppState {
   deleteSalaryVoucher: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<boolean>;
   payCreditSale: (id: string) => Promise<void>;
+  hasSupabaseConfig: boolean;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -637,9 +638,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         
         setLastSyncTime(new Date().toISOString());
-      } catch (error) {
+      } catch (error: any) {
         console.error('Supabase fetch error:', error);
-        // On error, we still have local data from initialState (loadState)
+        if (hasSupabaseConfig) {
+          toast.error(`Database connection failed: ${error.message || 'Check your internet connection'}`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -1662,7 +1665,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteStaffDeduction,
       createSalaryVoucher,
       deleteSalaryVoucher,
-      payCreditSale
+      payCreditSale,
+      hasSupabaseConfig
     }}>
       {children}
     </AppContext.Provider>

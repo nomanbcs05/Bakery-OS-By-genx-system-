@@ -1,7 +1,7 @@
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save } from 'lucide-react';
+import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save, Cloud, CloudOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Navigate } from 'react-router-dom';
@@ -29,7 +29,8 @@ export default function SettingsPage() {
     lockProfile,
     auditLogs,
     receiptSettings,
-    updateReceiptSettings
+    updateReceiptSettings,
+    hasSupabaseConfig
   } = useApp();
 
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -132,10 +133,16 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground">System configuration and audit logs</p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <Badge variant={isOnline ? "outline" : "destructive"} className="flex gap-1.5 py-1 px-3">
-            {isOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            {isOnline ? "System Online" : "Offline Mode"}
-          </Badge>
+          <div className="flex gap-2">
+            <Badge variant={hasSupabaseConfig ? "outline" : "destructive"} className="flex gap-1.5 py-1 px-3">
+              {hasSupabaseConfig ? <Cloud className="h-3.5 w-3.5 text-green-600" /> : <CloudOff className="h-3.5 w-3.5" />}
+              {hasSupabaseConfig ? "Database Linked" : "Local Only Mode"}
+            </Badge>
+            <Badge variant={isOnline ? "outline" : "destructive"} className="flex gap-1.5 py-1 px-3">
+              {isOnline ? <Wifi className="h-3.5 w-3.5 text-blue-600" /> : <WifiOff className="h-3.5 w-3.5" />}
+              {isOnline ? "System Online" : "Offline Mode"}
+            </Badge>
+          </div>
           {lastSyncTime && (
             <span className="text-[10px] text-muted-foreground italic">
               Last sync: {new Date(lastSyncTime).toLocaleTimeString()}

@@ -1,6 +1,6 @@
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
-  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard
+  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard, Cloud, CloudOff
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -45,7 +45,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { currentUser, selectedProfile, lockProfile } = useApp();
+  const { currentUser, selectedProfile, lockProfile, hasSupabaseConfig, isOnline } = useApp();
 
   if (!currentUser || !selectedProfile) return null;
 
@@ -160,7 +160,14 @@ export function AppSidebar() {
                 {selectedProfile.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">{selectedProfile.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{selectedProfile.name}</p>
+                  {hasSupabaseConfig ? (
+                    <Cloud className={cn("h-3 w-3", isOnline ? "text-green-500" : "text-amber-500")} title={isOnline ? "Cloud Synced" : "Pending Sync"} />
+                  ) : (
+                    <CloudOff className="h-3 w-3 text-red-500" title="Local Only Mode" />
+                  )}
+                </div>
                 <Badge className={`text-[10px] px-1.5 py-0 ${roleColors[selectedProfile.role]}`}>
                   {selectedProfile.role.replace('_', ' ')}
                 </Badge>
