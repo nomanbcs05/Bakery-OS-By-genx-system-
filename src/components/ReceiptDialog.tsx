@@ -150,20 +150,22 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const isValidDate = dDate instanceof Date && !isNaN(dDate.getTime());
   const finalDate = isValidDate ? dDate : new Date();
   const dateStr = finalDate.toISOString().split('T')[0];
-  
-  // Daily serial: Count sales for this branch on this date
+  // Daily sales for this branch on this specific date
   const dailySales = sales
     .filter(s => s.branch === branch && s.date && s.date.startsWith(dateStr))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const dailySerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
-  const paddedDailySerial = String(dailySerial).padStart(1, '0');
 
-  // Global serial: Total sales count since start (Invoice #)
+  // Global serial: Total sales count since start (Permanent Invoice #)
   const globalSales = [...sales]
     .filter(s => s.date)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
   const globalSerial = globalSales.findIndex(s => s.id === saleId) + 1 || 1;
-  const paddedGlobalSerial = String(globalSerial).padStart(4, '0');
+  const paddedGlobalSerial = String(globalSerial);
+
+  // Daily serial: starts at 1 every day (Day Serial)
+  const dailySerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
+  const paddedDailySerial = String(dailySerial).padStart(4, '0');
 
   const formattedDate = finalDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = finalDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -202,16 +204,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          {/* Large Order Number Box - Daily Serial */}
-          <div className="receipt-order-num">
-            {paddedDailySerial}
-          </div>
-
-          {/* Metadata Section */}
           <div className="text-[11pt] space-y-0.5 mb-2">
             <div className="flex-row">
-              <span>Invoice #: <span className="font-bold">{paddedDailySerial}</span></span>
-              <span>DAY-{paddedGlobalSerial}</span>
+              <span className="font-bold">Invoice #: {paddedGlobalSerial}</span>
+              <span className="font-bold">Day Serial: {paddedDailySerial}</span>
             </div>
             <div className="flex-row font-bold">
               <span>Business:</span>
