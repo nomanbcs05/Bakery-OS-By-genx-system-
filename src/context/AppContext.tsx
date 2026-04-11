@@ -482,41 +482,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (rmaData && rmaData.length > 0) {
           const remoteAdjustments = rmaData.map(fromDBRawAdjustment);
           setRawMaterialAdjustments(prev => {
-            const pending = prev.filter(a => a.syncStatus === 'pending' && !remoteAdjustments.find(r => r.id === a.id));
-            return [...remoteAdjustments, ...pending];
+            const merged = [...prev];
+            remoteAdjustments.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
           });
         }
         
         if (bData && bData.length > 0) {
           const remoteBatches = bData.map(fromDBBatch);
           setBatches(prev => {
-            const pending = prev.filter(b => b.syncStatus === 'pending' && !remoteBatches.find(r => r.id === b.id));
-            return [...remoteBatches, ...pending];
+            const merged = [...prev];
+            remoteBatches.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
           });
         }
         
         if (dData && dData.length > 0) {
           const remoteDispatches = dData.map(fromDBDispatch);
           setDispatches(prev => {
-            const pending = prev.filter(d => d.syncStatus === 'pending' && !remoteDispatches.find(r => r.id === d.id));
-            return [...remoteDispatches, ...pending];
+            const merged = [...prev];
+            remoteDispatches.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
           });
         }
         
         if (sData && sData.length > 0) {
           const remoteSales = sData.map(fromDBSale);
           setSales(prev => {
-            const pendingLocal = prev.filter(s => s.syncStatus === 'pending');
-            const uniquePending = pendingLocal.filter(local => !remoteSales.find(remote => remote.id === local.id));
-            return [...remoteSales, ...uniquePending];
+            const merged = [...prev];
+            remoteSales.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
           });
         }
 
         if (eData && eData.length > 0) {
           const remoteExpenses = eData.map(fromDBExpense);
           setExpenses(prev => {
-            const pending = prev.filter(e => e.syncStatus === 'pending' && !remoteExpenses.find(r => r.id === e.id));
-            return [...remoteExpenses, ...pending];
+            const merged = [...prev];
+            remoteExpenses.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
           });
         }
         
@@ -1123,7 +1142,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSales(prev => [...prev, newSale]);
 
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('sales').insert([toDBSale(newSale)]);
+      const { error } = await supabase.from('sales').insert([toDBSale(newSale)]);
+      if (error) {
+        console.error('Failed to sync sale to cloud:', error);
+        toast.error(`Sale saved locally, but cloud sync failed: ${error.message}`);
+        // Keep offline status if cloud fails
+        setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
+      }
     }
 
     addLog('create', 'sale', id, `Sale of Rs. ${total.toFixed(2)} at ${branch || 'factory'}`);
