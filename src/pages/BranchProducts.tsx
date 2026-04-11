@@ -30,33 +30,30 @@ export default function BranchProducts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  // Get current stock for the branch (only items where stock > 0)
-  const branchStockItems = getBranchStock(branchView);
-
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
 
   // Map to detailed product and group by category
   const groupedProducts = useMemo(() => {
-    const groups: Record<string, typeof branchStockItems & { productDetails: any }[]> = {};
+    const groups: Record<string, any[]> = {};
     
-    branchStockItems.forEach(item => {
-      const product = products.find(p => p.id === item.productId);
-      if (!product) return;
-      
+    products.filter(p => p.isActive).forEach(product => {
       if (selectedCategory !== 'All' && product.category !== selectedCategory) return;
       if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) return;
 
       const category = product.category || 'Uncategorized';
       if (!groups[category]) groups[category] = [];
       
+      const stockAmount = stock[product.id]?.[branchView] || 0;
+
       groups[category].push({
-        ...item,
+        productId: product.id,
+        stock: stockAmount,
         productDetails: product
       });
     });
     
     return groups;
-  }, [branchStockItems, products, selectedCategory, searchQuery]);
+  }, [products, stock, branchView, selectedCategory, searchQuery]);
 
   const handleAdjust = () => {
     if (!selectedProductId || !adjustQuantity || parseFloat(adjustQuantity) <= 0) return;
