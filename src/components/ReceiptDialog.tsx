@@ -106,18 +106,18 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     const doc = iframe.contentWindow?.document;
     if (doc) {
       doc.open();
-      doc.write(\`
+      doc.write(`
         <html><head><title>Receipt</title>
         <style>
           @page { size: auto; margin: 0; }
-          \${commonStyles}
+          ${commonStyles}
           body { padding: 8px; }
         </style></head>
         <body>
-          \${content.innerHTML}
+          ${content.innerHTML}
           <script>window.onload = () => { window.print(); };</script>
         </body></html>
-      \`);
+      `);
       doc.close();
 
       setTimeout(() => {
