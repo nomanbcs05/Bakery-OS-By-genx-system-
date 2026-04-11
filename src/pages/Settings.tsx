@@ -44,6 +44,22 @@ export default function SettingsPage() {
     updateReceiptSettings(formReceiptSettings);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 512 * 1024) {
+      toast.error('Logo file too large. Please use an image under 512KB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormReceiptSettings(prev => ({ ...prev, logoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.role !== 'admin') return <Navigate to="/" replace />;
 
@@ -196,15 +212,29 @@ export default function SettingsPage() {
                 <Input value={formReceiptSettings.tagline} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} placeholder="Premium Fabric" />
               </div>
               <div className="space-y-2 col-span-2">
-                <Label>Logo URL (PNG/JPG)</Label>
-                <div className="flex gap-4 items-start">
+                <Label>Business Logo</Label>
+                <div className="flex gap-4 items-center">
                   <div className="flex-1 space-y-2">
-                    <Input value={formReceiptSettings.logoUrl} onChange={e => setFormReceiptSettings(s => ({ ...s, logoUrl: e.target.value }))} placeholder="https://example.com/logo.png" />
-                    <p className="text-[10px] text-muted-foreground italic">Use a high-quality transparent PNG for best results on thermal printers.</p>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleLogoUpload}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">Uploaded logo will be saved for receipts. Max size 512KB.</p>
                   </div>
                   {formReceiptSettings.logoUrl && (
-                    <div className="h-14 w-14 border rounded p-1 bg-white flex items-center justify-center shrink-0">
-                      <img src={formReceiptSettings.logoUrl} alt="Preview" className="max-h-full max-w-full object-contain filter grayscale" />
+                    <div className="relative group">
+                      <div className="h-14 w-14 border rounded p-1 bg-white flex items-center justify-center shrink-0">
+                        <img src={formReceiptSettings.logoUrl} alt="Preview" className="max-h-full max-w-full object-contain filter grayscale" />
+                      </div>
+                      <button 
+                        onClick={() => setFormReceiptSettings(s => ({ ...s, logoUrl: '' }))}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove Logo"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
                   )}
                 </div>
