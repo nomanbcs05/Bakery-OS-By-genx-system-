@@ -14,6 +14,7 @@ import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Expenses from "./pages/Expenses";
 import Accounts from "./pages/Accounts";
+import Credits from "./pages/Credits";
 import SalesHistory from "./pages/SalesHistory";
 import SalesDetails from "./pages/SalesDetails";
 import BranchProducts from "./pages/BranchProducts";
@@ -151,6 +152,11 @@ const AppRoutes = () => {
         <Route path="/accounts" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <Accounts />
+          </ProtectedRoute>
+        } />
+        <Route path="/credits" element={
+          <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+            <Credits />
           </ProtectedRoute>
         } />
 

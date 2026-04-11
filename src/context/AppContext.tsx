@@ -150,7 +150,8 @@ interface AppContextType extends AppState {
   deleteStaffDeduction: (id: string) => Promise<void>;
   createSalaryVoucher: (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => Promise<void>;
   deleteSalaryVoucher: (id: string) => Promise<void>;
-  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod) => Promise<boolean>;
+  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<boolean>;
+  payCreditSale: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -166,7 +167,9 @@ const fromDBBatch = (b: DBProductionBatch): ProductionBatch => ({
   id: b.id, batchId: b.batch_id, productId: b.product_id, quantity: b.quantity, date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
 });
 const fromDBSale = (s: DBSale): Sale => ({
-  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: s.payment_method, date: s.date, syncStatus: s.sync_status || 'synced'
+  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: s.payment_method, 
+  customerName: s.customer_name, customerPhone: s.customer_phone, isCreditPaid: s.is_credit_paid,
+  date: s.date, syncStatus: s.sync_status || 'synced'
 });
 const fromDBExpense = (e: DBExpense): Expense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branchId: e.branch_id, syncStatus: e.sync_status || 'synced'
@@ -204,7 +207,9 @@ const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
   id: b.id, batch_id: b.batchId, product_id: b.productId, quantity: b.quantity, date: b.date, notes: b.notes, sync_status: b.syncStatus
 });
 const toDBSale = (s: Sale): DBSale => ({
-  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, payment_method: s.paymentMethod, date: s.date, sync_status: s.syncStatus
+  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, payment_method: s.paymentMethod, 
+  customer_name: s.customerName, customer_phone: s.customerPhone, is_credit_paid: s.isCreditPaid,
+  date: s.date, sync_status: s.syncStatus
 });
 const toDBExpense = (e: Expense): DBExpense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branch_id: e.branchId, sync_status: e.syncStatus
@@ -1217,7 +1222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success(`Production batch deleted successfully`);
   }, [addLog, isOnline]);
 
-  const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash') => {
+  const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
     for (const item of items) {
       const available = stock[item.productId]?.production || 0;
       if (item.quantity > available) {
@@ -1246,7 +1251,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
       const walkinSale: Sale = {
         id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems,
-        total, paymentMethod: paymentMethod, date: new Date().toISOString().slice(0, 10),
+        total, paymentMethod: paymentMethod, 
+        customerName, customerPhone, isCreditPaid: paymentMethod === 'cash' || paymentMethod === 'card',
+        date: new Date().toISOString().slice(0, 10),
         syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
       };
       
@@ -1260,6 +1267,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success(`Dispatch to ${destination.replace('_', ' ')} confirmed`);
     return true;
   }, [stock, products, addLog, isOnline]);
+
+  const payCreditSale = useCallback(async (id: string) => {
+    setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id);
+    }
+    toast.success('Credit payment recorded');
+  }, [isOnline]);
 
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
     if (type === 'branch' && branch) {
@@ -1644,7 +1659,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateStaffDeduction,
       deleteStaffDeduction,
       createSalaryVoucher,
-      deleteSalaryVoucher
+      deleteSalaryVoucher,
+      payCreditSale
     }}>
       {children}
     </AppContext.Provider>

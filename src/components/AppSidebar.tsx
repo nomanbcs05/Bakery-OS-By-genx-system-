@@ -1,6 +1,5 @@
-import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
-  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet
+  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +36,7 @@ const managementNav = [
   { title: 'Reports', url: '/reports', icon: BarChart3 },
   { title: 'Expenses', url: '/expenses', icon: Receipt },
   { title: 'Accounts', url: '/accounts', icon: Wallet },
+  { title: 'Credits', url: '/credits', icon: CreditCard },
   { title: 'Settings', url: '/settings', icon: Settings },
 ];
 
@@ -70,7 +70,7 @@ export function AppSidebar() {
 
   const filteredManagementNav = managementNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts'].includes(item.title);
+    if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts', 'Credits'].includes(item.title);
     if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses'].includes(item.title);
     return false;
   });

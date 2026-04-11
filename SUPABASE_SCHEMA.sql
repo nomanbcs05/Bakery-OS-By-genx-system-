@@ -287,5 +287,19 @@ BEGIN
   END IF;
 END $$;
 
+-- 14. Credit Tracking Columns in Sales
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='customer_name') THEN
+    ALTER TABLE sales ADD COLUMN customer_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='customer_phone') THEN
+    ALTER TABLE sales ADD COLUMN customer_phone TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='is_credit_paid') THEN
+    ALTER TABLE sales ADD COLUMN is_credit_paid BOOLEAN DEFAULT false;
+  END IF;
+END $$;
+
 -- Forcefully refresh the PostgREST API schema cache
 NOTIFY pgrst, 'reload schema';

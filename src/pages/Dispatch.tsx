@@ -15,6 +15,7 @@ import { Navigate } from 'react-router-dom';
 import GOTDialog from '@/components/GOTDialog';
 import ReceiptDialog from '@/components/ReceiptDialog';
 import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
+import { toast } from 'sonner';
 
 export default function DispatchPage() {
   const { currentUser, products, stock, createDispatch, dispatches, getProductById } = useApp();
@@ -27,6 +28,9 @@ export default function DispatchPage() {
   const [showGOT, setShowGOT] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMethod>('cash');
+  const [custName, setCustName] = useState('');
+  const [custPhone, setCustPhone] = useState('');
   
   const [receiptData, setReceiptData] = useState<{
     open: boolean;
@@ -61,6 +65,11 @@ export default function DispatchPage() {
   const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
     
+    if (paymentMeth === 'credit' && (!custName || !custPhone)) {
+      toast.error('Name and Phone number are required for credit sales');
+      return;
+    }
+
     // Prepare receipt data if walk-in
     let currentSaleId = `SL-${Date.now().toString(36).toUpperCase()}`;
     let receiptItems = items.map(i => ({
@@ -70,7 +79,7 @@ export default function DispatchPage() {
     }));
     let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    const success = await createDispatch(destination, items, paymentMeth);
+    const success = await createDispatch(destination, items, paymentMeth, custName, custPhone);
     if (success) {
       if (destination === 'walkin') {
         setReceiptData({
@@ -85,6 +94,8 @@ export default function DispatchPage() {
       setItems([]);
       setDestination('');
       setIsPaymentOpen(false);
+      setCustName('');
+      setCustPhone('');
     }
   };
 
@@ -212,18 +223,46 @@ export default function DispatchPage() {
             <DialogTitle>Complete Factory Sale</DialogTitle>
             <DialogDescription>Select payment method for this walk-in dispatch</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <Button variant="outline" className="h-24 flex flex-col gap-2 border-2 hover:border-primary" onClick={() => handleDispatch('cash')}>
-              <Banknote className="h-8 w-8 text-success" />
-              <span>Cash Payment</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex flex-col gap-2 border-2 hover:border-primary" onClick={() => handleDispatch('credit')}>
-              <CreditCard className="h-8 w-8 text-info" />
-              <span>Credit (Baki)</span>
-            </Button>
+          
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <Button 
+                variant={paymentMode === 'cash' ? "default" : "outline"} 
+                className="h-20 flex flex-col gap-1 border-2" 
+                onClick={() => setPaymentMode('cash')}
+              >
+                <Banknote className="h-6 w-6" />
+                <span className="text-xs">Cash</span>
+              </Button>
+              <Button 
+                variant={paymentMode === 'credit' ? "default" : "outline"} 
+                className="h-20 flex flex-col gap-1 border-2" 
+                onClick={() => setPaymentMode('credit')}
+              >
+                <CreditCard className="h-6 w-6" />
+                <span className="text-xs">Credit</span>
+              </Button>
+            </div>
+
+            {paymentMode === 'credit' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-1">
+                  <Label>Customer Name</Label>
+                  <Input value={custName} onChange={e => setCustName(e.target.value)} placeholder="Enter name" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Phone Number</Label>
+                  <Input value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="03xx-xxxxxxx" />
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsPaymentOpen(false)} className="w-full">Cancel</Button>
+          
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button className="w-full" onClick={() => handleDispatch(paymentMode)}>
+              Confirm & Print Bill
+            </Button>
+            <Button variant="ghost" onClick={() => setIsPaymentOpen(false)} className="w-full text-xs">Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

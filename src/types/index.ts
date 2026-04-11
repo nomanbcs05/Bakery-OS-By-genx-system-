@@ -82,6 +82,9 @@ export interface Sale {
   items: SaleItem[];
   total: number;
   paymentMethod: PaymentMethod;
+  customerName?: string;
+  customerPhone?: string;
+  isCreditPaid?: boolean;
   date: string;
   syncStatus: 'synced' | 'pending';
 }
@@ -160,6 +163,9 @@ export interface DBSale {
   items: SaleItem[];
   total: number;
   payment_method: PaymentMethod;
+  customer_name?: string;
+  customer_phone?: string;
+  is_credit_paid?: boolean;
   date: string;
   sync_status: 'synced' | 'pending';
 }
