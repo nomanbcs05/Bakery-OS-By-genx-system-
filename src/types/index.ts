@@ -237,4 +237,8 @@ export interface ReceiptSettings {
   footerMessage1: string;
   footerMessage2: string;
   printedBy: string;
+  branch1Location: string;
+  branch1OnlineOrder: string;
+  branch2Location: string;
+  branch2OnlineOrder: string;
 }

@@ -244,10 +244,31 @@ export default function SettingsPage() {
                 <Input value={formReceiptSettings.address} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} placeholder="Nawabshah, Pakistan" />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
+                <Label>Main Phone</Label>
                 <Input value={formReceiptSettings.phone} onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} placeholder="03111855990" />
               </div>
-              <div className="space-y-2 col-span-2">
+              
+              {/* Branch Information */}
+              <div className="grid grid-cols-2 gap-4 col-span-2 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label>Branch 1 Name/Loc</Label>
+                  <Input value={formReceiptSettings.branch1Location} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Location: e.target.value }))} placeholder="DHAMRA ROAD" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch 1 Order #</Label>
+                  <Input value={formReceiptSettings.branch1OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1OnlineOrder: e.target.value }))} placeholder="03297040402" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch 2 Name/Loc</Label>
+                  <Input value={formReceiptSettings.branch2Location} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Location: e.target.value }))} placeholder="JAM SAHAB RD" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Branch 2 Order #</Label>
+                  <Input value={formReceiptSettings.branch2OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2OnlineOrder: e.target.value }))} placeholder="03093660360" />
+                </div>
+              </div>
+
+              <div className="space-y-2 col-span-2 pt-2 border-t">
                 <Label>Footer Message 1</Label>
                 <Input value={formReceiptSettings.footerMessage1} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} placeholder="Thank you for shopping with elegance." />
               </div>

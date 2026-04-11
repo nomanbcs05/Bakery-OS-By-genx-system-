@@ -293,7 +293,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     phone: '0311-4610599, 0334-3610599',
     footerMessage1: '!!!!FOR THE LOVE OF FOOD !!!!',
     footerMessage2: 'POWERED BY: GENAI TECHNOLOGY +923342826675',
-    printedBy: 'DESIGNED & DEVELOPED BY GENAI TECH'
+    printedBy: 'DESIGNED & DEVELOPED BY GENAI TECH',
+    branch1Location: 'DHAMRA ROAD',
+    branch1OnlineOrder: '03297040402',
+    branch2Location: 'JAM SAHAB RD',
+    branch2OnlineOrder: '03093660360'
   };
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
