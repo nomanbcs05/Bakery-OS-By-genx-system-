@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer, QrCode } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 interface ReceiptDialogProps {
@@ -39,57 +39,48 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       doc.write(`
         <html><head><title>Receipt</title>
         <style>
+          @page { size: auto; margin: 0; }
           body { 
-            font-family: Arial, sans-serif; 
+            font-family: 'Courier New', Courier, monospace; 
             font-size: 11px; 
             color: #000; 
             background: #fff;
             margin: 0; 
             padding: 10px; 
-            width: 280px; 
+            width: 260px; 
           }
           .text-center { text-align: center; }
           .text-right { text-align: right; }
           .font-bold { font-weight: bold; }
           .uppercase { text-transform: uppercase; }
-          .border-y { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; }
-          .border-b { border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
-          .border-t { border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
-          .double-border-b { border-bottom: 3px double #000; padding-bottom: 4px; margin-bottom: 4px; }
-          .flex-between { display: flex; justify-content: space-between; align-items: center; }
-          .grid-meta { display: grid; grid-template-columns: 100px 1fr; gap: 2px; margin-bottom: 8px; }
+          .border-full { border: 1.5px solid #000; padding: 6px; margin-bottom: 8px; }
+          .border-b { border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 4px; }
+          .dashed-t { border-top: 1px dashed #000; padding-top: 4px; margin-top: 4px; }
+          .flex-between { display: flex; justify-content: space-between; align-items: start; }
+          .order-num-box { border: 2px solid #000; padding: 4px; margin: 8px 0; font-size: 24px; font-weight: bold; text-align: center; }
           
-          .brand-name { font-family: 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; margin: 4px 0; }
-          .tagline { font-family: 'Times New Roman', Times, serif; font-size: 12px; font-style: italic; }
-          .branch-name { font-size: 14px; font-weight: bold; margin: 4px 0; }
-          .address-text { font-size: 9px; line-height: 1.2; }
+          .meta-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+          .meta-label { font-weight: bold; }
           
-          .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr; font-weight: bold; font-size: 10px; }
-          .item-row { margin-top: 4px; font-size: 10px; }
-          .item-details { display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; padding-left: 20%; color: #333; margin-top: 2px; }
+          .table-header { display: flex; border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; font-weight: bold; }
+          .w-qty { width: 30px; }
+          .w-item { flex: 1; padding: 0 4px; }
+          .w-rate { width: 50px; text-align: right; }
+          .w-amount { width: 60px; text-align: right; }
           
-          .totals-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px; }
+          .item-row { display: flex; align-items: start; margin-bottom: 4px; line-height: 1.2; }
           
-          .box { border: 1px solid #000; padding: 4px; }
+          .totals-section { margin-top: 8px; border-top: 1px solid #000; padding-top: 4px; }
+          .highlight-row { background: #f0f0f0; margin: 4px 0; padding: 2px 0; font-size: 14px; display: flex; justify-content: space-between; font-weight: bold; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+          
+          @media print { 
+            body { padding: 0; width: 100%; } 
+            .highlight-row { -webkit-print-color-adjust: exact; background: #eee !important; }
+          }
         </style></head>
         <body>
-        <div class="text-center" style="margin-bottom: 12px;">
-          ${receiptSettings?.logoUrl 
-            ? `<img src="${receiptSettings.logoUrl}" style="max-height: 60px; max-width: 150px; margin-bottom: 8px; filter: grayscale(1);" />`
-            : `<div class="flex-center" style="margin-bottom: 4px;">
-                <svg width="40" height="24" viewBox="0 0 100 60" fill="currentColor" style="margin: 0 auto;">
-                  <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
-                  <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
-                </svg>
-              </div>`
-          }
-        </div>
-        ${content.innerHTML}
-        <script>
-           window.onload = () => {
-             window.print();
-           };
-        </script>
+          ${content.innerHTML}
+          <script>window.onload = () => { window.print(); };</script>
         </body></html>
       `);
       doc.close();
@@ -110,208 +101,126 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
   }, [open, autoPrint]);
 
-  const formattedDate = new Date(date).toLocaleString('en-GB', { 
-    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', 
-    hour: 'numeric', minute: '2-digit', hour12: true 
-  }).replace(',', '');
-
-  const totalQty = items.reduce((acc, item) => acc + item.quantity, 0);
-  const gst = 0; // Replace with actual GST calculation if needed
-  const grossAmount = total - gst;
+  const shortId = saleId.slice(-2).padStart(2, '0');
+  const dDate = new Date(date);
+  const formattedDate = dDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+  const formattedTime = dDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-center">Print Receipt</DialogTitle>
-        </DialogHeader>
-
-        <div className="bg-white text-black p-4 mx-auto w-[300px] border shadow-sm" ref={receiptRef}>
-          {/* Logo & Header */}
-          <div className="text-center mb-3">
+      <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
+        <div className="bg-white text-black p-4 mx-auto w-full max-w-[280px] shadow-sm border border-stone-200" ref={receiptRef} style={{ fontFamily: '"Courier New", Courier, monospace' }}>
+          
+          {/* Header Box */}
+          <div className="border-[1.5px] border-black p-2 text-center mb-2">
             {receiptSettings?.logoUrl ? (
-              <div className="flex justify-center mb-2">
-                <img 
-                  src={receiptSettings.logoUrl} 
-                  alt="Logo" 
-                  className="max-h-[60px] max-width-[150px] object-contain filter grayscale" 
-                />
-              </div>
+              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[150px] mx-auto mb-2 object-contain filter grayscale" />
             ) : (
-              <div className="flex justify-center mb-1">
-                <svg width="40" height="24" viewBox="0 0 100 60" fill="currentColor">
-                  {/* Decorative logo simulation */}
-                  <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
-                  <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
-                </svg>
-              </div>
+               <div className="flex justify-center mb-1">
+                 <svg width="60" height="40" viewBox="0 0 100 60" fill="currentColor">
+                   <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
+                   <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
+                 </svg>
+               </div>
             )}
-            <div className="font-serif text-[22px] font-bold leading-tight tracking-tight" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-              {receiptSettings?.brandName || 'Rehmat-e-Shereen'}
+            
+            <div className="text-[10px] leading-tight whitespace-pre-line mb-1">
+              {receiptSettings?.address}
             </div>
-            <div className="font-serif text-[12px] italic mb-1" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-              {receiptSettings?.tagline || 'make life delicious'}
+            <div className="text-[10px] font-bold mb-1">
+              {receiptSettings?.phone}
             </div>
-            <div className="text-[14px] font-bold mb-1">
-              {branch.toUpperCase()}
-            </div>
-            <div className="text-[9px] leading-tight">
-              {receiptSettings?.address || 'Main Branch, KARACHI, Pakistan'}
-            </div>
-            <div className="text-[9px] font-bold mt-1">
-              UAN #: {receiptSettings?.phone || '021 111 111 111'}
+            
+            <div className="border-t border-black border-dotted my-1"></div>
+            <div className="text-[9px] font-bold">
+              {receiptSettings?.printedBy}
             </div>
           </div>
 
-          <div className="text-center font-bold text-[12px] border-y border-black py-1 mb-2">
-            Sale Receipt
+          {/* Large Order Number Box */}
+          <div className="border-[1.5px] border-black py-1 text-center text-2xl font-bold mb-2">
+            {shortId}
           </div>
 
-          {/* Meta Details */}
-          <div className="grid grid-cols-[100px_1fr] gap-x-1 gap-y-1 text-[11px] mb-2">
-            <div className="font-bold">Invoice #</div>
-            <div>: {saleId.slice(0, 8).toUpperCase()}</div>
-            
-            <div className="font-bold">Operator Name</div>
-            <div>: {currentUser?.name || 'SYS_ADMIN'}</div>
-            
-            <div className="font-bold">Invoice Date</div>
-            <div>: {formattedDate}</div>
-            
-            <div className="font-bold">Client Name</div>
-            <div>: Walk-in Customer</div>
-            
-            <div className="font-bold">SalesMan</div>
-            <div>: {currentUser?.id?.slice(0, 6) || '000001'}</div>
-            
-            <div className="font-bold">Counter</div>
-            <div>: MAIN COUNTER</div>
-            
-            <div className="font-bold">Reference #</div>
-            <div>: 0</div>
+          {/* Metadata Section */}
+          <div className="space-y-0.5 text-[11px] mb-2">
+            <div className="flex justify-between">
+              <span>Invoice #: <span className="font-bold">{shortId}</span></span>
+              <span>DAY-{(parseInt(shortId) + 1000).toString().padStart(4, '0')}</span>
+            </div>
+            <div className="flex justify-between items-start">
+              <span className="font-bold">Restaurant:</span>
+              <span className="font-bold text-right uppercase">{receiptSettings?.brandName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Cashier:</span>
+              <span>{currentUser?.name || 'SYS_ADMIN'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Type:</span>
+              <span className="font-bold uppercase">WALK IN</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{formattedDate}</span>
+              <span>{formattedTime}</span>
+            </div>
           </div>
 
-          {/* Table Header */}
-          <div className="border-y border-black py-1 mb-1 bg-gray-50 flex text-[9px] font-bold">
-            <div className="w-[45%]">Item Name</div>
-            <div className="w-[15%] text-right">Price</div>
-            <div className="w-[15%] text-center">Qty/Wt</div>
-            <div className="w-[12%] text-center">Tax %</div>
-            <div className="w-[13%] text-right">Amount</div>
-          </div>
-
-          {/* Category Example */}
-          <div className="text-center font-bold text-[10px] my-1 tracking-wider border-b border-black pb-1">
-            ITEMS
-          </div>
-
-          {/* Items List */}
-          <div className="mb-2 min-h-[50px]">
-            {items.map((item, i) => (
-              <div key={i} className="mb-2 text-[10px]">
-                <div className="truncate">{String(i + 1).padStart(5, '0')} {item.name}</div>
-                <div className="flex w-full text-gray-700 mt-[2px]">
-                  <div className="w-[15%]"></div>
-                  <div className="w-[30%] text-right">{item.unitPrice.toLocaleString()}</div>
-                  <div className="w-[25%] text-center">{item.quantity}.000 P</div>
-                  <div className="w-[15%] text-center">0.00%</div>
-                  <div className="w-[15%] text-right text-black">{((item.quantity * item.unitPrice)).toLocaleString()}</div>
+          {/* Table */}
+          <div className="border-t-[1.5px] border-black pt-1">
+            <div className="flex font-bold text-[11px] border-b border-black pb-0.5 mb-1">
+              <div className="w-[30px]">Qty</div>
+              <div className="flex-1 px-1">Item</div>
+              <div className="w-[50px] text-right">Rate</div>
+              <div className="w-[60px] text-right">Amount</div>
+            </div>
+            
+            <div className="space-y-1 min-h-[40px]">
+              {items.map((item, i) => (
+                <div key={i} className="flex items-start text-[10px] leading-[1.1]">
+                  <div className="w-[30px] font-bold">{item.quantity}</div>
+                  <div className="flex-1 px-1 uppercase">{item.name}</div>
+                  <div className="w-[50px] text-right">{item.unitPrice}</div>
+                  <div className="w-[60px] text-right font-bold">{(item.quantity * item.unitPrice)}</div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Footer Totals */}
-          <div className="border-y border-black py-1 flex justify-between font-bold text-[10px] px-2 mb-2">
-            <span>Total Item <span className="ml-4">{items.length}</span></span>
-            <span>Total Qty <span className="ml-4">{totalQty}</span></span>
-          </div>
-
-          <div className="text-[11px] space-y-1 mb-2">
+          {/* Totals Section */}
+          <div className="mt-4 space-y-0.5 text-[11px]">
             <div className="flex justify-between">
-              <span>Gross Amount</span>
-              <span className="font-bold">{grossAmount.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>On Invoice Discount</span>
-              <span className="border-b border-black border-dashed flex-1 mx-2 relative top-[-4px]"></span>
-              <div className="flex justify-end min-w-[60px]">
-                <span className="mr-4">(0.00%)</span>
-                <span>0.00</span>
-              </div>
-            </div>
-            <div className="flex justify-between">
-              <span>G.S.T</span>
-              <span className="border-b border-black border-dashed flex-1 mx-2 relative top-[-4px]"></span>
-              <span className="font-bold">{gst.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Other Charges */}
-          <div className="text-[11px] mb-2">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="border-t border-black flex-1"></span>
-              <span className="font-bold">Other Charges Detail</span>
-              <span className="border-t border-black flex-1"></span>
-            </div>
-            <div className="flex justify-between pl-2">
-              <span className="italic text-[10px]">Fbr Service Fee</span>
-              <span className="border-b border-black border-dashed flex-1 mx-2 relative top-[-4px]"></span>
-              <span>1</span>
-            </div>
-            <div className="flex justify-between font-bold mt-1">
-              <span>Total Charges</span>
-              <span className="border-b border-black flex-1 mx-2 relative top-[-4px]"></span>
-              <span>1</span>
-            </div>
-          </div>
-
-          {/* Net Amount */}
-          <div className="border-t-[1px] border-b-[3px] border-black border-double py-1 mb-3 flex justify-between items-center bg-gray-50">
-            <span className="font-bold text-[13px]">Net Amount</span>
-            <span className="font-bold text-[15px]">{(total + 1).toLocaleString()}</span>
-          </div>
-
-          {/* FBR Info */}
-          <div className="text-center mb-3">
-            <div className="font-bold text-[11px]">FBR Invoice #</div>
-            <div className="text-[10px] tracking-widest">{saleId.replace(/[^0-9]/g, '').padEnd(16, '0').slice(0, 16)}</div>
-            
-            <div className="flex justify-center items-center gap-4 mt-2">
-              <div className="text-[9px] font-bold border border-black p-1 text-center w-20 uppercase">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 mx-auto mb-1" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                POS<br/>System
-              </div>
-              <div className="border border-black p-1">
-                <QrCode size={40} strokeWidth={1} />
-              </div>
+              <span>SubTotal :</span>
+              <span className="font-bold">{total}</span>
             </div>
             
-            <div className="text-[9px] mt-2 italic leading-tight px-4">
-              Verify this invoice through FBR TaxAsaan MobileApp or SMS at 9966 and win exciting prizes in draw
+            <div className="bg-gray-100 border-y border-black font-bold flex justify-between py-0.5 px-1 items-center my-1">
+              <span className="text-sm">Net Bill :</span>
+              <span className="text-lg">{total}</span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span>TIP :</span>
+              <span></span>
             </div>
           </div>
 
-          {/* Payment Info */}
-          <div className="border border-black flex flex-col text-[11px]">
-            <div className="flex justify-between p-1 border-b border-black">
-              <span className="font-bold">Cash Paid</span>
-              <span>{(total + 1).toLocaleString()}</span>
+          {/* Footer Box */}
+          <div className="border-[1.5px] border-black p-1 text-center mt-3">
+            <div className="font-bold text-[10px] mb-0.5">
+              {receiptSettings?.footerMessage1}
             </div>
-            <div className="flex justify-between p-1 bg-gray-100">
-              <span className="font-bold">Cash Back</span>
-              <span>-</span>
+            <div className="text-[8px] leading-tight">
+              {receiptSettings?.footerMessage2}
             </div>
           </div>
 
         </div>
 
-        <DialogFooter className="flex gap-2 sm:gap-2 mt-4">
-          <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
-          <Button onClick={handlePrint} className="flex-1 shrink-0">
-            <Printer className="h-4 w-4 mr-1" /> Print Receipt
+        <DialogFooter className="flex flex-row gap-2 mt-4">
+          <Button variant="outline" onClick={onClose} className="flex-1 bg-white hover:bg-stone-50 border-stone-300">Close Preview</Button>
+          <Button onClick={handlePrint} className="flex-1 bg-black text-white hover:bg-stone-900 border-none">
+            <Printer className="h-4 w-4 mr-2" /> Print Receipt
           </Button>
         </DialogFooter>
       </DialogContent>

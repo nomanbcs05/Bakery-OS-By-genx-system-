@@ -286,14 +286,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(initialState.lastSyncTime || null);
   
   const defaultReceiptSettings: ReceiptSettings = {
-    brandName: 'Sultan-E-Libas by Elegance',
-    tagline: 'Premium Fabric',
+    brandName: 'CRUST & CRUMS',
+    tagline: 'PREMIUM BAKERY',
     logoUrl: '',
-    address: 'Nawabshah, Pakistan',
-    phone: '03111855990',
-    footerMessage1: 'Thank you for shopping with elegance.',
-    footerMessage2: 'For quality assurance, cut pieces cannot be returned or exchanged.',
-    printedBy: 'GENX CLOUD, NAWABSHAH +923342826675'
+    address: 'Near Al Habib bank, Shahdadpur road\nIserpura, Nawabshah',
+    phone: '0311-4610599, 0334-3610599',
+    footerMessage1: '!!!!FOR THE LOVE OF FOOD !!!!',
+    footerMessage2: 'POWERED BY: GENAI TECHNOLOGY +923342826675',
+    printedBy: 'DESIGNED & DEVELOPED BY GENAI TECH'
   };
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
