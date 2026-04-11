@@ -23,26 +23,35 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const commonStyles = `
     body { 
       font-family: 'Courier New', Courier, monospace; 
-      font-size: 11px; 
+      font-size: 11pt; 
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 290px; 
+      width: 300px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .font-bold { font-weight: bold; }
     .uppercase { text-transform: uppercase; }
     
+    .receipt-logo {
+      max-height: 70pt !important;
+      max-width: 200pt !important;
+      margin: 0 auto 5pt auto;
+      display: block;
+      object-fit: contain;
+      filter: grayscale(1);
+    }
+
     .receipt-box { 
       border: 1.5pt solid #000 !important; 
-      padding: 6px; 
-      margin-bottom: 8px; 
+      padding: 6pt; 
+      margin-bottom: 8pt; 
     }
     .receipt-order-num { 
       border: 2pt solid #000 !important; 
-      padding: 6px; 
-      margin: 8px 0; 
+      padding: 6pt; 
+      margin: 8pt 0; 
       font-size: 22pt; 
       font-weight: bold; 
       text-align: center; 
@@ -50,18 +59,18 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
     .receipt-divider { 
       border-top: 1.5pt dashed #000; 
-      margin: 4px 0; 
+      margin: 4pt 0; 
     }
     .receipt-line { 
       border-top: 1.5pt solid #000; 
-      margin: 4px 0; 
+      margin: 4pt 0; 
     }
     
     .flex-row { display: flex; justify-content: space-between; }
     .highlight-bill { 
       border-top: 1pt solid #000; 
       border-bottom: 2pt solid #000; 
-      padding: 4px 2px; 
+      padding: 4pt 2pt; 
       font-size: 14pt; 
       font-weight: bold; 
       display: flex; 
@@ -73,8 +82,8 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       border-bottom: 1.5pt solid #000; 
       font-weight: bold; 
       display: flex; 
-      margin-bottom: 4px; 
-      padding-bottom: 2px;
+      margin-bottom: 4pt; 
+      padding-bottom: 2pt;
     }
     .w-qty { width: 40px; }
     .w-item { flex: 1; padding: 0 4px; }
@@ -111,7 +120,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <style>
           @page { size: auto; margin: 0; }
           ${commonStyles}
-          body { padding: 8px; }
+          body { padding: 10px; }
         </style></head>
         <body>
           ${content.innerHTML}
@@ -150,7 +159,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           {/* Header Box */}
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
-              <img src={receiptSettings.logoUrl} alt="Logo" className="max-h-16 max-w-[200px] mx-auto mb-2 object-contain filter grayscale" />
+              <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" />
             ) : (
                <div className="flex justify-center mb-1">
                  <svg width="60" height="40" viewBox="0 0 100 60" fill="currentColor">
