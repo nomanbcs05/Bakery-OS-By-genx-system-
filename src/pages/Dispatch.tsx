@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, Printer } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { DispatchDestination, DispatchItem } from '@/types';
 import { Navigate } from 'react-router-dom';
+import GOTDialog from '@/components/GOTDialog';
 
 export default function DispatchPage() {
   const { currentUser, products, stock, createDispatch, dispatches, getProductById } = useApp();
@@ -20,6 +21,7 @@ export default function DispatchPage() {
   const [items, setItems] = useState<DispatchItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [qty, setQty] = useState('');
+  const [showGOT, setShowGOT] = useState(false);
 
   const addItem = () => {
     if (!selectedProduct || !qty || parseInt(qty) <= 0) return;
@@ -42,6 +44,19 @@ export default function DispatchPage() {
       setItems([]);
       setDestination('');
     }
+  };
+
+  const [historyItems, setHistoryItems] = useState<{ name: string; quantity: number }[]>([]);
+  const [historyDest, setHistoryDest] = useState('');
+  const [showHistoryGOT, setShowHistoryGOT] = useState(false);
+
+  const printHistoryGOT = (items: any[], dest: string) => {
+    setHistoryItems(items.map(i => ({ 
+      name: getProductById(i.productId)?.name || 'Unknown', 
+      quantity: i.quantity 
+    })));
+    setHistoryDest(dest);
+    setShowHistoryGOT(true);
   };
 
   const availableProducts = products.filter(p => (stock[p.id]?.production || 0) > 0);
@@ -116,11 +131,31 @@ export default function DispatchPage() {
             <Alert><AlertCircle className="h-4 w-4" /><AlertDescription>Walk-in dispatch will automatically record as a factory gate sale.</AlertDescription></Alert>
           )}
 
-          <Button onClick={handleDispatch} disabled={!destination || items.length === 0} className="w-full sm:w-auto">
-            Confirm Dispatch
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleDispatch} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
+              Confirm Dispatch
+            </Button>
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowGOT(true)} 
+              disabled={items.length === 0}
+              className="flex-1 sm:flex-none"
+            >
+              <Printer className="h-4 w-4 mr-2" /> GOT
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      <GOTDialog 
+        open={showGOT}
+        onClose={() => setShowGOT(false)}
+        destination={destination}
+        items={items.map(i => ({ 
+          name: getProductById(i.productId)?.name || 'Unknown', 
+          quantity: i.quantity 
+        }))}
+      />
 
       {/* Dispatch History */}
       <Card>
@@ -133,6 +168,7 @@ export default function DispatchPage() {
                 <TableHead>Destination</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -147,15 +183,32 @@ export default function DispatchPage() {
                     })}
                   </TableCell>
                   <TableCell><Badge className="bg-success text-success-foreground">{d.status}</Badge></TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => printHistoryGOT(d.items, d.destination)}
+                      className="h-8 w-8 p-0"
+                      title="Print GOT"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {dispatches.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No dispatches yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No dispatches yet</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      <GOTDialog 
+        open={showHistoryGOT}
+        onClose={() => setShowHistoryGOT(false)}
+        destination={historyDest}
+        items={historyItems}
+      />
     </div>
   );
 }
