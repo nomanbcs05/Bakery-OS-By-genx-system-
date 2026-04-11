@@ -241,4 +241,6 @@ export interface ReceiptSettings {
   branch1OnlineOrder: string;
   branch2Location: string;
   branch2OnlineOrder: string;
+  branch1Cashier: string;
+  branch2Cashier: string;
 }

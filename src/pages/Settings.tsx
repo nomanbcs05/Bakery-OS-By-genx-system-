@@ -259,12 +259,20 @@ export default function SettingsPage() {
                   <Input value={formReceiptSettings.branch1OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1OnlineOrder: e.target.value }))} placeholder="03297040402" />
                 </div>
                 <div className="space-y-2">
+                  <Label>Branch 1 Cashier</Label>
+                  <Input value={formReceiptSettings.branch1Cashier} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Cashier: e.target.value }))} placeholder="M. Ali" />
+                </div>
+                <div className="space-y-2 pt-2 border-t mt-2">
                   <Label>Branch 2 Name/Loc</Label>
                   <Input value={formReceiptSettings.branch2Location} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Location: e.target.value }))} placeholder="JAM SAHAB RD" />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 pt-2 border-t mt-2">
                   <Label>Branch 2 Order #</Label>
                   <Input value={formReceiptSettings.branch2OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2OnlineOrder: e.target.value }))} placeholder="03093660360" />
+                </div>
+                <div className="space-y-2 pt-2 border-t mt-2">
+                  <Label>Branch 2 Cashier</Label>
+                  <Input value={formReceiptSettings.branch2Cashier} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Cashier: e.target.value }))} placeholder="Faisal" />
                 </div>
               </div>
 

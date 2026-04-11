@@ -18,7 +18,7 @@ interface ReceiptDialogProps {
 
 export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date, autoPrint }: ReceiptDialogProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const { receiptSettings, currentUser } = useApp();
+  const { receiptSettings, sales } = useApp();
 
   const commonStyles = `
     body { 
@@ -52,7 +52,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       border: 2pt solid #000 !important; 
       padding: 6pt; 
       margin: 8pt 0; 
-      font-size: 22pt; 
+      font-size: 26pt; 
       font-weight: bold; 
       text-align: center; 
       display: block;
@@ -145,10 +145,26 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
   }, [open, autoPrint]);
 
-  const shortId = saleId.slice(-4).toUpperCase();
+  // Logic for sequential numbering
   const dDate = new Date(date);
+  const dateStr = dDate.toISOString().split('T')[0];
+  
+  // Daily serial: Count sales for this branch on this date
+  const dailySales = sales
+    .filter(s => s.branch === branch && s.date.startsWith(dateStr))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const dailySerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
+  const paddedDailySerial = String(dailySerial).padStart(1, '0'); // User showed "Y1", so just "1" is fine or "01"
+
+  // Global serial: Total sales count since start (Invoice #)
+  const globalSales = [...sales].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const globalSerial = globalSales.findIndex(s => s.id === saleId) + 1 || 1;
+  const paddedGlobalSerial = String(globalSerial).padStart(4, '0');
+
   const formattedDate = dDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = dDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  const cashierName = branch === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -169,7 +185,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
                </div>
             )}
             
-            <div className="text-[10pt] leading-tight whitespace-pre-line mb-1">
+            <div className="text-[10pt] leading-tight whitespace-pre-line mb-1 font-bold">
               {receiptSettings?.address}
             </div>
             <div className="text-[10pt] font-bold">
@@ -182,24 +198,24 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          {/* Large Order Number Box */}
+          {/* Large Order Number Box - Daily Serial */}
           <div className="receipt-order-num">
-            {shortId.slice(-2)}
+            {paddedDailySerial}
           </div>
 
           {/* Metadata Section */}
           <div className="text-[11pt] space-y-0.5 mb-2">
             <div className="flex-row">
-              <span>Invoice #: <span className="font-bold">{shortId.slice(-2)}</span></span>
-              <span>DAY-{shortId}</span>
+              <span>Invoice #: <span className="font-bold">{paddedDailySerial}</span></span>
+              <span>DAY-{paddedGlobalSerial}</span>
             </div>
             <div className="flex-row font-bold">
               <span>Restaurant:</span>
-              <span className="uppercase">{receiptSettings?.brandName}</span>
+              <span className="uppercase">M.A BAKER'S</span>
             </div>
             <div className="flex-row">
               <span>Cashier:</span>
-              <span>{currentUser?.name || 'SYS_ADMIN'}</span>
+              <span>{cashierName || 'GenX Cloud POS'}</span>
             </div>
             <div className="flex-row">
               <span>Type:</span>

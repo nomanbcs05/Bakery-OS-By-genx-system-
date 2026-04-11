@@ -297,7 +297,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     branch1Location: 'DHAMRA ROAD',
     branch1OnlineOrder: '03297040402',
     branch2Location: 'JAM SAHAB RD',
-    branch2OnlineOrder: '03093660360'
+    branch2OnlineOrder: '03093660360',
+    branch1Cashier: 'M. Ali',
+    branch2Cashier: 'Faisal'
   };
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
