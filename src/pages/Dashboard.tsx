@@ -33,7 +33,7 @@ export default function Dashboard() {
 
   const categoryData = products.reduce((acc, p) => {
     const existing = acc.find(a => a.name === p.category);
-    const produced = todayBatches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
+    const produced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
     if (existing) existing.value += produced;
     else acc.push({ name: p.category, value: produced });
     return acc;
