@@ -231,6 +231,7 @@ export interface DBBranchStockAdjustment {
 export interface ReceiptSettings {
   brandName: string;
   tagline: string;
+  logoUrl?: string;
   address: string;
   phone: string;
   footerMessage1: string;

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer, QrCode } from 'lucide-react';
@@ -13,59 +13,102 @@ interface ReceiptDialogProps {
   branch: string;
   saleId: string;
   date: string;
+  autoPrint?: boolean;
 }
 
-export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date }: ReceiptDialogProps) {
+export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date, autoPrint }: ReceiptDialogProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { receiptSettings, currentUser } = useApp();
 
   const handlePrint = () => {
     const content = receiptRef.current;
     if (!content) return;
-    const win = window.open('', '_blank', 'width=320,height=600');
-    if (!win) return;
-    win.document.write(`
-      <html><head><title>Receipt</title>
-      <style>
-        body { 
-          font-family: Arial, sans-serif; 
-          font-size: 11px; 
-          color: #000; 
-          background: #fff;
-          margin: 0; 
-          padding: 10px; 
-          width: 280px; 
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <html><head><title>Receipt</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            font-size: 11px; 
+            color: #000; 
+            background: #fff;
+            margin: 0; 
+            padding: 10px; 
+            width: 280px; 
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .font-bold { font-weight: bold; }
+          .uppercase { text-transform: uppercase; }
+          .border-y { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; }
+          .border-b { border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
+          .border-t { border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
+          .double-border-b { border-bottom: 3px double #000; padding-bottom: 4px; margin-bottom: 4px; }
+          .flex-between { display: flex; justify-content: space-between; align-items: center; }
+          .grid-meta { display: grid; grid-template-columns: 100px 1fr; gap: 2px; margin-bottom: 8px; }
+          
+          .brand-name { font-family: 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; margin: 4px 0; }
+          .tagline { font-family: 'Times New Roman', Times, serif; font-size: 12px; font-style: italic; }
+          .branch-name { font-size: 14px; font-weight: bold; margin: 4px 0; }
+          .address-text { font-size: 9px; line-height: 1.2; }
+          
+          .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr; font-weight: bold; font-size: 10px; }
+          .item-row { margin-top: 4px; font-size: 10px; }
+          .item-details { display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; padding-left: 20%; color: #333; margin-top: 2px; }
+          
+          .totals-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px; }
+          
+          .box { border: 1px solid #000; padding: 4px; }
+        </style></head>
+        <body>
+        <div class="text-center" style="margin-bottom: 12px;">
+          ${receiptSettings?.logoUrl 
+            ? `<img src="${receiptSettings.logoUrl}" style="max-height: 60px; max-width: 150px; margin-bottom: 8px; filter: grayscale(1);" />`
+            : `<div class="flex-center" style="margin-bottom: 4px;">
+                <svg width="40" height="24" viewBox="0 0 100 60" fill="currentColor" style="margin: 0 auto;">
+                  <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
+                  <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
+                </svg>
+              </div>`
+          }
+        </div>
+        ${content.innerHTML}
+        <script>
+           window.onload = () => {
+             window.print();
+           };
+        </script>
+        </body></html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
         }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .font-bold { font-weight: bold; }
-        .uppercase { text-transform: uppercase; }
-        .border-y { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4px 0; }
-        .border-b { border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
-        .border-t { border-top: 1px solid #000; padding-top: 4px; margin-top: 4px; }
-        .double-border-b { border-bottom: 3px double #000; padding-bottom: 4px; margin-bottom: 4px; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        .grid-meta { display: grid; grid-template-columns: 100px 1fr; gap: 2px; margin-bottom: 8px; }
-        
-        .brand-name { font-family: 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; margin: 4px 0; }
-        .tagline { font-family: 'Times New Roman', Times, serif; font-size: 12px; font-style: italic; }
-        .branch-name { font-size: 14px; font-weight: bold; margin: 4px 0; }
-        .address-text { font-size: 9px; line-height: 1.2; }
-        
-        .table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr; font-weight: bold; font-size: 10px; }
-        .item-row { margin-top: 4px; font-size: 10px; }
-        .item-details { display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; padding-left: 20%; color: #333; margin-top: 2px; }
-        
-        .totals-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px; }
-        
-        .box { border: 1px solid #000; padding: 4px; }
-      </style></head><body>
-      ${content.innerHTML}
-      <script>window.print(); window.close();</script>
-      </body></html>
-    `);
-    win.document.close();
+      }, 5000);
+    }
   };
+
+  useEffect(() => {
+    if (open && autoPrint) {
+      setTimeout(() => {
+        handlePrint();
+      }, 500);
+    }
+  }, [open, autoPrint]);
 
   const formattedDate = new Date(date).toLocaleString('en-GB', { 
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', 
@@ -86,13 +129,23 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <div className="bg-white text-black p-4 mx-auto w-[300px] border shadow-sm" ref={receiptRef}>
           {/* Logo & Header */}
           <div className="text-center mb-3">
-            <div className="flex justify-center mb-1">
-              <svg width="40" height="24" viewBox="0 0 100 60" fill="currentColor">
-                {/* Decorative logo simulation */}
-                <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
-                <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
-              </svg>
-            </div>
+            {receiptSettings?.logoUrl ? (
+              <div className="flex justify-center mb-2">
+                <img 
+                  src={receiptSettings.logoUrl} 
+                  alt="Logo" 
+                  className="max-h-[60px] max-width-[150px] object-contain filter grayscale" 
+                />
+              </div>
+            ) : (
+              <div className="flex justify-center mb-1">
+                <svg width="40" height="24" viewBox="0 0 100 60" fill="currentColor">
+                  {/* Decorative logo simulation */}
+                  <path d="M50 0 L60 20 L80 20 L65 35 L70 55 L50 40 L30 55 L35 35 L20 20 L40 20 Z" fill="#000" />
+                  <path d="M50 10 L55 25 L70 25 L60 35 L65 50 L50 40 L35 50 L40 35 L30 25 L45 25 Z" fill="#fff" />
+                </svg>
+              </div>
+            )}
             <div className="font-serif text-[22px] font-bold leading-tight tracking-tight" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
               {receiptSettings?.brandName || 'Rehmat-e-Shereen'}
             </div>

@@ -195,6 +195,20 @@ export default function SettingsPage() {
                 <Label>Tagline</Label>
                 <Input value={formReceiptSettings.tagline} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} placeholder="Premium Fabric" />
               </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Logo URL (PNG/JPG)</Label>
+                <div className="flex gap-4 items-start">
+                  <div className="flex-1 space-y-2">
+                    <Input value={formReceiptSettings.logoUrl} onChange={e => setFormReceiptSettings(s => ({ ...s, logoUrl: e.target.value }))} placeholder="https://example.com/logo.png" />
+                    <p className="text-[10px] text-muted-foreground italic">Use a high-quality transparent PNG for best results on thermal printers.</p>
+                  </div>
+                  {formReceiptSettings.logoUrl && (
+                    <div className="h-14 w-14 border rounded p-1 bg-white flex items-center justify-center shrink-0">
+                      <img src={formReceiptSettings.logoUrl} alt="Preview" className="max-h-full max-w-full object-contain filter grayscale" />
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Address</Label>
                 <Input value={formReceiptSettings.address} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} placeholder="Nawabshah, Pakistan" />

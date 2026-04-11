@@ -288,6 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const defaultReceiptSettings: ReceiptSettings = {
     brandName: 'Sultan-E-Libas by Elegance',
     tagline: 'Premium Fabric',
+    logoUrl: '',
     address: 'Nawabshah, Pakistan',
     phone: '03111855990',
     footerMessage1: 'Thank you for shopping with elegance.',
