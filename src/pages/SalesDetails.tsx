@@ -124,14 +124,16 @@ export default function SalesDetails() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Detailed Sales Records</h1>
           <p className="text-sm text-muted-foreground">Product-by-product itemized sales log</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportCSV} className="h-9">
-            <Download className="h-4 w-4 mr-2" /> Export
-          </Button>
-          <Badge variant="outline" className="px-3 py-1 bg-primary/5 border-primary/20 text-primary font-bold">
-            Total Revenue: Rs. {totalRevenue.toFixed(2)}
-          </Badge>
-        </div>
+        {selectedProfile.role !== 'branch_staff' && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportCSV} className="h-9">
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Badge variant="outline" className="px-3 py-1 bg-primary/5 border-primary/20 text-primary font-bold">
+              Total Revenue: Rs. {totalRevenue.toFixed(2)}
+            </Badge>
+          </div>
+        )}
       </div>
 
       <Card className="border-border/50 shadow-sm">

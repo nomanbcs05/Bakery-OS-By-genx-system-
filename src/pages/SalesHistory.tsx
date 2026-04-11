@@ -17,7 +17,7 @@ import { Navigate } from 'react-router-dom';
 type BranchFilter = 'all' | 'branch_1' | 'branch_2' | 'factory_walkin';
 
 export default function SalesHistory() {
-  const { currentUser, sales, getProductById } = useApp();
+  const { currentUser, selectedProfile, sales, getProductById } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [search, setSearch] = useState('');
@@ -161,38 +161,42 @@ export default function SalesHistory() {
           <h1 className="text-2xl font-bold text-foreground">Sales History</h1>
           <p className="text-sm text-muted-foreground">Branch-wise sales breakdown with search & filtering</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download className="h-4 w-4 mr-1" /> Export CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={printSummary}>
-            <Printer className="h-4 w-4 mr-1" /> Print Summary
-          </Button>
-        </div>
+        {selectedProfile?.role !== 'branch_staff' && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="h-4 w-4 mr-1" /> Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={printSummary}>
+              <Printer className="h-4 w-4 mr-1" /> Print Summary
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
-      <div ref={summaryRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Branch 1', data: branchSummary.branch_1, color: 'text-primary' },
-          { label: 'Branch 2', data: branchSummary.branch_2, color: 'text-secondary-foreground' },
-          { label: 'Walk-in', data: branchSummary.factory_walkin, color: 'text-accent-foreground' },
-          { label: 'Grand Total', data: { count: grandCount, total: grandTotal, cash: Object.values(branchSummary).reduce((s, b) => s + b.cash, 0), card: Object.values(branchSummary).reduce((s, b) => s + b.card, 0) }, color: 'text-foreground' },
-        ].map(({ label, data, color }) => (
-          <Card key={label}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold ${color}`}>Rs. {data.total.toFixed(2)}</p>
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>{data.count} sales</span>
-                <span>Cash: Rs. {data.cash.toFixed(2)}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {selectedProfile?.role !== 'branch_staff' && (
+        <div ref={summaryRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Branch 1', data: branchSummary.branch_1, color: 'text-primary' },
+            { label: 'Branch 2', data: branchSummary.branch_2, color: 'text-secondary-foreground' },
+            { label: 'Walk-in', data: branchSummary.factory_walkin, color: 'text-accent-foreground' },
+            { label: 'Grand Total', data: { count: grandCount, total: grandTotal, cash: Object.values(branchSummary).reduce((s, b) => s + b.cash, 0), card: Object.values(branchSummary).reduce((s, b) => s + b.card, 0) }, color: 'text-foreground' },
+          ].map(({ label, data, color }) => (
+            <Card key={label}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-2xl font-bold ${color}`}>Rs. {data.total.toFixed(2)}</p>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>{data.count} sales</span>
+                  <span>Cash: Rs. {data.cash.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
