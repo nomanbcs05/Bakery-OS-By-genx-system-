@@ -239,5 +239,53 @@ BEGIN
   END IF;
 END $$;
 
--- Forcefully refresh the PostgREST API schema cache so frontend fetches don't fail!
+-- 11. Staff Members Table
+CREATE TABLE IF NOT EXISTS staff_members (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  department TEXT NOT NULL,
+  base_salary DECIMAL NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at DATE DEFAULT CURRENT_DATE
+);
+
+-- 12. Staff Deductions / Advances Table
+CREATE TABLE IF NOT EXISTS staff_deductions (
+  id TEXT PRIMARY KEY,
+  staff_id TEXT REFERENCES staff_members(id) ON DELETE CASCADE,
+  amount DECIMAL NOT NULL,
+  reason TEXT,
+  date DATE NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 13. Salary Vouchers Table
+CREATE TABLE IF NOT EXISTS salary_vouchers (
+  id TEXT PRIMARY KEY,
+  staff_id TEXT REFERENCES staff_members(id) ON DELETE CASCADE,
+  amount DECIMAL NOT NULL,
+  month TEXT NOT NULL,
+  year INTEGER NOT NULL,
+  date DATE NOT NULL,
+  status TEXT DEFAULT 'paid',
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- Add new tables to Realtime
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'staff_members') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE staff_members;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'staff_deductions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE staff_deductions;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'salary_vouchers') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE salary_vouchers;
+  END IF;
+END $$;
+
+-- Forcefully refresh the PostgREST API schema cache
 NOTIFY pgrst, 'reload schema';

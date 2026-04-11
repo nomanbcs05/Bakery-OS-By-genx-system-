@@ -244,3 +244,61 @@ export interface ReceiptSettings {
   branch1Cashier: string;
   branch2Cashier: string;
 }
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  department: string;
+  baseSalary: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface StaffDeduction {
+  id: string;
+  staffId: string;
+  amount: number;
+  reason: string;
+  date: string;
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface SalaryVoucher {
+  id: string;
+  staffId: string;
+  amount: number;
+  month: string;
+  year: number;
+  date: string;
+  status: 'paid';
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface DBStaffMember {
+  id: string;
+  name: string;
+  department: string;
+  base_salary: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DBStaffDeduction {
+  id: string;
+  staff_id: string;
+  amount: number;
+  reason: string;
+  date: string;
+  sync_status: 'synced' | 'pending';
+}
+
+export interface DBSalaryVoucher {
+  id: string;
+  staff_id: string;
+  amount: number;
+  month: string;
+  year: number;
+  date: string;
+  status: 'paid';
+  sync_status: 'synced' | 'pending';
+}

@@ -3,7 +3,9 @@ import type {
   User, Product, ProductionBatch, Dispatch, DispatchDestination,
   DispatchItem, Sale, SaleItem, SaleType, PaymentMethod, Expense, AuditLog, InventorySnapshot, UserRole,
   RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings,
-  DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment
+  StaffMember, StaffDeduction, SalaryVoucher,
+  DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
+  DBStaffMember, DBStaffDeduction, DBSalaryVoucher
 } from '@/types';
 import { toast } from 'sonner';
 import { supabase, hasSupabaseConfig } from '@/lib/supabase';
@@ -97,6 +99,9 @@ interface AppState {
   lastSyncTime: string | null;
   isLoading: boolean;
   receiptSettings: ReceiptSettings;
+  staff: StaffMember[];
+  staffDeductions: StaffDeduction[];
+  salaryVouchers: SalaryVoucher[];
 }
 
 interface AppContextType extends AppState {
@@ -136,6 +141,15 @@ interface AppContextType extends AppState {
   forceSync: () => Promise<void>;
   seedDatabase: () => Promise<void>;
   updateReceiptSettings: (settings: Partial<ReceiptSettings>) => void;
+  // Staff & Accounts
+  addStaffMember: (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => Promise<void>;
+  updateStaffMember: (id: string, updates: Partial<StaffMember>) => Promise<void>;
+  deleteStaffMember: (id: string) => Promise<void>;
+  addStaffDeduction: (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => Promise<void>;
+  updateStaffDeduction: (id: string, updates: Partial<StaffDeduction>) => Promise<void>;
+  deleteStaffDeduction: (id: string) => Promise<void>;
+  createSalaryVoucher: (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => Promise<void>;
+  deleteSalaryVoucher: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -171,6 +185,15 @@ const fromDBRawAdjustment = (a: DBRawMaterialAdjustment): RawMaterialAdjustment 
 const fromDBBranchAdjustment = (a: DBBranchStockAdjustment): BranchStockAdjustment => ({
   id: a.id, productId: a.product_id, branch: a.branch, quantity: a.quantity, reason: a.reason, date: a.date, userId: a.user_id
 });
+const fromDBStaff = (s: DBStaffMember): StaffMember => ({
+  id: s.id, name: s.name, department: s.department, baseSalary: s.base_salary, isActive: s.is_active, createdAt: s.created_at
+});
+const fromDBDeduction = (d: DBStaffDeduction): StaffDeduction => ({
+  id: d.id, staffId: d.staff_id, amount: d.amount, reason: d.reason, date: d.date, syncStatus: d.sync_status || 'synced'
+});
+const fromDBVoucher = (v: DBSalaryVoucher): SalaryVoucher => ({
+  id: v.id, staffId: v.staff_id, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, syncStatus: v.sync_status || 'synced'
+});
 
 // Helper to convert frontend objects to DB snake_case
 const toDBProduct = (p: Product): DBProduct => ({
@@ -199,6 +222,15 @@ const toDBRawAdjustment = (a: RawMaterialAdjustment): DBRawMaterialAdjustment =>
 });
 const toDBBranchAdjustment = (a: BranchStockAdjustment): DBBranchStockAdjustment => ({
   id: a.id, product_id: a.productId, branch: a.branch, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: 'synced'
+});
+const toDBStaff = (s: StaffMember): DBStaffMember => ({
+  id: s.id, name: s.name, department: s.department, base_salary: s.baseSalary, is_active: s.isActive, created_at: s.createdAt
+});
+const toDBDeduction = (d: StaffDeduction): DBStaffDeduction => ({
+  id: d.id, staff_id: d.staffId, amount: d.amount, reason: d.reason, date: d.date, sync_status: d.syncStatus
+});
+const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
+  id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -280,6 +312,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sales, setSales] = useState<Sale[]>(initialState.sales || []);
   const [expenses, setExpenses] = useState<Expense[]>(initialState.expenses || []);
   const [branchStockAdjustments, setBranchStockAdjustments] = useState<BranchStockAdjustment[]>(initialState.branchStockAdjustments || []);
+  const [staff, setStaff] = useState<StaffMember[]>(initialState.staff || []);
+  const [staffDeductions, setStaffDeductions] = useState<StaffDeduction[]>(initialState.staffDeductions || []);
+  const [salaryVouchers, setSalaryVouchers] = useState<SalaryVoucher[]>(initialState.salaryVouchers || []);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialState.auditLogs || []);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -456,7 +491,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { data: sData },
           { data: eData },
           { data: lData },
-          { data: bsaData }
+          { data: bsaData },
+          { data: stData },
+          { data: sdData },
+          { data: svData }
         ] = await Promise.all([
           supabase.from('products').select('*'),
           supabase.from('raw_materials').select('*'),
@@ -466,7 +504,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           supabase.from('sales').select('*'),
           supabase.from('expenses').select('*'),
           supabase.from('audit_logs').select('*'),
-          supabase.from('branch_stock_adjustments').select('*')
+          supabase.from('branch_stock_adjustments').select('*'),
+          supabase.from('staff_members').select('*'),
+          supabase.from('staff_deductions').select('*'),
+          supabase.from('salary_vouchers').select('*')
         ]);
 
         // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
@@ -555,6 +596,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return [...remoteBsa, ...offline];
           });
         }
+
+        if (stData && stData.length > 0) {
+          const remoteStaff = stData.map(fromDBStaff);
+          setStaff(prev => {
+            const offline = prev.filter(local => !remoteStaff.find(r => r.id === local.id));
+            return [...remoteStaff, ...offline];
+          });
+        }
+
+        if (sdData && sdData.length > 0) {
+          const remoteDeductions = sdData.map(fromDBDeduction);
+          setStaffDeductions(prev => {
+            const merged = [...prev];
+            remoteDeductions.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
+          });
+        }
+
+        if (svData && svData.length > 0) {
+          const remoteVouchers = svData.map(fromDBVoucher);
+          setSalaryVouchers(prev => {
+            const merged = [...prev];
+            remoteVouchers.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
+          });
+        }
         
         setLastSyncTime(new Date().toISOString());
       } catch (error) {
@@ -631,6 +704,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newStaff = fromDBStaff(payload.new as DBStaffMember);
+          setStaff(prev => {
+            const index = prev.findIndex(r => r.id === newStaff.id);
+            if (index === -1) return [...prev, newStaff];
+            const next = [...prev];
+            next[index] = newStaff;
+            return next;
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_deductions' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newAdj = fromDBDeduction(payload.new as DBStaffDeduction);
+          setStaffDeductions(prev => {
+            if (prev.find(a => a.id === newAdj.id)) return prev;
+            return [...prev, newAdj];
+          });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'salary_vouchers' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newVoucher = fromDBVoucher(payload.new as DBSalaryVoucher);
+          setSalaryVouchers(prev => {
+            if (prev.find(a => a.id === newVoucher.id)) return prev;
+            return [...prev, newVoucher];
+          });
+        }
+      })
       .subscribe();
 
     return () => {
@@ -655,7 +758,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       auditLogs, 
       stock, 
       lastSyncTime,
-      receiptSettings
+      receiptSettings,
+      staff,
+      staffDeductions,
+      salaryVouchers
     };
     
     try {
@@ -663,7 +769,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to save business data to localStorage:', e);
     }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers]);
 
   // Persist AUTH data separately
   useEffect(() => {
@@ -767,11 +873,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (err) { console.error('Expense sync error:', err); }
     }
 
+    // 5. Sync Staff Deductions
+    const pendingDeductions = staffDeductions.filter(d => d.syncStatus === 'pending');
+    if (pendingDeductions.length > 0) {
+      try {
+        const { error } = await supabase.from('staff_deductions').insert(
+          pendingDeductions.map(d => toDBDeduction({ ...d, syncStatus: 'synced' }))
+        );
+        if (!error) {
+          setStaffDeductions(prev => prev.map(d => d.syncStatus === 'pending' ? { ...d, syncStatus: 'synced' } : d));
+          syncCount += pendingDeductions.length;
+        }
+      } catch (err) { console.error('Staff deductions sync error:', err); }
+    }
+
+    // 6. Sync Salary Vouchers
+    const pendingVouchers = salaryVouchers.filter(v => v.syncStatus === 'pending');
+    if (pendingVouchers.length > 0) {
+      try {
+        const { error } = await supabase.from('salary_vouchers').insert(
+          pendingVouchers.map(v => toDBVoucher({ ...v, syncStatus: 'synced' }))
+        );
+        if (!error) {
+          setSalaryVouchers(prev => prev.map(v => v.syncStatus === 'pending' ? { ...v, syncStatus: 'synced' } : v));
+          syncCount += pendingVouchers.length;
+        }
+      } catch (err) { console.error('Salary vouchers sync error:', err); }
+    }
+
     if (syncCount > 0) {
       toast.success(`Successfully synced ${syncCount} offline records to cloud`);
       setLastSyncTime(new Date().toISOString());
     }
-  }, [sales, batches, dispatches, expenses]);
+  }, [sales, batches, dispatches, expenses, staffDeductions, salaryVouchers]);
 
   const forceSync = useCallback(async () => {
     if (!navigator.onLine) {
@@ -1346,6 +1480,87 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })).filter(s => s.stock > 0);
   }, [products, stock]);
 
+  const addStaffMember = useCallback(async (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => {
+    const id = `st-${Date.now()}`;
+    const newStaff: StaffMember = { ...s, id, isActive: true, createdAt: new Date().toISOString().slice(0, 10) };
+    setStaff(prev => [...prev, newStaff]);
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('staff_members').insert([toDBStaff(newStaff)]);
+    }
+    addLog('create', 'staff', id, `Added staff member: ${s.name}`);
+    toast.success(`Staff member "${s.name}" added`);
+  }, [addLog]);
+
+  const updateStaffMember = useCallback(async (id: string, updates: Partial<StaffMember>) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    if (navigator.onLine && hasSupabaseConfig) {
+      const staffMember = staff.find(s => s.id === id);
+      if (staffMember) {
+        await supabase.from('staff_members').update(toDBStaff({ ...staffMember, ...updates })).eq('id', id);
+      }
+    }
+    addLog('update', 'staff', id, `Updated staff member: ${id}`);
+    toast.success(`Staff updated`);
+  }, [staff, addLog]);
+
+  const deleteStaffMember = useCallback(async (id: string) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('staff_members').update({ is_active: false }).eq('id', id);
+    }
+    addLog('delete', 'staff', id, `Soft deleted staff member: ${id}`);
+    toast.success(`Staff member deleted`);
+  }, [addLog]);
+
+  const addStaffDeduction = useCallback(async (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => {
+    const id = `sd-${Date.now()}`;
+    const newDeduction: StaffDeduction = { ...d, id, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
+    setStaffDeductions(prev => [...prev, newDeduction]);
+    if (isOnline && hasSupabaseConfig) {
+      await supabase.from('staff_deductions').insert([toDBDeduction(newDeduction)]);
+    }
+    addLog('create', 'staff_deduction', id, `Deduction for staff ${d.staffId}: Rs. ${d.amount}`);
+    toast.success(`Deduction/Advance recorded`);
+  }, [addLog, isOnline]);
+
+  const updateStaffDeduction = useCallback(async (id: string, updates: Partial<StaffDeduction>) => {
+    setStaffDeductions(prev => prev.map(d => d.id === id ? { ...d, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : d));
+    if (navigator.onLine && hasSupabaseConfig) {
+       const deduction = staffDeductions.find(d => d.id === id);
+       if (deduction) {
+         await supabase.from('staff_deductions').update(toDBDeduction({ ...deduction, ...updates, syncStatus: 'synced' })).eq('id', id);
+       }
+    }
+    toast.success(`Deduction updated`);
+  }, [staffDeductions, isOnline]);
+
+  const deleteStaffDeduction = useCallback(async (id: string) => {
+    setStaffDeductions(prev => prev.filter(d => d.id !== id));
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('staff_deductions').delete().eq('id', id);
+    }
+    toast.success(`Deduction deleted`);
+  }, []);
+
+  const createSalaryVoucher = useCallback(async (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => {
+    const id = `sv-${Date.now()}`;
+    const newVoucher: SalaryVoucher = { ...v, id, status: 'paid', syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
+    setSalaryVouchers(prev => [...prev, newVoucher]);
+    if (isOnline && hasSupabaseConfig) {
+      await supabase.from('salary_vouchers').insert([toDBVoucher(newVoucher)]);
+    }
+    addLog('create', 'salary_voucher', id, `Salary paid to staff ${v.staffId}: Rs. ${v.amount}`);
+    toast.success(`Salary payment recorded`);
+  }, [addLog, isOnline]);
+
+  const deleteSalaryVoucher = useCallback(async (id: string) => {
+    setSalaryVouchers(prev => prev.filter(v => v.id !== id));
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('salary_vouchers').delete().eq('id', id);
+    }
+    toast.success(`Salary voucher deleted`);
+  }, []);
+
   const logout = async () => {
     // Only clear auth state — NEVER touch business data (sales, expenses, etc.)
     await supabase.auth.signOut();
@@ -1417,7 +1632,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       seedDatabase,
       logout,
       receiptSettings,
-      updateReceiptSettings
+      updateReceiptSettings,
+      staff,
+      staffDeductions,
+      salaryVouchers,
+      addStaffMember,
+      updateStaffMember,
+      deleteStaffMember,
+      addStaffDeduction,
+      updateStaffDeduction,
+      deleteStaffDeduction,
+      createSalaryVoucher,
+      deleteSalaryVoucher
     }}>
       {children}
     </AppContext.Provider>

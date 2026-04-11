@@ -13,6 +13,7 @@ import WalkInSales from "./pages/WalkInSales";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Expenses from "./pages/Expenses";
+import Accounts from "./pages/Accounts";
 import SalesHistory from "./pages/SalesHistory";
 import SalesDetails from "./pages/SalesDetails";
 import BranchProducts from "./pages/BranchProducts";
@@ -145,6 +146,11 @@ const AppRoutes = () => {
         <Route path="/expenses" element={
           <ProtectedRoute allowedRoles={['admin', 'accountant', 'branch_staff']}>
             <Expenses />
+          </ProtectedRoute>
+        } />
+        <Route path="/accounts" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Accounts />
           </ProtectedRoute>
         } />
 

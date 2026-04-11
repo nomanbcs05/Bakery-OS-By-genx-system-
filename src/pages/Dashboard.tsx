@@ -2,7 +2,7 @@ import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, TrendingUp, Factory, ShoppingCart, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Navigate } from 'react-router-dom';
 
 export default function Dashboard() {
@@ -10,31 +10,47 @@ export default function Dashboard() {
 
   if (!currentUser) return <Navigate to="/login" replace />;
 
-  const todaySales = sales.filter(s => s.date === new Date().toISOString().slice(0, 10));
-  const totalRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
-  const totalProduced = batches.reduce((sum, b) => sum + b.quantity, 0);
-  const totalDispatched = dispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const todaySales = sales.filter(s => s.date === today);
+  const todayBatches = batches.filter(b => b.date === today);
+  const todayDispatches = dispatches.filter(d => d.date === today);
   const snapshots = getInventorySnapshots();
+  
+  const totalRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
+  const totalProduced = todayBatches.reduce((sum, b) => sum + b.quantity, 0);
+  const totalDispatched = todayDispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
+  const totalSold = todaySales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0);
 
   const pendingSyncCount = sales.filter(s => s.syncStatus === 'pending').length;
 
   const lowStock = snapshots.filter(s => s.productionStock < 20 && s.productionStock > 0);
 
   const branchSalesData = [
-    { name: 'Branch 1', sales: sales.filter(s => s.branch === 'branch_1').reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Branch 2', sales: sales.filter(s => s.branch === 'branch_2').reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Walk-in', sales: sales.filter(s => s.type === 'factory_walkin').reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 1', sales: todaySales.filter(s => s.branch === 'branch_1').reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 2', sales: todaySales.filter(s => s.branch === 'branch_2').reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Walk-in', sales: todaySales.filter(s => s.type === 'factory_walkin').reduce((sum, s) => sum + s.total, 0) },
   ];
 
   const categoryData = products.reduce((acc, p) => {
     const existing = acc.find(a => a.name === p.category);
-    const produced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
+    const produced = todayBatches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
     if (existing) existing.value += produced;
     else acc.push({ name: p.category, value: produced });
     return acc;
-  }, [] as { name: string; value: number }[]);
+  }, [] as { name: string; value: number }[])
+  .filter(item => item.value > 0)
+  .sort((a, b) => b.value - a.value);
 
-  const COLORS = ['hsl(32, 95%, 44%)', 'hsl(25, 80%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(210, 100%, 52%)'];
+  const COLORS = [
+    '#f97316', // Orange 500
+    '#0ea5e9', // Sky 500
+    '#22c55e', // Green 500
+    '#a855f7', // Purple 500
+    '#ef4444', // Red 500
+    '#14b8a6', // Teal 500
+    '#eab308', // Yellow 500
+    '#6366f1'  // Indigo 500
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -57,60 +73,60 @@ export default function Dashboard() {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="stat-card">
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Today's Revenue</p>
-                <p className="text-2xl font-bold text-foreground">Rs. {totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">{todaySales.length} transactions</p>
+                <p className="text-sm text-muted-foreground font-medium">Today's Revenue</p>
+                <p className="text-2xl font-bold text-foreground mt-1">Rs. {totalRevenue.toFixed(0)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{todaySales.length} transactions</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary" />
+                <TrendingUp className="h-5 w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="stat-card">
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Produced</p>
-                <p className="text-2xl font-bold text-foreground">{totalProduced}</p>
-                <p className="text-xs text-muted-foreground">{batches.length} batches</p>
+                <p className="text-sm text-muted-foreground font-medium">Produced Today</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{totalProduced}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{todayBatches.length} batches</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
-                <Factory className="h-6 w-6 text-success" />
+                <Factory className="h-5 w-5 text-success" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="stat-card">
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Dispatched</p>
-                <p className="text-2xl font-bold text-foreground">{totalDispatched}</p>
-                <p className="text-xs text-muted-foreground">{dispatches.length} dispatches</p>
+                <p className="text-sm text-muted-foreground font-medium">Dispatched Today</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{totalDispatched}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{todayDispatches.length} dispatches</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-info/10 flex items-center justify-center">
-                <Package className="h-6 w-6 text-info" />
+                <Package className="h-5 w-5 text-info" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="stat-card">
-          <CardContent className="p-0">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Items Sold</p>
-                <p className="text-2xl font-bold text-foreground">{sales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0)}</p>
-                <p className="text-xs text-muted-foreground">all channels</p>
+                <p className="text-sm text-muted-foreground font-medium">Sold Today</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{totalSold}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">units sold today</p>
               </div>
               <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
-                <ShoppingCart className="h-6 w-6 text-warning" />
+                <ShoppingCart className="h-5 w-5 text-warning" />
               </div>
             </div>
           </CardContent>
@@ -149,12 +165,38 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                  <Pie 
+                    data={categoryData} 
+                    cx="50%" 
+                    cy="45%" 
+                    innerRadius={65} 
+                    outerRadius={85} 
+                    paddingAngle={5}
+                    dataKey="value" 
+                    label={({ name, value, percent }) => 
+                      percent > 0.08 ? `${name}: ${value}` : ''
+                    }
+                  >
                     {categoryData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={4} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    contentStyle={{ 
+                      background: 'rgba(255, 255, 255, 0.95)', 
+                      backdropFilter: 'blur(4px)',
+                      border: '1px solid hsl(var(--border))', 
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -171,14 +213,14 @@ export default function Dashboard() {
           {(['branch_1', 'branch_2', 'factory_walkin'] as const).map(channel => {
             const label = channel === 'branch_1' ? 'Branch 1' : channel === 'branch_2' ? 'Branch 2' : 'Walk-in';
             const channelSales = channel === 'factory_walkin'
-              ? sales.filter(s => s.type === 'factory_walkin')
-              : sales.filter(s => s.branch === channel);
+              ? todaySales.filter(s => s.type === 'factory_walkin')
+              : todaySales.filter(s => s.branch === channel);
             const channelTotal = channelSales.reduce((sum, s) => sum + s.total, 0);
             return (
               <div key={channel} className="mb-4 last:mb-0">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-                  <Badge variant="secondary">{channelSales.length} sales · ${channelTotal.toFixed(2)}</Badge>
+                  <Badge variant="secondary">{channelSales.length} sales · Rs. {channelTotal.toFixed(0)}</Badge>
                 </div>
                 {channelSales.length === 0 ? (
                   <p className="text-xs text-muted-foreground pl-2">No sales yet</p>
