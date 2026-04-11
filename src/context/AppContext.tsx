@@ -1104,10 +1104,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (type === 'branch' && branch) {
       for (const item of items) {
         const available = stock[item.productId]?.[branch] || 0;
-        if (item.quantity > available) {
-          toast.error(`Insufficient stock at ${branch.replace('_', ' ')}`);
-          return false;
-        }
+        // Removed strict stock validation to allow "always available for selling"
+        // if (item.quantity > available) {
+        //   toast.error(`Insufficient stock at ${branch.replace('_', ' ')}`);
+        //   return false;
+        // }
       }
     }
 
