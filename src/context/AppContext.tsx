@@ -513,7 +513,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { data: bsaData },
           { data: stData },
           { data: sdData },
-          { data: svData }
+          { data: svData },
+          { data: purchasesData }
         ] = await Promise.all([
           supabase.from('products').select('*'),
           supabase.from('raw_materials').select('*'),
@@ -1431,10 +1432,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
 
         // Also update material stock in DB
-        const material = rawMaterials.find(m => m.id === p.materialId);
-        if (material) {
+        const currentMaterial = rawMaterials.find(m => m.id === p.materialId);
+        if (currentMaterial) {
           await supabase.from('raw_materials')
-            .update({ current_stock: material.currentStock + p.quantity, last_updated: new Date().toISOString() })
+            .update({ current_stock: currentMaterial.currentStock + p.quantity, last_updated: new Date().toISOString() })
             .eq('id', p.materialId);
         }
       } catch (err) {
