@@ -223,7 +223,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row">
               <span>Type:</span>
-              <span className="font-bold uppercase">WALK IN</span>
+              <span className="font-bold uppercase">{branch === 'FACTORY' ? 'FACTORY SALE' : 'BRANCH POS'}</span>
+            </div>
+            <div className="flex-row">
+              <span>Payment:</span>
+              <span className="font-bold uppercase tracking-widest bg-stone-200 px-1">{paymentMethod}</span>
             </div>
             <div className="flex-row">
               <span>{formattedDate}</span>

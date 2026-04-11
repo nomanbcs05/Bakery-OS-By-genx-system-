@@ -72,7 +72,7 @@ export interface DispatchItem {
   quantity: number;
 }
 
-export type PaymentMethod = 'cash' | 'card';
+export type PaymentMethod = 'cash' | 'card' | 'credit';
 export type SaleType = 'branch' | 'factory_walkin';
 
 export interface Sale {

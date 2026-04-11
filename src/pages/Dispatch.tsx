@@ -7,11 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Plus, Trash2, AlertCircle, Printer } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { DispatchDestination, DispatchItem } from '@/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import type { DispatchDestination, DispatchItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 import GOTDialog from '@/components/GOTDialog';
+import ReceiptDialog from '@/components/ReceiptDialog';
+import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
 
 export default function DispatchPage() {
   const { currentUser, products, stock, createDispatch, dispatches, getProductById } = useApp();
@@ -22,6 +25,24 @@ export default function DispatchPage() {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [qty, setQty] = useState('');
   const [showGOT, setShowGOT] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  
+  const [receiptData, setReceiptData] = useState<{
+    open: boolean;
+    items: any[];
+    total: number;
+    paymentMethod: string;
+    saleId: string;
+    date: string;
+  }>({
+    open: false,
+    items: [],
+    total: 0,
+    paymentMethod: 'cash',
+    saleId: '',
+    date: '',
+  });
 
   const addItem = () => {
     if (!selectedProduct || !qty || parseInt(qty) <= 0) return;
@@ -37,12 +58,42 @@ export default function DispatchPage() {
 
   const removeItem = (productId: string) => setItems(items.filter(i => i.productId !== productId));
 
-  const handleDispatch = () => {
+  const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
-    const success = createDispatch(destination, items);
+    
+    // Prepare receipt data if walk-in
+    let currentSaleId = `SL-${Date.now().toString(36).toUpperCase()}`;
+    let receiptItems = items.map(i => ({
+      name: getProductById(i.productId)?.name || 'Unknown',
+      quantity: i.quantity,
+      unitPrice: getProductById(i.productId)?.price || 0
+    }));
+    let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
+    const success = await createDispatch(destination, items, paymentMeth);
     if (success) {
+      if (destination === 'walkin') {
+        setReceiptData({
+          open: true,
+          items: receiptItems,
+          total,
+          paymentMethod: paymentMeth,
+          saleId: currentSaleId,
+          date: new Date().toISOString()
+        });
+      }
       setItems([]);
       setDestination('');
+      setIsPaymentOpen(false);
+    }
+  };
+
+  const handleWalkinDispatch = () => {
+    if (!destination || items.length === 0) return;
+    if (destination === 'walkin') {
+      setIsPaymentOpen(true);
+    } else {
+      handleDispatch();
     }
   };
 
@@ -132,9 +183,16 @@ export default function DispatchPage() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={handleDispatch} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
-              Confirm Dispatch
-            </Button>
+            {destination === 'walkin' ? (
+              <Button onClick={handleWalkinDispatch} disabled={items.length === 0} className="flex-1 sm:flex-none bg-success hover:bg-success/90">
+                <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
+              </Button>
+            ) : (
+              <Button onClick={handleDispatch} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
+                Confirm Dispatch
+              </Button>
+            )}
+            
             <Button 
               variant="secondary" 
               onClick={() => setShowGOT(true)} 
@@ -146,6 +204,47 @@ export default function DispatchPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment Selection Dialog */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Complete Factory Sale</DialogTitle>
+            <DialogDescription>Select payment method for this walk-in dispatch</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button variant="outline" className="h-24 flex flex-col gap-2 border-2 hover:border-primary" onClick={() => handleDispatch('cash')}>
+              <Banknote className="h-8 w-8 text-success" />
+              <span>Cash Payment</span>
+            </Button>
+            <Button variant="outline" className="h-24 flex flex-col gap-2 border-2 hover:border-primary" onClick={() => handleDispatch('credit')}>
+              <CreditCard className="h-8 w-8 text-info" />
+              <span>Credit (Baki)</span>
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsPaymentOpen(false)} className="w-full">Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ReceiptDialog 
+        open={receiptData.open}
+        onClose={() => setReceiptData(prev => ({ ...prev, open: false }))}
+        items={receiptData.items}
+        total={receiptData.total}
+        paymentMethod={receiptData.paymentMethod}
+        branch="FACTORY"
+        saleId={receiptData.saleId}
+        date={receiptData.date}
+        autoPrint={true}
+      />
+
+      <DispatchSummaryDialog 
+        open={showSummary}
+        onClose={() => setShowSummary(false)}
+        date={new Date().toISOString().slice(0, 10)}
+      />
 
       <GOTDialog 
         open={showGOT}
@@ -159,7 +258,17 @@ export default function DispatchPage() {
 
       {/* Dispatch History */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Dispatch History</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base">Dispatch History</CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex items-center gap-2 text-primary hover:bg-primary/5"
+            onClick={() => setShowSummary(true)}
+          >
+            <Eye className="h-4 w-4" /> Day Summary
+          </Button>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>

@@ -150,6 +150,7 @@ interface AppContextType extends AppState {
   deleteStaffDeduction: (id: string) => Promise<void>;
   createSalaryVoucher: (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => Promise<void>;
   deleteSalaryVoucher: (id: string) => Promise<void>;
+  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -1216,7 +1217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success(`Production batch deleted successfully`);
   }, [addLog, isOnline]);
 
-  const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[]) => {
+  const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash') => {
     for (const item of items) {
       const available = stock[item.productId]?.production || 0;
       if (item.quantity > available) {
@@ -1245,7 +1246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
       const walkinSale: Sale = {
         id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems,
-        total, paymentMethod: 'cash', date: new Date().toISOString().slice(0, 10),
+        total, paymentMethod: paymentMethod, date: new Date().toISOString().slice(0, 10),
         syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
       };
       
