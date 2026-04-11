@@ -327,20 +327,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(initialState.lastSyncTime || null);
   
   const defaultReceiptSettings: ReceiptSettings = {
-    brandName: 'CRUST & CRUMS',
-    tagline: 'PREMIUM BAKERY',
+    brandName: '',
+    tagline: '',
     logoUrl: '',
-    address: 'Near Al Habib bank, Shahdadpur road\nIserpura, Nawabshah',
-    phone: '0311-4610599, 0334-3610599',
-    footerMessage1: '!!!!FOR THE LOVE OF FOOD !!!!',
-    footerMessage2: 'POWERED BY: GENAI TECHNOLOGY +923342826675',
-    printedBy: 'DESIGNED & DEVELOPED BY GENAI TECH',
-    branch1Location: 'DHAMRA ROAD',
-    branch1OnlineOrder: '03297040402',
-    branch2Location: 'JAM SAHAB RD',
-    branch2OnlineOrder: '03093660360',
-    branch1Cashier: 'M. Ali',
-    branch2Cashier: 'Faisal'
+    address: '',
+    phone: '',
+    footerMessage1: '',
+    footerMessage2: '',
+    printedBy: '',
+    branch1Location: '',
+    branch1OnlineOrder: '',
+    branch2Location: '',
+    branch2OnlineOrder: '',
+    branch1Cashier: '',
+    branch2Cashier: '',
+    isLocked: false
   };
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
@@ -1590,9 +1591,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateReceiptSettings = useCallback((settings: Partial<ReceiptSettings>) => {
-    setReceiptSettings(prev => ({ ...prev, ...settings }));
-    toast.success('Receipt settings updated');
-  }, []);
+    setReceiptSettings(prev => ({ ...prev, ...settings, isLocked: true }));
+    toast.success('Receipt information saved permanently');
+    addLog('update', 'receipt_settings', 'system', 'Locked receipt information permanently');
+  }, [addLog]);
 
   return (
     <AppContext.Provider value={{

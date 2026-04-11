@@ -214,8 +214,8 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               <span>DAY-{paddedGlobalSerial}</span>
             </div>
             <div className="flex-row font-bold">
-              <span>Restaurant:</span>
-              <span className="uppercase">M.A BAKER'S</span>
+              <span>Business:</span>
+              <span className="uppercase">{receiptSettings?.brandName || 'BakeryPOS'}</span>
             </div>
             <div className="flex-row">
               <span>Cashier:</span>
@@ -278,12 +278,12 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <div className="receipt-divider !mt-4"></div>
           <div className="text-[7.5pt] space-y-1 py-1 uppercase leading-tight">
             <div className="flex-row items-center">
-              <span>BRANCH 1: <span className="font-bold underline">{receiptSettings?.branch1Location || 'DHAMRA ROAD'}</span></span>
-              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch1OnlineOrder || '03297040402'}</span></span>
+              <span>BRANCH 1: <span className="font-bold underline">{receiptSettings?.branch1Location}</span></span>
+              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch1OnlineOrder}</span></span>
             </div>
             <div className="flex-row items-center">
-              <span>BRANCH 2: <span className="font-bold underline">{receiptSettings?.branch2Location || 'JAM SAHAB RD'}</span></span>
-              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch2OnlineOrder || '03093660360'}</span></span>
+              <span>BRANCH 2: <span className="font-bold underline">{receiptSettings?.branch2Location}</span></span>
+              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch2OnlineOrder}</span></span>
             </div>
           </div>
           <div className="receipt-divider"></div>

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { UserRole } from '@/types';
 
 export default function SettingsPage() {
@@ -40,6 +40,12 @@ export default function SettingsPage() {
   const [tempPin, setTempPin] = useState('');
 
   const [formReceiptSettings, setFormReceiptSettings] = useState(receiptSettings);
+
+  // Sync form settings when global settings change (e.g. after permanent save)
+  useEffect(() => {
+    setFormReceiptSettings(receiptSettings);
+  }, [receiptSettings]);
+
   const handleSaveReceiptSettings = () => {
     updateReceiptSettings(formReceiptSettings);
   };
@@ -195,21 +201,41 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
               <span className="flex items-center gap-2"><Printer className="h-4 w-4" /> Receipt Information</span>
-              <Button size="sm" onClick={handleSaveReceiptSettings} className="h-8 flex items-center gap-1.5">
-                <Save className="h-3.5 w-3.5" /> Save
-              </Button>
+              {!receiptSettings.isLocked ? (
+                <Button size="sm" onClick={handleSaveReceiptSettings} className="h-8 flex items-center gap-1.5 bg-green-600 hover:bg-green-700">
+                  <Save className="h-3.5 w-3.5" /> Save permanently
+                </Button>
+              ) : (
+                <Badge variant="outline" className="flex gap-1.5 py-1 px-3 border-amber-500 text-amber-700 bg-amber-50">
+                  <Lock className="h-3.5 w-3.5" /> Information Locked
+                </Badge>
+              )}
             </CardTitle>
-            <CardDescription>Customize business details printed on customer receipts.</CardDescription>
+            <CardDescription>
+              {receiptSettings.isLocked 
+                ? "This information has been saved permanently and cannot be changed."
+                : "Enter your business details below. Once saved, these details cannot be changed again."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2 col-span-2">
                 <Label>Brand Name</Label>
-                <Input value={formReceiptSettings.brandName} onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} placeholder="Sultan-E-Libas by Elegance" />
+                <Input 
+                  value={formReceiptSettings.brandName} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} 
+                  placeholder="Sultan-E-Libas by Elegance"
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label>Tagline</Label>
-                <Input value={formReceiptSettings.tagline} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} placeholder="Premium Fabric" />
+                <Input 
+                  value={formReceiptSettings.tagline} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} 
+                  placeholder="Premium Fabric"
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label>Business Logo</Label>
@@ -220,6 +246,7 @@ export default function SettingsPage() {
                       accept="image/*" 
                       onChange={handleLogoUpload}
                       className="cursor-pointer"
+                      disabled={receiptSettings.isLocked}
                     />
                     <p className="text-[10px] text-muted-foreground italic">Uploaded logo will be saved for receipts. Max size 512KB.</p>
                   </div>
@@ -228,65 +255,122 @@ export default function SettingsPage() {
                       <div className="h-14 w-14 border rounded p-1 bg-white flex items-center justify-center shrink-0">
                         <img src={formReceiptSettings.logoUrl} alt="Preview" className="max-h-full max-w-full object-contain filter grayscale" />
                       </div>
-                      <button 
-                        onClick={() => setFormReceiptSettings(s => ({ ...s, logoUrl: '' }))}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Remove Logo"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {!receiptSettings.isLocked && (
+                        <button 
+                          onClick={() => setFormReceiptSettings(s => ({ ...s, logoUrl: '' }))}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remove Logo"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Address</Label>
-                <Input value={formReceiptSettings.address} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} placeholder="Nawabshah, Pakistan" />
+                <Input 
+                  value={formReceiptSettings.address} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} 
+                  placeholder="Nawabshah, Pakistan"
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Main Phone</Label>
-                <Input value={formReceiptSettings.phone} onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} placeholder="03111855990" />
+                <Input 
+                  value={formReceiptSettings.phone} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} 
+                  placeholder="03111855990"
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               
               {/* Branch Information */}
               <div className="grid grid-cols-2 gap-4 col-span-2 pt-2 border-t">
                 <div className="space-y-2">
                   <Label>Branch 1 Name/Loc</Label>
-                  <Input value={formReceiptSettings.branch1Location} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Location: e.target.value }))} placeholder="DHAMRA ROAD" />
+                  <Input 
+                    value={formReceiptSettings.branch1Location} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Location: e.target.value }))} 
+                    placeholder="DHAMRA ROAD"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Branch 1 Order #</Label>
-                  <Input value={formReceiptSettings.branch1OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1OnlineOrder: e.target.value }))} placeholder="03297040402" />
+                  <Input 
+                    value={formReceiptSettings.branch1OnlineOrder} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch1OnlineOrder: e.target.value }))} 
+                    placeholder="03297040402"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Branch 1 Cashier</Label>
-                  <Input value={formReceiptSettings.branch1Cashier} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Cashier: e.target.value }))} placeholder="M. Ali" />
+                  <Input 
+                    value={formReceiptSettings.branch1Cashier} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Cashier: e.target.value }))} 
+                    placeholder="M. Ali"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
                 <div className="space-y-2 pt-2 border-t mt-2">
                   <Label>Branch 2 Name/Loc</Label>
-                  <Input value={formReceiptSettings.branch2Location} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Location: e.target.value }))} placeholder="JAM SAHAB RD" />
+                  <Input 
+                    value={formReceiptSettings.branch2Location} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Location: e.target.value }))} 
+                    placeholder="JAM SAHAB RD"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
                 <div className="space-y-2 pt-2 border-t mt-2">
                   <Label>Branch 2 Order #</Label>
-                  <Input value={formReceiptSettings.branch2OnlineOrder} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2OnlineOrder: e.target.value }))} placeholder="03093660360" />
+                  <Input 
+                    value={formReceiptSettings.branch2OnlineOrder} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch2OnlineOrder: e.target.value }))} 
+                    placeholder="03093660360"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
                 <div className="space-y-2 pt-2 border-t mt-2">
                   <Label>Branch 2 Cashier</Label>
-                  <Input value={formReceiptSettings.branch2Cashier} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Cashier: e.target.value }))} placeholder="Faisal" />
+                  <Input 
+                    value={formReceiptSettings.branch2Cashier} 
+                    onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Cashier: e.target.value }))} 
+                    placeholder="Faisal"
+                    disabled={receiptSettings.isLocked}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2 col-span-2 pt-2 border-t">
                 <Label>Footer Message 1</Label>
-                <Input value={formReceiptSettings.footerMessage1} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} placeholder="Thank you for shopping with elegance." />
+                <Input 
+                  value={formReceiptSettings.footerMessage1} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} 
+                  placeholder="Thank you for shopping with elegance."
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label>Footer Message 2</Label>
-                <Input value={formReceiptSettings.footerMessage2} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} placeholder="For quality assurance, cut pieces cannot be returned or exchanged." />
+                <Input 
+                  value={formReceiptSettings.footerMessage2} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} 
+                  placeholder="For quality assurance, cut pieces cannot be returned or exchanged."
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label>Printed By (Software credits)</Label>
-                <Input value={formReceiptSettings.printedBy} onChange={e => setFormReceiptSettings(s => ({ ...s, printedBy: e.target.value }))} placeholder="GENX CLOUD, NAWABSHAH +923342826675" />
+                <Input 
+                  value={formReceiptSettings.printedBy} 
+                  onChange={e => setFormReceiptSettings(s => ({ ...s, printedBy: e.target.value }))} 
+                  placeholder="GENX CLOUD, NAWABSHAH +923342826675"
+                  disabled={receiptSettings.isLocked}
+                />
               </div>
             </div>
           </CardContent>

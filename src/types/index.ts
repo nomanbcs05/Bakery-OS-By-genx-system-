@@ -249,6 +249,7 @@ export interface ReceiptSettings {
   branch2OnlineOrder: string;
   branch1Cashier: string;
   branch2Cashier: string;
+  isLocked?: boolean;
 }
 
 export interface StaffMember {
