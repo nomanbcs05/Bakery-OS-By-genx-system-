@@ -13,22 +13,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { BarChart3, Trash2, ChevronDown } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart3, Trash2, ChevronDown, Calendar, Layers } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function Reports() {
   const { currentUser, sales, products, batches, expenses, clearSales, clearAllReportData } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
+  
   const [branchFilter, setBranchFilter] = useState<string>('all');
+  const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('all');
+  const [viewMode, setViewMode] = useState<'product' | 'category'>('product');
 
-  const filteredSales = branchFilter === 'all' ? sales
-    : branchFilter === 'walkin' ? sales.filter(s => s.type === 'factory_walkin')
-    : sales.filter(s => s.branch === branchFilter);
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  
+  const isWithinTimeframe = (dateStr: string) => {
+    if (timeframe === 'all') return true;
+    if (timeframe === 'today') return dateStr === todayStr;
+    
+    const date = new Date(dateStr);
+    const diffDays = (now.getTime() - date.getTime()) / (1000 * 3600 * 24);
+    
+    if (timeframe === 'week') return diffDays <= 7;
+    if (timeframe === 'month') return diffDays <= 30;
+    return true;
+  };
+
+  const filteredSales = sales.filter(s => {
+    const matchesBranch = branchFilter === 'all' 
+      ? true 
+      : branchFilter === 'walkin' ? s.type === 'factory_walkin' 
+      : s.branch === branchFilter;
+    
+    return matchesBranch && isWithinTimeframe(s.date);
+  });
+
+  const filteredBatches = batches.filter(b => isWithinTimeframe(b.date));
+  const filteredExpenses = expenses.filter(e => isWithinTimeframe(e.date));
 
   const totalRevenue = filteredSales.reduce((sum, s) => sum + s.total, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const estimatedProfit = totalRevenue - totalExpenses;
 
   // Product-wise sales
@@ -38,12 +64,24 @@ export default function Reports() {
     return { name: p.name, quantity: qty, revenue: rev };
   }).filter(p => p.quantity > 0).sort((a, b) => b.revenue - a.revenue);
 
-  // Production vs Sales
-  const prodVsSales = products.map(p => ({
-    name: p.name,
-    produced: batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0),
-    sold: sales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0),
-  })).filter(p => p.produced > 0);
+  // Grouped Data: Product vs Category
+  let comparisonData = [];
+  
+  if (viewMode === 'product') {
+    comparisonData = products.map(p => ({
+      name: p.name,
+      produced: filteredBatches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0),
+      sold: filteredSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0),
+    })).filter(p => p.produced > 0 || p.sold > 0);
+  } else {
+    const categories = Array.from(new Set(products.map(p => p.category)));
+    comparisonData = categories.map(cat => {
+      const catProducts = products.filter(p => p.category === cat);
+      const prod = filteredBatches.filter(b => catProducts.some(p => p.id === b.productId)).reduce((sum, b) => sum + b.quantity, 0);
+      const sold = filteredSales.flatMap(s => s.items).filter(i => catProducts.some(p => p.id === i.productId)).reduce((sum, i) => sum + i.quantity, 0);
+      return { name: cat, produced: prod, sold };
+    }).filter(c => c.produced > 0 || c.sold > 0);
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -52,12 +90,35 @@ export default function Reports() {
           <h1 className="text-2xl font-bold text-foreground">Reports</h1>
           <p className="text-sm text-muted-foreground">Sales, production, and financial reports</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={timeframe} onValueChange={(v: any) => setTimeframe(v)}>
+            <SelectTrigger className="w-40">
+              <Calendar className="h-4 w-4 mr-2 opacity-50" />
+              <SelectValue placeholder="Timeframe" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Lifetime</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Channels</SelectItem>
+              <SelectItem value="branch_1">Branch 1</SelectItem>
+              <SelectItem value="branch_2">Branch 2</SelectItem>
+              <SelectItem value="walkin">Walk-in</SelectItem>
+            </SelectContent>
+          </Select>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 text-destructive border-destructive/20 hover:bg-destructive/5 hover:text-destructive">
+              <Button variant="outline" className="text-destructive border-destructive/20 hover:bg-destructive/5 hover:text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
-                Clear Data
+                Clear
                 <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
@@ -87,26 +148,16 @@ export default function Reports() {
                <DropdownMenuSeparator />
                <DropdownMenuItem 
                  onClick={() => {
-                   if(confirm('Are you sure you want to clear ALL report data (Sales, Production, and Expenses)? This action cannot be undone.')) {
+                   if(confirm('Are you sure you want to clear ALL report data?')) {
                      clearAllReportData();
                    }
                  }} 
-                 className="bg-destructive text-destructive-foreground focus:bg-destructive/90 focus:text-destructive-foreground"
+                 className="bg-destructive text-destructive-foreground"
                >
-                 Clear All Report Data
+                 Wipe All Reports
                </DropdownMenuItem>
              </DropdownMenuContent>
            </DropdownMenu>
-
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="branch_1">Branch 1</SelectItem>
-              <SelectItem value="branch_2">Branch 2</SelectItem>
-              <SelectItem value="walkin">Walk-in</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -128,17 +179,35 @@ export default function Reports() {
 
       {/* Production vs Sales Chart */}
       <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Production vs Sales</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" /> Production vs Sales
+          </CardTitle>
+          <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <Layers className="h-3 w-3 mr-2 opacity-50" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="product">By Product</SelectItem>
+              <SelectItem value="category">By Category</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardHeader>
         <CardContent>
-          <div className="h-72">
+          <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={prodVsSales}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                <Bar dataKey="produced" fill="hsl(var(--primary))" name="Produced" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="sold" fill="hsl(var(--success))" name="Sold" radius={[4, 4, 0, 0]} />
+              <BarChart data={comparisonData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  cursor={{ fill: 'hsl(var(--muted)/0.1)' }}
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} 
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <Bar dataKey="produced" fill="hsl(var(--primary))" name="Produced" radius={[4, 4, 0, 0]} barSize={30} />
+                <Bar dataKey="sold" fill="hsl(var(--success))" name="Sold" radius={[4, 4, 0, 0]} barSize={30} />
               </BarChart>
             </ResponsiveContainer>
           </div>
