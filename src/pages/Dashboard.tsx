@@ -16,7 +16,9 @@ export default function Dashboard() {
   const todayDispatches = dispatches.filter(d => d.date === today);
   const snapshots = getInventorySnapshots();
   
-  const totalRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
+  const totalRevenue = todaySales
+    .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
+    .reduce((sum, s) => sum + s.total, 0);
   const totalProduced = todayBatches.reduce((sum, b) => sum + b.quantity, 0);
   const totalDispatched = todayDispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
   const totalSold = todaySales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0);
@@ -26,9 +28,9 @@ export default function Dashboard() {
   const lowStock = snapshots.filter(s => s.productionStock < 20 && s.productionStock > 0);
 
   const branchSalesData = [
-    { name: 'Branch 1', sales: todaySales.filter(s => s.branch === 'branch_1').reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Branch 2', sales: todaySales.filter(s => s.branch === 'branch_2').reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Walk-in', sales: todaySales.filter(s => s.type === 'factory_walkin').reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 1', sales: todaySales.filter(s => s.branch === 'branch_1' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 2', sales: todaySales.filter(s => s.branch === 'branch_2' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Walk-in', sales: todaySales.filter(s => s.type === 'factory_walkin' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
   ];
 
   const categoryData = products.reduce((acc, p) => {
@@ -215,7 +217,9 @@ export default function Dashboard() {
             const channelSales = channel === 'factory_walkin'
               ? todaySales.filter(s => s.type === 'factory_walkin')
               : todaySales.filter(s => s.branch === channel);
-            const channelTotal = channelSales.reduce((sum, s) => sum + s.total, 0);
+            const channelTotal = channelSales
+              .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
+              .reduce((sum, s) => sum + s.total, 0);
             return (
               <div key={channel} className="mb-4 last:mb-0">
                 <div className="flex items-center justify-between mb-2">

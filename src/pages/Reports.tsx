@@ -53,14 +53,17 @@ export default function Reports() {
   const filteredBatches = batches.filter(b => isWithinTimeframe(b.date));
   const filteredExpenses = expenses.filter(e => isWithinTimeframe(e.date));
 
-  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.total, 0);
+  const totalRevenue = filteredSales
+    .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
+    .reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const estimatedProfit = totalRevenue - totalExpenses;
 
   // Product-wise sales
   const productSales = products.map(p => {
-    const qty = filteredSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
-    const rev = filteredSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+    const relevantSales = filteredSales.filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid);
+    const qty = relevantSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
+    const rev = relevantSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
     return { name: p.name, quantity: qty, revenue: rev };
   }).filter(p => p.quantity > 0).sort((a, b) => b.revenue - a.revenue);
 
@@ -71,14 +74,22 @@ export default function Reports() {
     comparisonData = products.map(p => ({
       name: p.name,
       produced: filteredBatches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0),
-      sold: filteredSales.flatMap(s => s.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0),
+      sold: filteredSales
+        .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
+        .flatMap(s => s.items)
+        .filter(i => i.productId === p.id)
+        .reduce((sum, i) => sum + i.quantity, 0),
     })).filter(p => p.produced > 0 || p.sold > 0);
   } else {
     const categories = Array.from(new Set(products.map(p => p.category)));
     comparisonData = categories.map(cat => {
       const catProducts = products.filter(p => p.category === cat);
       const prod = filteredBatches.filter(b => catProducts.some(p => p.id === b.productId)).reduce((sum, b) => sum + b.quantity, 0);
-      const sold = filteredSales.flatMap(s => s.items).filter(i => catProducts.some(p => p.id === i.productId)).reduce((sum, i) => sum + i.quantity, 0);
+      const sold = filteredSales
+        .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
+        .flatMap(s => s.items)
+        .filter(i => catProducts.some(p => p.id === i.productId))
+        .reduce((sum, i) => sum + i.quantity, 0);
       return { name: cat, produced: prod, sold };
     }).filter(c => c.produced > 0 || c.sold > 0);
   }
