@@ -1,3 +1,4 @@
+import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard
 } from 'lucide-react';
