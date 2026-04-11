@@ -146,23 +146,27 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   }, [open, autoPrint]);
 
   // Logic for sequential numbering
-  const dDate = new Date(date);
-  const dateStr = dDate.toISOString().split('T')[0];
+  const dDate = date ? new Date(date) : new Date();
+  const isValidDate = dDate instanceof Date && !isNaN(dDate.getTime());
+  const finalDate = isValidDate ? dDate : new Date();
+  const dateStr = finalDate.toISOString().split('T')[0];
   
   // Daily serial: Count sales for this branch on this date
   const dailySales = sales
-    .filter(s => s.branch === branch && s.date.startsWith(dateStr))
+    .filter(s => s.branch === branch && s.date && s.date.startsWith(dateStr))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const dailySerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
-  const paddedDailySerial = String(dailySerial).padStart(1, '0'); // User showed "Y1", so just "1" is fine or "01"
+  const paddedDailySerial = String(dailySerial).padStart(1, '0');
 
   // Global serial: Total sales count since start (Invoice #)
-  const globalSales = [...sales].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const globalSales = [...sales]
+    .filter(s => s.date)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const globalSerial = globalSales.findIndex(s => s.id === saleId) + 1 || 1;
   const paddedGlobalSerial = String(globalSerial).padStart(4, '0');
 
-  const formattedDate = dDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
-  const formattedTime = dDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const formattedDate = finalDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+  const formattedTime = finalDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
   const cashierName = branch === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
 
