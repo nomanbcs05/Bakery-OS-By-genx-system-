@@ -4,8 +4,12 @@ import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
-  BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag
+  BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
+  UserCircle, LogOut, Cloud, CloudOff
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const mainNav = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
@@ -35,7 +39,7 @@ const managementNav = [
 ];
 
 export function POSNavbar() {
-  const { selectedProfile } = useApp();
+  const { selectedProfile, lockProfile, logout, hasSupabaseConfig, isOnline } = useApp();
   const location = useLocation();
 
   if (!selectedProfile) return null;
@@ -70,25 +74,72 @@ export function POSNavbar() {
   const allLinks = [...filteredMainNav, ...filteredSalesNav, ...filteredManagementNav];
 
   return (
-    <div className="flex-shrink-0 w-full bg-white border-b border-slate-100 px-4 py-2.5 flex items-center gap-4 overflow-x-auto scrollbar-hide no-scrollbar">
-      <div className="flex items-center gap-2 mr-4 bg-primary/5 px-3 py-1.5 rounded-2xl">
-         <ChefHat className="h-4 w-4 text-primary" />
-         <span className="text-xs font-black text-slate-800 tracking-tight">Bakewise POS</span>
+    <div className="flex-shrink-0 w-full bg-slate-900 px-4 py-2 flex items-center justify-between border-b border-white/5">
+      <div className="flex items-center flex-1 overflow-x-auto no-scrollbar scrollbar-hide gap-1.5 py-1">
+        <div className="flex items-center gap-2 mr-6 bg-white/10 px-3 py-1.5 rounded-2xl shrink-0">
+           <ChefHat className="h-4 w-4 text-primary" />
+           <span className="text-[10px] font-black text-white uppercase tracking-wider">Bakewise</span>
+        </div>
+        
+        <div className="flex items-center gap-1.5">
+          {allLinks.map((item) => (
+            <NavLink
+              key={item.url}
+              to={item.url}
+              end={item.url === '/'}
+              className="px-4 py-1.5 rounded-full text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all whitespace-nowrap flex items-center gap-2 border border-transparent uppercase tracking-wider"
+              activeClassName="bg-white text-slate-900 border-white shadow-lg"
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              {item.title}
+            </NavLink>
+          ))}
+        </div>
       </div>
-      
-      <div className="flex items-center gap-1.5">
-        {allLinks.map((item) => (
-          <NavLink
-            key={item.url}
-            to={item.url}
-            end={item.url === '/'}
-            className="px-4 py-1.5 rounded-full text-[11px] font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all whitespace-nowrap flex items-center gap-2 border border-transparent"
-            activeClassName="bg-slate-900 border-slate-900 text-white shadow-lg shadow-black/5"
+
+      <div className="flex items-center gap-4 pl-4 ml-4 border-l border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex flex-col items-end">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-black text-white leading-none">{selectedProfile.name}</span>
+              {hasSupabaseConfig && (
+                <Cloud className={cn("h-2.5 w-2.5", isOnline ? "text-green-500" : "text-amber-500")} />
+              )}
+            </div>
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-0.5">
+              {selectedProfile.role.replace('_', ' ')}
+            </p>
+          </div>
+          <div className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-black text-white shadow-xl",
+            selectedProfile.role === 'admin' ? "bg-red-600" : 
+            selectedProfile.role === 'production_manager' ? "bg-blue-600" :
+            selectedProfile.role === 'accountant' ? "bg-green-600" : "bg-orange-600"
+          )}>
+            {selectedProfile.name.charAt(0)}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+            onClick={lockProfile}
+            title="Switch Profile (Go Back)"
           >
-            <item.icon className="h-3.5 w-3.5" />
-            {item.title}
-          </NavLink>
-        ))}
+            <UserCircle className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+            onClick={logout}
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
