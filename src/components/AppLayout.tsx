@@ -10,7 +10,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { isLoading, currentUser, selectedProfile, isProfileLocked } = useApp();
   const location = useLocation();
   
-  const isPosPage = location.pathname.startsWith('/pos/') || location.pathname === '/walkin';
+  const isPosPage = location.pathname.startsWith('/pos/') || 
+                    location.pathname === '/walkin' ||
+                    location.pathname === '/branch-products' ||
+                    location.pathname === '/sales-history' ||
+                    location.pathname === '/sales-details' ||
+                    location.pathname === '/expenses';
 
   if ((!currentUser || !selectedProfile || isProfileLocked) && !isLoading) {
     return (
