@@ -34,7 +34,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <POSStatusBar />
         <POSNavbar />
         {/* Small space between navbar and content */}
-        <div className="h-2 w-full flex-shrink-0" /> 
+        <div className="h-6 w-full flex-shrink-0" /> 
         <main className="flex-1 overflow-auto relative px-4 lg:px-6">
           {isLoading ? (
             <div className="h-full w-full flex flex-col items-center justify-center space-y-4">

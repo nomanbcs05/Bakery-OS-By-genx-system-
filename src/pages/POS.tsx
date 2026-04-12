@@ -106,7 +106,7 @@ export default function POS({ branch }: POSProps) {
     <div className="animate-fade-in -mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Grid */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-8">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
