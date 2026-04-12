@@ -164,7 +164,15 @@ const AUTH_STORAGE_KEY = 'bakewise_auth_state';
 
 // Helper to convert DB objects to CamelCase
 const fromDBProduct = (p: DBProduct): Product => ({
-  id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, isActive: p.is_active, createdAt: p.created_at
+  id: p.id, 
+  name: p.name, 
+  category: p.category, 
+  price: p.price, 
+  unit: p.unit, 
+  isActive: p.is_active, 
+  createdAt: p.created_at,
+  imageUrl: p.image_url,
+  description: p.description
 });
 const fromDBBatch = (b: DBProductionBatch): ProductionBatch => ({
   id: b.id, batchId: b.batch_id, productId: b.product_id, quantity: b.quantity, date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
@@ -208,7 +216,15 @@ const fromDBPurchase = (p: DBPurchase): Purchase => ({
 
 // Helper to convert frontend objects to DB snake_case
 const toDBProduct = (p: Product): DBProduct => ({
-  id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, is_active: p.isActive, created_at: p.createdAt
+  id: p.id, 
+  name: p.name, 
+  category: p.category, 
+  price: p.price, 
+  unit: p.unit, 
+  is_active: p.isActive, 
+  created_at: p.createdAt,
+  image_url: p.imageUrl,
+  description: p.description
 });
 const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
   id: b.id, batch_id: b.batchId, product_id: b.productId, quantity: b.quantity, date: b.date, notes: b.notes, sync_status: b.syncStatus

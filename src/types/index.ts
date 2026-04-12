@@ -18,6 +18,8 @@ export interface Product {
   unit: string;
   isActive: boolean;
   createdAt: string;
+  imageUrl?: string;
+  description?: string;
 }
 
 export interface RawMaterial {
@@ -144,6 +146,8 @@ export interface DBProduct {
   unit: string;
   is_active: boolean;
   created_at: string;
+  image_url?: string;
+  description?: string;
 }
 
 export interface DBProductionBatch {
