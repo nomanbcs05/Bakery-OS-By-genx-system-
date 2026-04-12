@@ -1,9 +1,10 @@
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, TrendingUp, Factory, ShoppingCart, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Package, TrendingUp, Factory, ShoppingCart, AlertTriangle, ArrowUpRight, ArrowDownRight, Layers, Layout, Share2 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts';
 import { Navigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 export default function Dashboard() {
   const { currentUser, products, batches, sales, dispatches, stock, getInventorySnapshots, getProductById } = useApp();
@@ -36,168 +37,193 @@ export default function Dashboard() {
   const categoryData = products.reduce((acc, p) => {
     const existing = acc.find(a => a.name === p.category);
     const produced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
-    if (existing) existing.value += produced;
-    else acc.push({ name: p.category, value: produced });
+    if (produced > 0) {
+      if (existing) existing.value += produced;
+      else acc.push({ name: p.category, value: produced });
+    }
     return acc;
   }, [] as { name: string; value: number }[])
-  .filter(item => item.value > 0)
   .sort((a, b) => b.value - a.value);
 
-  const COLORS = [
-    '#f97316', // Orange 500
-    '#0ea5e9', // Sky 500
-    '#22c55e', // Green 500
-    '#a855f7', // Purple 500
-    '#ef4444', // Red 500
-    '#14b8a6', // Teal 500
-    '#eab308', // Yellow 500
-    '#6366f1'  // Indigo 500
-  ];
+  const COLORS = ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'];
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0 }
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Overview of today's bakery operations</p>
+    <div className="space-y-6 p-4 lg:p-6 bg-slate-50/50 min-h-screen">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
+        <div className="space-y-0.5">
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-sm font-medium">Bakewise operational overview for today</p>
+        </div>
+        
+        {pendingSyncCount > 0 && (
+          <Badge className="bg-amber-50 text-amber-700 border-amber-200 rounded-lg px-3 py-1.5 flex items-center gap-2 animate-pulse">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">{pendingSyncCount} sales pending sync</span>
+          </Badge>
+        )}
       </div>
 
-      {/* Stat Cards */}
-      {pendingSyncCount > 0 && (
-        <Card className="bg-warning/10 border-warning/20 mb-6">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-warning">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="font-medium text-sm">{pendingSyncCount} sales waiting to be synced to cloud</span>
-            </div>
-            <p className="text-xs text-muted-foreground">App will sync automatically when back online</p>
-          </CardContent>
-        </Card>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="stat-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Today's Revenue</p>
-                <p className="text-2xl font-bold text-foreground mt-1">Rs. {totalRevenue.toFixed(0)}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{todaySales.length} transactions</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Small Compact Stat Cards (Layout Copy from Snapshot) */}
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        <motion.div variants={item}>
+          <div className="bg-[#2563EB] rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200 group hover:scale-[1.02] transition-transform">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Today's Revenue</span>
+               <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
+                 <TrendingUp className="h-4 w-4" />
+               </div>
+             </div>
+             <div className="flex items-end justify-between">
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">Rs. {totalRevenue.toLocaleString()}</h3>
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter">
+                  {todaySales.length} TRX
+               </div>
+             </div>
+          </div>
+        </motion.div>
 
-        <Card className="stat-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Produced Today</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{totalProduced}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{todayBatches.length} batches</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-success/10 flex items-center justify-center">
-                <Factory className="h-5 w-5 text-success" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div variants={item}>
+          <div className="bg-[#1F2937] rounded-[24px] p-5 relative overflow-hidden text-white shadow-xl group hover:scale-[1.02] transition-transform">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-[10px] font-bold opacity-70 uppercase tracking-[0.15em]">Produced Volume</span>
+               <div className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center">
+                 <Factory className="h-4 w-4" />
+               </div>
+             </div>
+             <div className="flex items-end justify-between">
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalProduced.toLocaleString()}</h3>
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[9px] font-bold tracking-tighter uppercase">
+                 {todayBatches.length} Batches
+               </div>
+             </div>
+          </div>
+        </motion.div>
 
-        <Card className="stat-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Dispatched Today</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{totalDispatched}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{todayDispatches.length} dispatches</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-info/10 flex items-center justify-center">
-                <Package className="h-5 w-5 text-info" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <motion.div variants={item}>
+          <div className="bg-[#2563EB] rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200 group hover:scale-[1.02] transition-transform">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Dispatched Units</span>
+               <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
+                 <Package className="h-4 w-4" />
+               </div>
+             </div>
+             <div className="flex items-end justify-between">
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalDispatched.toLocaleString()}</h3>
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter uppercase">
+                 {todayDispatches.length} Trips
+               </div>
+             </div>
+          </div>
+        </motion.div>
 
-        <Card className="stat-card">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium">Sold Today</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{totalSold}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">units sold today</p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-warning/10 flex items-center justify-center">
-                <ShoppingCart className="h-5 w-5 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <motion.div variants={item}>
+          <div className="bg-[#1F2937] rounded-[24px] p-5 relative overflow-hidden text-white shadow-xl group hover:scale-[1.02] transition-transform">
+             <div className="flex items-center justify-between mb-2">
+               <span className="text-[10px] font-bold opacity-70 uppercase tracking-[0.15em]">Market Demand</span>
+               <div className="h-7 w-7 rounded-lg bg-white/10 flex items-center justify-center">
+                 <ShoppingCart className="h-4 w-4" />
+               </div>
+             </div>
+             <div className="flex items-end justify-between">
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalSold.toLocaleString()}</h3>
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 text-[9px] font-bold tracking-tighter uppercase">
+                  Units Sold
+               </div>
+             </div>
+          </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Charts */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Sales by Channel</CardTitle>
+        {/* Sales by Channel Card */}
+        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+          <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
+            <div className="space-y-0.5">
+              <CardTitle className="text-sm font-bold text-slate-800">Sales by Channel</CardTitle>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Revenue distribution by branch</CardDescription>
+            </div>
+            <Layout className="h-4 w-4 text-slate-300" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={branchSalesData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Revenue']}
+                <AreaChart data={branchSalesData}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="0 0" stroke="rgba(0,0,0,0.03)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} dy={5} />
+                  <YAxis hide />
+                  <Tooltip 
+                    contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 5px 20px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 700 }}
+                    cursor={{ stroke: '#2563EB', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
                   />
-                  <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-                </BarChart>
+                  <Area type="monotone" dataKey="sales" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Production by Category</CardTitle>
+        {/* Categories Distribution */}
+        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+          <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
+             <div className="space-y-0.5">
+               <CardTitle className="text-sm font-bold text-slate-800">Production Focus</CardTitle>
+               <CardDescription className="text-[10px] font-medium text-slate-400">Category-wise resource allocation</CardDescription>
+             </div>
+             <Share2 className="h-4 w-4 text-slate-300" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie 
                     data={categoryData} 
                     cx="50%" 
-                    cy="45%" 
-                    innerRadius={65} 
-                    outerRadius={85} 
+                    cy="50%" 
+                    innerRadius={60} 
+                    outerRadius={80} 
                     paddingAngle={5}
                     dataKey="value" 
-                    label={({ name, value, percent }) => 
-                      percent > 0.08 ? `${name}: ${value}` : ''
-                    }
                   >
                     {categoryData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={4} />
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={8} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ 
-                      background: 'rgba(255, 255, 255, 0.95)', 
-                      backdropFilter: 'blur(4px)',
-                      border: '1px solid hsl(var(--border))', 
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }} 
+                    contentStyle={{ border: 'none', borderRadius: '12px', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', fontSize: '11px' }} 
                   />
                   <Legend 
                     verticalAlign="bottom" 
                     height={36}
                     iconType="circle"
-                    wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }}
+                    wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -206,77 +232,74 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Branch-wise Sales History */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Branch-wise Sales</CardTitle>
+      {/* Transaction Feed */}
+      <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+        <CardHeader className="p-6 border-b border-slate-50 flex flex-row items-center justify-between">
+          <div className="space-y-0.5">
+            <CardTitle className="text-sm font-bold text-slate-800">Active Transaction Feed</CardTitle>
+            <CardDescription className="text-[10px] font-medium text-slate-400">Live operational data from all branches</CardDescription>
+          </div>
+          <History className="h-4 w-4 text-slate-300" />
         </CardHeader>
-        <CardContent>
-          {(['branch_1', 'branch_2', 'factory_walkin'] as const).map(channel => {
-            const label = channel === 'branch_1' ? 'Branch 1' : channel === 'branch_2' ? 'Branch 2' : 'Walk-in';
-            const channelSales = channel === 'factory_walkin'
-              ? todaySales.filter(s => s.type === 'factory_walkin')
-              : todaySales.filter(s => s.branch === channel);
-            const channelTotal = channelSales
-              .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
-              .reduce((sum, s) => sum + s.total, 0);
-            return (
-              <div key={channel} className="mb-4 last:mb-0">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-                  <Badge variant="secondary">{channelSales.length} sales · Rs. {channelTotal.toFixed(0)}</Badge>
-                </div>
-                {channelSales.length === 0 ? (
-                  <p className="text-xs text-muted-foreground pl-2">No sales yet</p>
-                ) : (
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {channelSales.slice().reverse().map(sale => (
-                      <div key={sale.id} className="flex items-center justify-between text-sm bg-muted/50 rounded-lg px-3 py-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="text-foreground font-medium">
-                            {sale.items.map(i => {
-                              const p = getProductById(i.productId);
-                              return `${p?.name || '?'} x${i.quantity}`;
-                            }).join(', ')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 ml-2">
-                          <Badge variant="outline" className="text-xs capitalize">{sale.paymentMethod}</Badge>
-                          <span className="font-bold text-primary">Rs. {sale.total.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    ))}
+        <CardContent className="p-0">
+          <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
+            {todaySales.slice().reverse().map(sale => (
+              <div key={sale.id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${sale.branch === 'branch_1' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                    <ShoppingCart className="h-4 w-4" />
                   </div>
-                )}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">
+                      {sale.items.map(i => `${getProductById(i.productId)?.name || '?'} x${i.quantity}`).join(', ')}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
+                        {sale.branch === 'factory_walkin' ? 'Walk-in' : sale.branch === 'branch_1' ? 'Branch 1' : 'Branch 2'}
+                      </span>
+                      <span className="h-1 w-1 rounded-full bg-slate-200" />
+                      <span className="text-[9px] font-medium text-slate-400 capitalize">{sale.paymentMethod}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-black text-slate-900">Rs. {sale.total.toLocaleString()}</span>
+                </div>
               </div>
-            );
-          })}
+            ))}
+            {todaySales.length === 0 && (
+              <div className="p-12 text-center">
+                <p className="text-xs font-medium text-slate-300 italic tracking-wide">No transactions recorded today</p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Low Stock Alerts */}
+      {/* Low Stock Alerts (Modernized) */}
       {lowStock.length > 0 && (
-        <Card className="border-warning/30 bg-warning/5">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" />
-              Low Stock Alerts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {lowStock.map(s => {
-                const product = getProductById(s.productId);
-                return (
-                  <Badge key={s.productId} variant="outline" className="border-warning/40 text-warning">
-                    {product?.name}: {s.productionStock} left
+        <Card className="border-none bg-red-50/50 rounded-3xl">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {lowStock.map(s => (
+                  <Badge key={s.productId} className="bg-white text-red-600 border-none shadow-sm rounded-md text-[9px] font-bold uppercase tracking-tight">
+                    {getProductById(s.productId)?.name}: {s.productionStock}
                   </Badge>
-                );
-              })}
+                ))}
+              </div>
             </div>
+            <span className="text-[9px] font-black text-red-400 uppercase tracking-widest hidden sm:block">Inventory Alert</span>
           </CardContent>
         </Card>
       )}
+      
+      <div className="text-center py-4 text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+        Bakewise System | Core Dashboard
+      </div>
     </div>
   );
 }
