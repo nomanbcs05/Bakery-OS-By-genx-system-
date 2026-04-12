@@ -54,7 +54,7 @@ export function AppSidebar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Production Stock', 'Dispatch'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Dashboard', 'Raw Materials', 'Purchases', 'Production', 'Production Stock', 'Dispatch'].includes(item.title);
     if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
     if (isRole(['branch_staff'])) return false; // No main nav items for branch staff
     return false;
@@ -72,6 +72,7 @@ export function AppSidebar() {
 
   const filteredManagementNav = managementNav.filter(item => {
     if (isRole(['admin'])) return true;
+    if (isRole(['production_manager'])) return ['Reports'].includes(item.title);
     if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts', 'Credits'].includes(item.title);
     if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses'].includes(item.title);
     return false;

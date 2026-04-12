@@ -96,21 +96,38 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border shadow-sm;
+    @apply bg-card/80 backdrop-blur-md border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
   }
   .stat-card {
-    @apply bg-card rounded-xl border border-border p-5 shadow-sm transition-shadow hover:shadow-md;
+    @apply bg-card rounded-[2rem] border border-border p-8 shadow-[0_20px_50px_rgba(0,0,0,0.04)] transition-all duration-500 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] hover:-translate-y-1;
   }
   .pos-grid {
     @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3;
   }
+  .mesh-gradient {
+    background-color: hsla(32, 95%, 44%, 0.05);
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(32, 95%, 44%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(142, 71%, 45%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(32, 95%, 44%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(142, 71%, 45%, 0.1) 0px, transparent 50%);
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .animate-fade-in {
-  animation: fade-in 0.3s ease-out;
+  animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
 }

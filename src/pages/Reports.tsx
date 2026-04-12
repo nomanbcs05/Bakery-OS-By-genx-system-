@@ -18,7 +18,7 @@ import { BarChart3, Trash2, ChevronDown, Calendar, Layers } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function Reports() {
-  const { currentUser, sales, products, batches, expenses, clearSales, clearAllReportData } = useApp();
+  const { currentUser, sales, products, batches, expenses, purchases, clearSales, clearAllReportData } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   
@@ -52,11 +52,16 @@ export default function Reports() {
 
   const filteredBatches = batches.filter(b => isWithinTimeframe(b.date));
   const filteredExpenses = expenses.filter(e => isWithinTimeframe(e.date));
-
+  const filteredPurchases = purchases.filter(p => isWithinTimeframe(p.date));
+  
   const totalRevenue = filteredSales
     .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
     .reduce((sum, s) => sum + s.total, 0);
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  
+  const totalExpenseEntries = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalProcurement = filteredPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+  
+  const totalExpenses = totalExpenseEntries + totalProcurement;
   const estimatedProfit = totalRevenue - totalExpenses;
 
   // Product-wise sales
@@ -173,18 +178,27 @@ export default function Reports() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="stat-card"><CardContent className="p-0">
-          <p className="text-sm text-muted-foreground">Total Revenue</p>
-          <p className="text-2xl font-bold text-foreground">Rs. {totalRevenue.toFixed(2)}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="stat-card border-none bg-primary/5 shadow-sm"><CardContent className="p-6">
+          <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Total Revenue</p>
+          <p className="text-2xl font-black text-foreground">Rs. {totalRevenue.toLocaleString()}</p>
         </CardContent></Card>
-        <Card className="stat-card"><CardContent className="p-0">
-          <p className="text-sm text-muted-foreground">Total Expenses</p>
-          <p className="text-2xl font-bold text-destructive">Rs. {totalExpenses.toFixed(2)}</p>
+        
+        <Card className="stat-card border-none bg-orange-50 shadow-sm"><CardContent className="p-6">
+          <p className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-1">Procurement</p>
+          <p className="text-2xl font-black text-foreground">Rs. {totalProcurement.toLocaleString()}</p>
         </CardContent></Card>
-        <Card className="stat-card"><CardContent className="p-0">
-          <p className="text-sm text-muted-foreground">Est. Profit</p>
-          <p className={`text-2xl font-bold ${estimatedProfit >= 0 ? 'text-success' : 'text-destructive'}`}>Rs. {estimatedProfit.toFixed(2)}</p>
+
+        <Card className="stat-card border-none bg-destructive/5 shadow-sm"><CardContent className="p-6">
+          <p className="text-xs font-bold text-destructive uppercase tracking-widest mb-1">Total Expenses</p>
+          <p className="text-2xl font-black text-destructive">Rs. {totalExpenses.toLocaleString()}</p>
+        </CardContent></Card>
+        
+        <Card className="stat-card border-none bg-success/5 shadow-sm"><CardContent className="p-6">
+          <p className="text-xs font-bold text-success uppercase tracking-widest mb-1">Est. Profit</p>
+          <p className={`text-2xl font-black ${estimatedProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+            Rs. {estimatedProfit.toLocaleString()}
+          </p>
         </CardContent></Card>
       </div>
 
