@@ -17,7 +17,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     location.pathname === '/sales-history' ||
                     location.pathname === '/sales-details' ||
                     location.pathname === '/expenses' ||
-                    (selectedProfile?.role === 'branch_staff');
+                    selectedProfile?.role === 'branch_staff' ||
+                    selectedProfile?.role === 'admin';
 
   if ((!currentUser || !selectedProfile || isProfileLocked) && !isLoading) {
     return (
