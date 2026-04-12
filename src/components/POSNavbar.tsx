@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
-  UserCircle, LogOut, Cloud, CloudOff
+  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,41 @@ const managementNav = [
 export function POSNavbar() {
   const { selectedProfile, lockProfile, logout, hasSupabaseConfig, isOnline } = useApp();
   const location = useLocation();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 5);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+    }
+    return () => {
+      el?.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll]);
+
+  // Re-check after links render
+  useEffect(() => {
+    setTimeout(checkScroll, 100);
+  }, [location.pathname, checkScroll]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const amount = 200;
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
 
   if (!selectedProfile) return null;
 
@@ -74,14 +109,32 @@ export function POSNavbar() {
   const allLinks = [...filteredMainNav, ...filteredSalesNav, ...filteredManagementNav];
 
   return (
-    <div className="flex-shrink-0 w-full bg-white px-4 py-2 flex items-center justify-between border-b border-slate-100 shadow-sm relative z-50">
-      <div className="flex items-center flex-1 overflow-x-auto gap-1.5 py-1 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <style dangerouslySetInnerHTML={{ __html: `
-          .scrollbar-none::-webkit-scrollbar {
-            display: none;
-          }
-        `}} />
-        <div className="flex items-center gap-2 mr-6 bg-slate-100 px-3 py-1.5 rounded-2xl shrink-0">
+    <div className="flex-shrink-0 w-full bg-white px-2 py-2 flex items-center justify-between border-b border-slate-100 shadow-sm relative z-50">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .nav-scroll::-webkit-scrollbar { display: none; }
+      `}} />
+
+      {/* Left Arrow */}
+      <button
+        onClick={() => scroll('left')}
+        className={cn(
+          "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 mr-1",
+          canScrollLeft 
+            ? "bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer" 
+            : "text-slate-200 cursor-default"
+        )}
+        disabled={!canScrollLeft}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      {/* Scrollable Nav Links */}
+      <div 
+        ref={scrollRef}
+        className="flex items-center flex-1 overflow-x-auto gap-1.5 py-1 nav-scroll relative" 
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <div className="flex items-center gap-2 mr-4 bg-slate-100 px-3 py-1.5 rounded-2xl shrink-0">
            <ChefHat className="h-4 w-4 text-primary" />
            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Bakewise</span>
         </div>
@@ -102,7 +155,22 @@ export function POSNavbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 pl-4 ml-4 border-l border-slate-100 shrink-0">
+      {/* Right Arrow */}
+      <button
+        onClick={() => scroll('right')}
+        className={cn(
+          "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ml-1",
+          canScrollRight 
+            ? "bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer" 
+            : "text-slate-200 cursor-default"
+        )}
+        disabled={!canScrollRight}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+
+      {/* Profile & Actions */}
+      <div className="flex items-center gap-4 pl-4 ml-2 border-l border-slate-100 shrink-0">
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex flex-col items-end">
             <div className="flex items-center gap-1.5">
