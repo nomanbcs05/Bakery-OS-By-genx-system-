@@ -5,6 +5,7 @@ import { useApp } from '@/context/AppContext';
 import { Loader2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { POSNavbar } from '@/components/POSNavbar';
+import { POSStatusBar } from '@/components/POSStatusBar';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { isLoading, currentUser, selectedProfile, isProfileLocked } = useApp();
@@ -25,12 +26,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  // If on a POS page, use full screen with top capsule navbar
+  // If on a POS page, use full screen with top status bar & capsule navbar
   if (isPosPage && currentUser && selectedProfile && !isProfileLocked) {
     return (
       <div className="min-h-screen flex flex-col w-full bg-slate-50 overflow-hidden">
+        <POSStatusBar />
         <POSNavbar />
-        <main className="flex-1 overflow-auto relative">
+        {/* Small space between navbar and content */}
+        <div className="h-2 w-full flex-shrink-0" /> 
+        <main className="flex-1 overflow-auto relative px-4 lg:px-6">
           {isLoading ? (
             <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
               <Loader2 className="h-10 w-10 text-primary animate-spin" />
