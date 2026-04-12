@@ -82,14 +82,14 @@ export default function Purchases() {
         <div className="space-y-0.5">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
              Procurement
-             <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] py-0 px-2 font-bold uppercase tracking-wider">v2.0</Badge>
+             <Badge variant="secondary" className="bg-orange-100 text-primary hover:bg-orange-100 rounded-lg text-[10px] py-0 px-2 font-bold uppercase tracking-wider">v2.0</Badge>
           </h1>
           <p className="text-slate-500 text-sm font-medium">Manage raw material logistics and accounts</p>
         </div>
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="rounded-xl h-10 px-5 shadow-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all flex items-center gap-2">
+            <Button className="rounded-xl h-10 px-5 shadow-sm bg-primary hover:bg-primary/95 text-white font-semibold text-sm transition-all flex items-center gap-2">
               <Plus className="h-4 w-4" />
               New Entry
             </Button>
@@ -136,7 +136,7 @@ export default function Purchases() {
             </div>
             <DialogFooter className="mt-6 gap-2">
               <Button variant="ghost" onClick={() => setIsAddOpen(false)} className="rounded-xl">Cancel</Button>
-              <Button onClick={handleAddPurchase} className="rounded-xl bg-blue-600 hover:bg-blue-700 px-8">Submit Entry</Button>
+              <Button onClick={handleAddPurchase} className="rounded-xl bg-primary hover:bg-primary/95 px-8">Submit Entry</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -144,8 +144,8 @@ export default function Purchases() {
 
       {/* Small Stat Cards (Layout Copy from Screenshot) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Blue Style */}
-        <div className="bg-[#2563EB] rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200">
+        {/* Card 1: Primary Style */}
+        <div className="bg-primary rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-200">
            <div className="flex items-center justify-between mb-2">
              <span className="text-xs font-medium opacity-90 uppercase tracking-[0.1em]">Gross Investment</span>
              <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -155,7 +155,7 @@ export default function Purchases() {
            <div className="flex items-end justify-between">
              <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalSpent/1000).toFixed(1)}K</h3>
              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-bold">
-               +11.01%
+               TOTAL
              </div>
            </div>
         </div>
@@ -170,14 +170,14 @@ export default function Purchases() {
            </div>
            <div className="flex items-end justify-between">
              <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalPaid/1000).toFixed(1)}K</h3>
-             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-400/20 text-red-300 text-[10px] font-bold">
-               -0.03%
+             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+               PAID
              </div>
            </div>
         </div>
 
-        {/* Card 3: Blue Style */}
-        <div className="bg-[#2563EB] rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200">
+        {/* Card 3: Primary Style */}
+        <div className="bg-primary rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-200">
            <div className="flex items-center justify-between mb-2">
              <span className="text-xs font-medium opacity-90 uppercase tracking-[0.1em]">Outstanding</span>
              <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -187,7 +187,7 @@ export default function Purchases() {
            <div className="flex items-end justify-between">
              <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalRemaining/1000).toFixed(1)}K</h3>
              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-bold">
-               +15.03%
+               DEBT
              </div>
            </div>
         </div>
@@ -202,8 +202,8 @@ export default function Purchases() {
            </div>
            <div className="flex items-end justify-between">
              <h3 className="text-[26px] font-black leading-tight tracking-tight">{filteredPurchases.length}</h3>
-             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-green-400">
-               +6.08%
+             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-primary">
+               COUNT
              </div>
            </div>
         </div>
@@ -221,7 +221,7 @@ export default function Purchases() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <Input 
                   placeholder="Search..." 
-                  className="pl-9 rounded-xl border-slate-200 h-9 text-xs focus:ring-blue-100 transition-all"
+                  className="pl-9 rounded-xl border-slate-200 h-9 text-xs focus:ring-orange-100 transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -262,7 +262,7 @@ export default function Purchases() {
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge className={`rounded-lg px-2 py-0.5 text-[9px] font-bold uppercase shadow-none border-none ${
-                        p.paymentMethod === 'cash' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                        p.paymentMethod === 'cash' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-primary'
                     }`} variant="outline">
                       {p.paymentMethod}
                     </Badge>

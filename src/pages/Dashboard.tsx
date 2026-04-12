@@ -45,7 +45,8 @@ export default function Dashboard() {
   }, [] as { name: string; value: number }[])
   .sort((a, b) => b.value - a.value);
 
-  const COLORS = ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'];
+  // Using theme primary colors
+  const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5'];
 
   const container = {
     hidden: { opacity: 0 },
@@ -86,7 +87,7 @@ export default function Dashboard() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         <motion.div variants={item}>
-          <div className="bg-[#2563EB] rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200 group hover:scale-[1.02] transition-transform">
+          <div className="bg-primary rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-200 group hover:scale-[1.02] transition-transform">
              <div className="flex items-center justify-between mb-2">
                <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Today's Revenue</span>
                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -112,7 +113,7 @@ export default function Dashboard() {
              </div>
              <div className="flex items-end justify-between">
                <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalProduced.toLocaleString()}</h3>
-               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[9px] font-bold tracking-tighter uppercase">
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[9px] font-bold tracking-tighter uppercase">
                  {todayBatches.length} Batches
                </div>
              </div>
@@ -120,7 +121,7 @@ export default function Dashboard() {
         </motion.div>
 
         <motion.div variants={item}>
-          <div className="bg-[#2563EB] rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-200 group hover:scale-[1.02] transition-transform">
+          <div className="bg-primary rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-200 group hover:scale-[1.02] transition-transform">
              <div className="flex items-center justify-between mb-2">
                <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Dispatched Units</span>
                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -146,7 +147,7 @@ export default function Dashboard() {
              </div>
              <div className="flex items-end justify-between">
                <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalSold.toLocaleString()}</h3>
-               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 text-[9px] font-bold tracking-tighter uppercase">
+               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/20 text-success text-[9px] font-bold tracking-tighter uppercase">
                   Units Sold
                </div>
              </div>
@@ -171,8 +172,8 @@ export default function Dashboard() {
                 <AreaChart data={branchSalesData}>
                   <defs>
                     <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="0 0" stroke="rgba(0,0,0,0.03)" vertical={false} />
@@ -180,10 +181,10 @@ export default function Dashboard() {
                   <YAxis hide />
                   <Tooltip 
                     contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 5px 20px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 700 }}
-                    cursor={{ stroke: '#2563EB', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
                     formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
                   />
-                  <Area type="monotone" dataKey="sales" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                  <Area type="monotone" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -246,7 +247,7 @@ export default function Dashboard() {
             {todaySales.slice().reverse().map(sale => (
               <div key={sale.id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${sale.branch === 'branch_1' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'}`}>
+                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${sale.branch === 'branch_1' ? 'bg-orange-50 text-primary' : 'bg-slate-100 text-slate-600'}`}>
                     <ShoppingCart className="h-4 w-4" />
                   </div>
                   <div>

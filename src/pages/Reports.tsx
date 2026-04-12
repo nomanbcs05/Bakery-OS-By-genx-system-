@@ -23,6 +23,7 @@ import {
   TrendingUp, 
   DollarSign, 
   ArrowUpRight, 
+  History,
   Activity,
   Filter
 } from 'lucide-react';
@@ -110,6 +111,9 @@ export default function Reports() {
     }).filter(c => c.produced > 0 || c.sold > 0);
   }
 
+  // Using theme primary colors
+  const COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5'];
+
   return (
     <div className="space-y-6 p-4 lg:p-6 bg-slate-50/50 min-h-screen">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
@@ -165,8 +169,8 @@ export default function Reports() {
 
       {/* Summary Small Cards (Snow UI style copy) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Revenue (Blue) */}
-        <div className="bg-[#2563EB] rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-100">
+        {/* Card 1: Revenue (Primary Orange) */}
+        <div className="bg-primary rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-100">
            <div className="flex items-center justify-between mb-2">
              <span className="text-xs font-medium opacity-90 uppercase tracking-[0.1em]">Total Revenue</span>
              <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -189,12 +193,12 @@ export default function Reports() {
            </div>
            <div className="flex items-end justify-between">
              <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalProcurement/1000).toFixed(1)}K</h3>
-             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-400/20 text-red-300 text-[10px] font-bold">-2.1%</div>
+             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[10px] font-bold">ACTIVE</div>
            </div>
         </div>
 
-        {/* Card 3: Expenses (Blue) */}
-        <div className="bg-[#2563EB] rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-blue-100">
+        {/* Card 3: Expenses (Primary Orange) */}
+        <div className="bg-primary rounded-[22px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-100">
            <div className="flex items-center justify-between mb-2">
              <span className="text-xs font-medium opacity-90 uppercase tracking-[0.1em]">Total Expenses</span>
              <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
@@ -219,8 +223,8 @@ export default function Reports() {
              <h3 className={`text-[26px] font-black leading-tight tracking-tight ${estimatedProfit < 0 ? 'text-red-400' : ''}`}>
                {(estimatedProfit/1000).toFixed(1)}K
              </h3>
-             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${estimatedProfit >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-               {estimatedProfit >= 0 ? '+6.5%' : '-4.2%'}
+             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${estimatedProfit >= 0 ? 'bg-primary/20 text-primary' : 'bg-red-500/20 text-red-400'}`}>
+               {estimatedProfit >= 0 ? 'PROFIT' : 'LOSS'}
              </div>
            </div>
         </div>
@@ -236,7 +240,7 @@ export default function Reports() {
              </div>
              <div className="hidden sm:flex gap-4 items-center pl-8 border-l border-slate-100">
                 <div className="flex items-center gap-2">
-                   <div className="w-2 h-2 rounded-full bg-blue-500" />
+                   <div className="w-2 h-2 rounded-full bg-primary" />
                    <span className="text-xs font-bold text-slate-500">Produced</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -262,8 +266,8 @@ export default function Reports() {
               <AreaChart data={comparisonData}>
                 <defs>
                   <linearGradient id="colorProduced" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="0 0" stroke="rgba(0,0,0,0.03)" vertical={false} />
@@ -280,13 +284,13 @@ export default function Reports() {
                   tickLine={false}
                 />
                 <Tooltip 
-                  cursor={{ stroke: '#2563EB', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
                   contentStyle={{ background: '#fff', border: 'none', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', fontSize: '11px', fontWeight: 700 }} 
                 />
                 <Area 
                   type="monotone" 
                   dataKey="produced" 
-                  stroke="#2563EB" 
+                  stroke="hsl(var(--primary))" 
                   strokeWidth={3} 
                   fillOpacity={1} 
                   fill="url(#colorProduced)" 
@@ -355,9 +359,9 @@ export default function Reports() {
                      <YAxis hide />
                      <Tooltip 
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', fontSize: '10px' }}
-                        cursor={{ fill: 'rgba(37,99,235,0.03)' }}
+                        cursor={{ fill: 'rgba(249,115,22,0.03)' }}
                      />
-                     <Bar dataKey="quantity" fill="#2563EB" radius={[6, 6, 0, 0]} barSize={24} />
+                     <Bar dataKey="quantity" fill="#f97316" radius={[6, 6, 0, 0]} barSize={24} />
                    </BarChart>
                  </ResponsiveContainer>
                </div>
