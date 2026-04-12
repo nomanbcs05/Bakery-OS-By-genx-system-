@@ -3,15 +3,39 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useApp } from '@/context/AppContext';
 import { Loader2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { POSNavbar } from '@/components/POSNavbar';
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const { isLoading, currentUser, selectedProfile, isProfileLocked } = useApp();
+  const location = useLocation();
+  
+  const isPosPage = location.pathname.startsWith('/pos/') || location.pathname === '/walkin';
 
   if ((!currentUser || !selectedProfile || isProfileLocked) && !isLoading) {
     return (
       <main className="flex-1 min-h-screen">
         {children}
       </main>
+    );
+  }
+
+  // If on a POS page, use full screen with top capsule navbar
+  if (isPosPage && currentUser && selectedProfile && !isProfileLocked) {
+    return (
+      <div className="min-h-screen flex flex-col w-full bg-slate-50 overflow-hidden">
+        <POSNavbar />
+        <main className="flex-1 overflow-auto relative">
+          {isLoading ? (
+            <div className="h-full w-full flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground animate-pulse">Connecting to Supabase...</p>
+            </div>
+          ) : (
+            children
+          )}
+        </main>
+      </div>
     );
   }
 
