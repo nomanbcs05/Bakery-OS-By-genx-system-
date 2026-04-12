@@ -74,8 +74,13 @@ export function POSNavbar() {
   const allLinks = [...filteredMainNav, ...filteredSalesNav, ...filteredManagementNav];
 
   return (
-    <div className="flex-shrink-0 w-full bg-white px-4 py-2 flex items-center justify-between border-b border-slate-100">
-      <div className="flex items-center flex-1 overflow-x-auto no-scrollbar scrollbar-hide gap-1.5 py-1">
+    <div className="flex-shrink-0 w-full bg-white px-4 py-2 flex items-center justify-between border-b border-slate-100 shadow-sm relative z-50">
+      <div className="flex items-center flex-1 overflow-x-auto gap-1.5 py-1 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style dangerouslySetInnerHTML={{ __html: `
+          .scrollbar-none::-webkit-scrollbar {
+            display: none;
+          }
+        `}} />
         <div className="flex items-center gap-2 mr-6 bg-slate-100 px-3 py-1.5 rounded-2xl shrink-0">
            <ChefHat className="h-4 w-4 text-primary" />
            <span className="text-[10px] font-black text-slate-900 uppercase tracking-wider">Bakewise</span>
