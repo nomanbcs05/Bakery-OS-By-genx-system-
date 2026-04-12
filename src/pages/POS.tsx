@@ -103,7 +103,7 @@ export default function POS({ branch }: POSProps) {
   };
 
   return (
-    <div className="animate-fade-in -mt-4">
+    <div className="animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Grid */}
         <div className="lg:col-span-2 space-y-8">
