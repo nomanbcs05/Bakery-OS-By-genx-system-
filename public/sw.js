@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bakewise-v4'; // Bump version
+const CACHE_NAME = 'bakewise-v5'; // Bump version
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Strictly skip dev server/HMR/Vite requests from caching
+  // Skip dev server/HMR/Vite requests
   if (
     url.hostname === 'localhost' || 
     url.hostname === '127.0.0.1' ||
@@ -48,15 +48,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strictly skip supabase/API calls from caching
+  // Skip supabase/API calls
   if (url.hostname.includes('supabase.co')) return;
 
+  // NETWORK FIRST for index.html and root to prevent caching old bundle links
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+        return response;
+      }).catch(() => {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // CACHE FIRST for other assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;
 
       return fetch(event.request).then((response) => {
-        // Return valid response but don't cache if it's not successful
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
@@ -68,11 +84,6 @@ self.addEventListener('fetch', (event) => {
 
         return response;
       }).catch((err) => {
-        // Handle navigation fallback
-        if (event.request.mode === 'navigate') {
-          return caches.match('/');
-        }
-        // Instead of letting it throw, return a dummy response or re-throw properly
         throw err;
       });
     })
