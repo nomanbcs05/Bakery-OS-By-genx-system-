@@ -18,7 +18,6 @@ import {
   CreditCard, 
   ArrowUpRight, 
   TrendingUp, 
-  History,
   Calendar,
   Layers,
   Filter,

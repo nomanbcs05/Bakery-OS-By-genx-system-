@@ -23,7 +23,6 @@ import {
   TrendingUp, 
   DollarSign, 
   ArrowUpRight, 
-  History,
   Activity,
   Filter
 } from 'lucide-react';
