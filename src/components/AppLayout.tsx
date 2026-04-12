@@ -16,7 +16,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     location.pathname === '/branch-products' ||
                     location.pathname === '/sales-history' ||
                     location.pathname === '/sales-details' ||
-                    location.pathname === '/expenses';
+                    location.pathname === '/expenses' ||
+                    (selectedProfile?.role === 'branch_staff');
 
   if ((!currentUser || !selectedProfile || isProfileLocked) && !isLoading) {
     return (

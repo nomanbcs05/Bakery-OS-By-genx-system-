@@ -103,12 +103,7 @@ export default function POS({ branch }: POSProps) {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">{branchLabel} POS</h1>
-        <p className="text-sm text-muted-foreground">Point of sale — sell available stock</p>
-      </div>
-
+    <div className="animate-fade-in -mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Grid */}
         <div className="lg:col-span-2 space-y-4">
