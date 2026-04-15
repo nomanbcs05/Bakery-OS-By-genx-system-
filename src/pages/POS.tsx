@@ -85,18 +85,17 @@ export default function POS({ branch }: POSProps) {
       unitPrice: i.unitPrice,
     }));
     const receiptTotal = total;
-    const saleId = `RCP-${Date.now().toString(36).toUpperCase()}`;
     const date = new Date().toISOString();
 
-    const success = await createSale('branch', branch, cart, method);
-    if (success) {
+    const createdSaleId = await createSale('branch', branch, cart, method);
+    if (createdSaleId) {
       setCart([]);
       setReceiptData({
         open: true,
         items: receiptItems,
         total: receiptTotal,
         paymentMethod: method,
-        saleId,
+        saleId: createdSaleId as string,
         date,
       });
     }

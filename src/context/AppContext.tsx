@@ -123,8 +123,8 @@ interface AppContextType extends AppState {
   addProduction: (productId: string, quantity: number, notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
-  createDispatch: (destination: DispatchDestination, items: DispatchItem[]) => boolean;
-  createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => boolean;
+  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<string | boolean>;
+  createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => Promise<string | false> | string | false;
   refundSale: (id: string) => Promise<boolean>;
   addExpense: (e: Omit<Expense, 'id'>) => void;
   updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
@@ -1306,12 +1306,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (isOnline && hasSupabaseConfig) {
         await supabase.from('sales').insert([toDBSale(walkinSale)]);
       }
+      return walkinSale.id;
     }
 
-    addLog('create', 'dispatch', id, `Dispatched to ${destination}`);
-    toast.success(`Dispatch to ${destination.replace('_', ' ')} confirmed`);
+    addLog('create', 'dispatch', id, `Created dispatch to ${destination}`);
+    toast.success(`Dispatch recorded`);
     return true;
-  }, [stock, products, addLog, isOnline]);
+  }, [stock, products, isOnline, addLog, hasSupabaseConfig, adjustProductionStock, adjustBranchStock]);
 
   const payCreditSale = useCallback(async (id: string) => {
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));
@@ -1355,7 +1356,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     addLog('create', 'sale', id, `Sale of Rs. ${total.toFixed(2)} at ${branch || 'factory'}`);
     toast.success(isOnline ? `Sale recorded: Rs. ${total.toFixed(2)}` : `Sale saved offline: Rs. ${total.toFixed(2)}`);
-    return true;
+    return id;
   }, [stock, addLog, isOnline]);
 
   const refundSale = useCallback(async (id: string) => {

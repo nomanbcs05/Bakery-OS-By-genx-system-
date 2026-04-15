@@ -143,10 +143,9 @@ export default function WalkInSales() {
     const receiptTotal = total;
 
     const success = await createDispatch('walkin', cart.map(i => ({ productId: i.productId, quantity: i.quantity })));
-    if (success) {
-      const saleId = `RCP-${Date.now().toString(36).toUpperCase()}`;
+    if (success && typeof success === 'string') {
       setCart([]);
-      printDirectly(receiptItems, receiptTotal, 'cash', saleId, new Date().toLocaleString());
+      printDirectly(receiptItems, receiptTotal, 'cash', success, new Date().toLocaleString());
     }
   };
 

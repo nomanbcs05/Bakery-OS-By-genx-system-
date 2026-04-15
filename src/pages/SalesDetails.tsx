@@ -24,9 +24,24 @@ export default function SalesDetails() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
   // Flatten the sales into individual line items
-  const lineItems = useMemo(() => {
+    // Map of Date -> Branch -> Array of Sale IDs (ordered by insertion/date)
+    const dailyTracker: Record<string, Record<string, string[]>> = {};
+    const sortedSales = [...sales].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    sortedSales.forEach(s => {
+      const dateStr = s.date ? s.date.split('T')[0].split(' ')[0] : 'unknown';
+      const bId = s.branch || 'factory';
+      if (!dailyTracker[dateStr]) dailyTracker[dateStr] = {};
+      if (!dailyTracker[dateStr][bId]) dailyTracker[dateStr][bId] = [];
+      // Only push unique IDs to avoid duplication if items iterate
+      if (!dailyTracker[dateStr][bId].includes(s.id)) {
+        dailyTracker[dateStr][bId].push(s.id);
+      }
+    });
+
     const items: Array<{
       saleId: string;
+      invoiceNo: number;
       date: string;
       branch: string;
       type: string;
@@ -38,9 +53,14 @@ export default function SalesDetails() {
     }> = [];
 
     sales.forEach(sale => {
+      const dateStr = sale.date ? sale.date.split('T')[0].split(' ')[0] : 'unknown';
+      const bId = sale.branch || 'factory';
+      const invoiceNo = (dailyTracker[dateStr]?.[bId]?.indexOf(sale.id) ?? -1) + 1 || 1;
+
       sale.items.forEach(item => {
         items.push({
           saleId: sale.id,
+          invoiceNo,
           date: sale.date,
           branch: sale.branch || '',
           type: sale.type,
@@ -93,12 +113,13 @@ export default function SalesDetails() {
   const totalRevenue = filteredItems.reduce((acc, curr) => acc + curr.total, 0);
 
   const exportCSV = () => {
-    const headers = ['Date', 'Sale ID', 'Branch', 'Product', 'Qty', 'Price', 'Total', 'Payment'];
+    const headers = ['Date', 'Sale ID', 'Invoice #', 'Branch', 'Product', 'Qty', 'Price', 'Total', 'Payment'];
     const rows = filteredItems.map(item => {
       const p = getProductById(item.productId);
       return [
         item.date,
         item.saleId,
+        item.invoiceNo,
         item.type === 'factory_walkin' ? 'Walk-in' : (item.branch === 'branch_1' ? 'Branch 1' : 'Branch 2'),
         p?.name || 'Unknown',
         item.quantity,
@@ -212,6 +233,7 @@ export default function SalesDetails() {
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Line Total</TableHead>
                   <TableHead className="text-center">Sale ID</TableHead>
+                  <TableHead className="text-center">Invoice #</TableHead>
                   <TableHead>Payment</TableHead>
                 </TableRow>
               </TableHeader>
@@ -247,6 +269,9 @@ export default function SalesDetails() {
                         <TableCell className="text-right font-mono font-bold text-primary">Rs. {item.total.toFixed(0)}</TableCell>
                         <TableCell className="text-center">
                           <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">#{item.saleId.slice(-5)}</code>
+                        </TableCell>
+                        <TableCell className="text-center font-bold">
+                          {item.invoiceNo}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] capitalize h-5">

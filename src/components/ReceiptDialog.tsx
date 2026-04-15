@@ -145,6 +145,9 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
   }, [open, autoPrint]);
 
+  // Normalize branch name for logic comparisons (e.g. "Branch 1" -> "branch_1")
+  const branchId = branch.toLowerCase().replace(' ', '_');
+
   // Logic for sequential numbering
   const dDate = date ? new Date(date) : new Date();
   const isValidDate = dDate instanceof Date && !isNaN(dDate.getTime());
@@ -152,7 +155,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const dateStr = finalDate.toISOString().split('T')[0];
   // Daily sales for this branch on this specific date
   const dailySales = sales
-    .filter(s => s.branch === branch && s.date && s.date.startsWith(dateStr))
+    .filter(s => s.branch === branchId && s.date && s.date.startsWith(dateStr))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // Invoice #: starts at 1 every day (counts from starting shift)
@@ -168,7 +171,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const formattedDate = finalDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = finalDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-  const cashierName = branch === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
+  const cashierName = branchId === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -217,7 +220,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row">
               <span>Type:</span>
-              <span className="font-bold uppercase">{branch === 'FACTORY' ? 'FACTORY SALE' : 'BRANCH POS'}</span>
+              <span className="font-bold uppercase">{branchId === 'factory' ? 'FACTORY SALE' : 'BRANCH POS'}</span>
             </div>
             <div className="flex-row">
               <span>Payment:</span>

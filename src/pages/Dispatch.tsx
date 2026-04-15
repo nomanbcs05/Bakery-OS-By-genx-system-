@@ -81,13 +81,13 @@ export default function DispatchPage() {
 
     const success = await createDispatch(destination, items, paymentMeth, custName, custPhone);
     if (success) {
-      if (destination === 'walkin') {
+      if (destination === 'walkin' && typeof success === 'string') {
         setReceiptData({
           open: true,
           items: receiptItems,
           total,
           paymentMethod: paymentMeth,
-          saleId: currentSaleId,
+          saleId: success,
           date: new Date().toISOString()
         });
       }
