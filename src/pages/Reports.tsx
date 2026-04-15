@@ -101,11 +101,11 @@ export default function Reports() {
     const categories = Array.from(new Set(products.map(p => p.category)));
     comparisonData = categories.map(cat => {
       const catProducts = products.filter(p => p.category === cat);
-      const prod = filteredBatches.filter(b => catProducts.some(p => p.id === b.productId)).reduce((sum, b) => sum + b.quantity, 0);
-      const sold = filteredSales
+      const prod = (filteredBatches || []).filter(b => (catProducts || []).some(p => p.id === b.productId)).reduce((sum, b) => sum + b.quantity, 0);
+      const sold = (filteredSales || [])
         .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
-        .flatMap(s => s.items)
-        .filter(i => catProducts.some(p => p.id === i.productId))
+        .flatMap(s => (s.items || []))
+        .filter(i => (catProducts || []).some(p => p.id === i.productId))
         .reduce((sum, i) => sum + i.quantity, 0);
       return { name: cat, produced: prod, sold };
     }).filter(c => c.produced > 0 || c.sold > 0);

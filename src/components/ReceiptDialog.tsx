@@ -176,6 +176,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Sales Receipt</DialogTitle>
+          <DialogDescription>Printable sales receipt details</DialogDescription>
+        </DialogHeader>
         <style>{commonStyles}</style>
         <div className="bg-white text-black p-4 mx-auto w-full max-w-[320px] shadow-sm" ref={receiptRef}>
           

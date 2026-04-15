@@ -30,7 +30,7 @@ export default function Recipes() {
 
   const handleSelectProduct = (productId: string) => {
     setSelectedProduct(productId);
-    const existingRecipe = recipes.find(r => r.productId === productId && r.isActive);
+    const existingRecipe = (recipes || []).find(r => r.productId === productId && r.isActive);
     if (existingRecipe) {
       setEditingRecipe(existingRecipe.ingredients);
     } else {
@@ -82,7 +82,7 @@ export default function Recipes() {
       return;
     }
 
-    const existingRecipe = recipes.find(r => r.productId === selectedProduct && r.isActive);
+    const existingRecipe = (recipes || []).find(r => r.productId === selectedProduct && r.isActive);
 
     if (existingRecipe) {
       if (editingRecipe.length === 0) {
@@ -136,8 +136,8 @@ export default function Recipes() {
             <CardContent className="p-0">
               <div className="h-[calc(100vh-280px)] overflow-y-auto">
                 <ul className="divide-y">
-                  {filteredProducts.map(p => {
-                    const hasRecipe = recipes.some(r => r.productId === p.id && r.isActive && r.ingredients.length > 0);
+                  {(filteredProducts || []).map(p => {
+                    const hasRecipe = (recipes || []).some(r => r.productId === p.id && r.isActive && (r.ingredients || []).length > 0);
                     return (
                       <li key={p.id}>
                         <button

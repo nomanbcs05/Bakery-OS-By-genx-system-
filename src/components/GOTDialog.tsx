@@ -135,6 +135,10 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md bg-stone-100 border-none p-6 shadow-2xl">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Goods Out Ticket</DialogTitle>
+          <DialogDescription>Dispatch ticket for production items</DialogDescription>
+        </DialogHeader>
         <style>{commonStyles}</style>
         <div className="bg-white text-black p-6 mx-auto w-full max-w-[320px] shadow-sm" ref={printRef}>
           
