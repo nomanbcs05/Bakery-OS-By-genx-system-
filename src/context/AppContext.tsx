@@ -1312,7 +1312,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('create', 'dispatch', id, `Created dispatch to ${destination}`);
     toast.success(`Dispatch recorded`);
     return true;
-  }, [stock, products, isOnline, addLog, hasSupabaseConfig, adjustProductionStock, adjustBranchStock]);
+  }, [stock, products, isOnline, addLog, hasSupabaseConfig]);
 
   const payCreditSale = useCallback(async (id: string) => {
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));
