@@ -155,17 +155,15 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     .filter(s => s.branch === branch && s.date && s.date.startsWith(dateStr))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Global serial: Total sales count since start (Permanent Invoice #)
-  const globalSales = [...sales]
-    .filter(s => s.date)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  const globalSerial = globalSales.findIndex(s => s.id === saleId) + 1 || 1;
-  const paddedGlobalSerial = String(globalSerial);
+  // Invoice #: starts at 1 every day (counts from starting shift)
+  const invoiceSerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
+  const paddedInvoiceSerial = String(invoiceSerial);
 
-  // Daily serial: starts at 1 every day (Day Serial)
-  const dailySerial = dailySales.findIndex(s => s.id === saleId) + 1 || 1;
-  const paddedDailySerial = String(dailySerial).padStart(4, '0');
+  // Day Serial: Number of operational days since first day of software use
+  const allDates = [...new Set(sales.filter(s => s.date).map(s => String(s.date).split('T')[0].split(' ')[0]))].sort();
+  const dayIndex = allDates.findIndex(d => d === dateStr);
+  const daySerial = dayIndex >= 0 ? dayIndex + 1 : Math.max(allDates.length, 1);
+  const paddedDaySerial = String(daySerial).padStart(4, '0');
 
   const formattedDate = finalDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = finalDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -206,8 +204,8 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
 
           <div className="text-[11pt] space-y-0.5 mb-2">
             <div className="flex-row">
-              <span className="font-bold">Invoice #: {paddedGlobalSerial}</span>
-              <span className="font-bold">Day Serial: {paddedDailySerial}</span>
+              <span className="font-bold">Invoice #: {paddedInvoiceSerial}</span>
+              <span className="font-bold">Day Serial: {paddedDaySerial}</span>
             </div>
             <div className="flex-row font-bold">
               <span>Business:</span>
