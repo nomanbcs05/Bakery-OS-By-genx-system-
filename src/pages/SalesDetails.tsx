@@ -24,6 +24,7 @@ export default function SalesDetails() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
   // Flatten the sales into individual line items
+  const lineItems = useMemo(() => {
     // Map of Date -> Branch -> Array of Sale IDs (ordered by insertion/date)
     const dailyTracker: Record<string, Record<string, string[]>> = {};
     const sortedSales = [...sales].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
