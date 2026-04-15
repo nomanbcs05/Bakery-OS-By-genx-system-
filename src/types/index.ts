@@ -20,6 +20,19 @@ export interface Product {
   createdAt: string;
 }
 
+export interface RecipeIngredient {
+  materialId: string;
+  quantity: number;
+}
+
+export interface Recipe {
+  id: string;
+  productId: string;
+  ingredients: RecipeIngredient[];
+  isActive: boolean;
+  syncStatus: 'synced' | 'pending';
+}
+
 export interface RawMaterial {
   id: string;
   name: string;
@@ -144,6 +157,14 @@ export interface DBProduct {
   unit: string;
   is_active: boolean;
   created_at: string;
+}
+
+export interface DBRecipe {
+  id: string;
+  product_id: string;
+  ingredients: any; // Will be stored as JSON/JSONB
+  is_active: boolean;
+  sync_status: 'synced' | 'pending';
 }
 
 export interface DBProductionBatch {

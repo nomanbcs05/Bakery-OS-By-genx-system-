@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
-  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight
+  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ const mainNav = [
   { title: 'Raw Materials', url: '/raw-materials', icon: Layers },
   { title: 'Purchases', url: '/purchases', icon: ShoppingBag },
   { title: 'Production', url: '/production', icon: Factory },
+  { title: 'Recipes (BOM)', url: '/recipes', icon: TestTube2 },
   { title: 'Production Stock', url: '/production-stock', icon: Package },
   { title: 'Dispatch', url: '/dispatch', icon: Truck },
 ];
@@ -36,6 +37,7 @@ const managementNav = [
   { title: 'Accounts', url: '/accounts', icon: Wallet },
   { title: 'Credits', url: '/credits', icon: CreditCard },
   { title: 'Settings', url: '/settings', icon: Settings },
+  { title: 'Branch Settings', url: '/branch-settings', icon: Settings },
 ];
 
 export function POSNavbar() {
@@ -83,7 +85,7 @@ export function POSNavbar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Dashboard', 'Raw Materials', 'Purchases', 'Production', 'Production Stock', 'Dispatch'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Dashboard', 'Raw Materials', 'Purchases', 'Production', 'Recipes (BOM)', 'Production Stock', 'Dispatch'].includes(item.title);
     if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
     return false;
   });
@@ -99,10 +101,10 @@ export function POSNavbar() {
   });
 
   const filteredManagementNav = managementNav.filter(item => {
-    if (isRole(['admin'])) return true;
+    if (isRole(['admin'])) return item.title !== 'Branch Settings';
     if (isRole(['production_manager'])) return ['Reports'].includes(item.title);
     if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts', 'Credits'].includes(item.title);
-    if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses'].includes(item.title);
+    if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses', 'Branch Settings'].includes(item.title);
     return false;
   });
 

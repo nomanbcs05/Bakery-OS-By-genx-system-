@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, typ
 import type {
   User, Product, ProductionBatch, Dispatch, DispatchDestination,
   DispatchItem, Sale, SaleItem, SaleType, PaymentMethod, Expense, AuditLog, InventorySnapshot, UserRole,
-  RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings,
+  RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings, Recipe, DBRecipe,
   StaffMember, StaffDeduction, SalaryVoucher,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
   DBStaffMember, DBStaffDeduction, DBSalaryVoucher
@@ -102,6 +102,7 @@ interface AppState {
   staff: StaffMember[];
   staffDeductions: StaffDeduction[];
   salaryVouchers: SalaryVoucher[];
+  recipes: Recipe[];
 }
 
 interface AppContextType extends AppState {
@@ -112,9 +113,14 @@ interface AppContextType extends AppState {
   updateRawMaterial: (id: string, updates: Partial<RawMaterial>) => Promise<void>;
   deleteRawMaterial: (id: string) => Promise<void>;
   adjustRawMaterialStock: (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => Promise<boolean>;
+  
+  addRecipe: (r: Omit<Recipe, 'id' | 'syncStatus'>) => Promise<void>;
+  updateRecipe: (id: string, updates: Partial<Recipe>) => Promise<void>;
+  deleteRecipe: (id: string) => Promise<void>;
+  
   branchStockAdjustments: BranchStockAdjustment[];
   adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => void;
-  addProduction: (productId: string, quantity: number, notes?: string) => void;
+  addProduction: (productId: string, quantity: number, notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[]) => boolean;
@@ -206,6 +212,10 @@ const fromDBPurchase = (p: DBPurchase): Purchase => ({
   vendorName: p.vendor_name, vendorCity: p.vendor_city, date: p.date, syncStatus: p.sync_status || 'synced'
 });
 
+const fromDBRecipe = (r: DBRecipe): Recipe => ({
+  id: r.id, productId: r.product_id, ingredients: r.ingredients || [], isActive: r.is_active, syncStatus: r.sync_status || 'synced'
+});
+
 // Helper to convert frontend objects to DB snake_case
 const toDBProduct = (p: Product): DBProduct => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, is_active: p.isActive, created_at: p.createdAt
@@ -248,6 +258,10 @@ const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
 const toDBPurchase = (p: Purchase): DBPurchase => ({
   id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
   vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
+});
+
+const toDBRecipe = (r: Recipe): DBRecipe => ({
+  id: r.id, product_id: r.productId, ingredients: r.ingredients, is_active: r.isActive, sync_status: r.syncStatus
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -333,6 +347,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [staffDeductions, setStaffDeductions] = useState<StaffDeduction[]>(initialState.staffDeductions || []);
   const [salaryVouchers, setSalaryVouchers] = useState<SalaryVoucher[]>(initialState.salaryVouchers || []);
   const [purchases, setPurchases] = useState<Purchase[]>(initialState.purchases || []);
+  const [recipes, setRecipes] = useState<Recipe[]>(initialState.recipes || []);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialState.auditLogs || []);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -514,7 +529,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { data: stData },
           { data: sdData },
           { data: svData },
-          { data: purchasesData }
+          { data: purchasesData },
+          { data: recipesData }
         ] = await Promise.all([
           supabase.from('products').select('*'),
           supabase.from('raw_materials').select('*'),
@@ -528,7 +544,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           supabase.from('staff_members').select('*'),
           supabase.from('staff_deductions').select('*'),
           supabase.from('salary_vouchers').select('*'),
-          supabase.from('purchases').select('*')
+          supabase.from('purchases').select('*'),
+          supabase.from('recipes').select('*')
         ]);
 
         // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
@@ -661,6 +678,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return merged;
           });
         }
+
+        if (recipesData && recipesData.length > 0) {
+          const remoteRecipes = recipesData.map(fromDBRecipe);
+          setRecipes(prev => {
+            const merged = [...prev];
+            remoteRecipes.forEach(r => {
+              const idx = merged.findIndex(l => l.id === r.id);
+              if (idx !== -1) merged[idx] = r; else merged.push(r);
+            });
+            return merged;
+          });
+        }
         
         setLastSyncTime(new Date().toISOString());
       } catch (error: any) {
@@ -769,6 +798,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newRecipe = fromDBRecipe(payload.new as DBRecipe);
+          setRecipes(prev => {
+            const index = prev.findIndex(r => r.id === newRecipe.id);
+            if (index === -1) return [...prev, newRecipe];
+            const next = [...prev];
+            next[index] = newRecipe;
+            return next;
+          });
+        }
+      })
       .subscribe();
 
     return () => {
@@ -796,7 +837,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       receiptSettings,
       staff,
       staffDeductions,
-      salaryVouchers
+      salaryVouchers,
+      recipes
     };
     
     try {
@@ -804,7 +846,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Failed to save business data to localStorage:', e);
     }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes]);
 
   // Persist AUTH data separately
   useEffect(() => {
@@ -1226,6 +1268,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addProduction = useCallback(async (productId: string, quantity: number, notes?: string) => {
     const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
+    
+    // Check Recipe and calculate deductions
+    const recipe = recipes.find(r => r.productId === productId && r.isActive);
+    if (recipe) {
+      // PRE-CHECK: Ensure we have enough stock before starting deductions
+      for (const ing of recipe.ingredients) {
+        const material = rawMaterials.find(m => m.id === ing.materialId);
+        const needed = ing.quantity * quantity;
+        if (!material || material.currentStock < needed) {
+          toast.error(`Insufficient ${material?.name || 'Raw Material'}! Need ${needed}${material?.unit || ''}.`);
+          return false; // Prevent production
+        }
+      }
+
+      // EXECUTE DEDUCTIONS
+      for (const ing of recipe.ingredients) {
+        const needed = ing.quantity * quantity;
+        await adjustRawMaterialStock(ing.materialId, 'out', needed, `Auto-deducted for Production: ${batchId}`);
+      }
+    }
+
     const id = `b${Date.now()}`;
     const newBatch: ProductionBatch = { 
       id, batchId, productId, quantity, 
@@ -1240,9 +1303,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await supabase.from('production_batches').insert([toDBBatch(newBatch)]);
     }
 
-    addLog('create', 'production', id, `Produced ${quantity} units`);
+    addLog('create', 'production', id, `Produced ${quantity} units (Batch: ${batchId})`);
     toast.success(isOnline ? `Production recorded: ${quantity} units` : `Production saved offline: ${quantity} units`);
-  }, [batches.length, addLog, isOnline]);
+    return true;
+  }, [batches.length, addLog, isOnline, recipes, rawMaterials, adjustRawMaterialStock]);
 
   const updateProduction = useCallback(async (id: string, updates: Partial<ProductionBatch>) => {
     setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : b));
@@ -1447,6 +1511,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('create', 'purchase', id, `Purchased ${p.quantity} from ${p.vendorName}`);
     toast.success(`Purchase recorded and stock updated!`);
   }, [addLog, isOnline, hasSupabaseConfig, rawMaterials]);
+
+  // RECIPES
+  const addRecipe = useCallback(async (r: Omit<Recipe, 'id' | 'syncStatus'>) => {
+    const id = `rec${Date.now()}`;
+    const newRecipe: Recipe = {
+      ...r,
+      id,
+      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
+    };
+    setRecipes(prev => [...prev, newRecipe]);
+    if (isOnline && hasSupabaseConfig) {
+      await supabase.from('recipes').insert([toDBRecipe(newRecipe)]);
+    }
+    toast.success(`Recipe saved!`);
+  }, [isOnline]);
+
+  const updateRecipe = useCallback(async (id: string, updates: Partial<Recipe>) => {
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : r));
+    if (isOnline && hasSupabaseConfig) {
+      const recipe = recipes.find(r => r.id === id);
+      if (recipe) {
+        await supabase.from('recipes').update(toDBRecipe({ ...recipe, ...updates, syncStatus: 'synced' })).eq('id', id);
+      }
+    }
+    toast.success(`Recipe updated!`);
+  }, [recipes, isOnline]);
+
+  const deleteRecipe = useCallback(async (id: string) => {
+    setRecipes(prev => prev.filter(r => r.id !== id));
+    if (isOnline && hasSupabaseConfig) {
+      await supabase.from('recipes').delete().eq('id', id);
+    }
+    toast.success(`Recipe deleted!`);
+  }, [isOnline]);
 
   const addRawMaterial = useCallback(async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
     const id = `rm${Date.now()}`;
@@ -1748,6 +1846,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       payCreditSale,
       purchases,
       addPurchase,
+      addRecipe,
+      updateRecipe,
+      deleteRecipe,
       hasSupabaseConfig
     }}>
       {children}

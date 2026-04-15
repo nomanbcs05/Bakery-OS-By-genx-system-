@@ -21,12 +21,14 @@ export default function Production() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Bread', price: '', unit: 'piece' });
 
-  const handleAddProduction = () => {
+  const handleAddProduction = async () => {
     if (!selectedProduct || !quantity || parseInt(quantity) <= 0) return;
-    addProduction(selectedProduct, parseInt(quantity), notes || undefined);
-    setQuantity('');
-    setNotes('');
-    setSelectedProduct('');
+    const success = await addProduction(selectedProduct, parseInt(quantity), notes || undefined);
+    if (success) {
+      setQuantity('');
+      setNotes('');
+      setSelectedProduct('');
+    }
   };
 
   const handleAddProduct = () => {

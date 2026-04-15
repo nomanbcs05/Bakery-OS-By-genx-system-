@@ -20,7 +20,9 @@ import SalesHistory from "./pages/SalesHistory";
 import SalesDetails from "./pages/SalesDetails";
 import BranchProducts from "./pages/BranchProducts";
 import ProductionStock from "./pages/ProductionStock";
+import Recipes from "./pages/Recipes";
 import SettingsPage from "./pages/Settings";
+import BranchSettings from "./pages/BranchSettings";
 import LoginPage from "./pages/Login";
 import RawMaterialStock from "./pages/RawMaterialStock";
 import ProfileSelection from "./pages/ProfileSelection";
@@ -90,6 +92,12 @@ const AppRoutes = () => {
         <Route path="/dispatch" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
             <DispatchPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/recipes" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
+            <Recipes />
           </ProtectedRoute>
         } />
 
@@ -169,6 +177,11 @@ const AppRoutes = () => {
         <Route path="/settings" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <SettingsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/branch-settings" element={
+          <ProtectedRoute allowedRoles={['admin', 'branch_staff']}>
+            <BranchSettings />
           </ProtectedRoute>
         } />
         <Route path="*" element={<NotFound />} />
