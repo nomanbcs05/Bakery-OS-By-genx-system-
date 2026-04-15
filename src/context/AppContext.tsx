@@ -1266,68 +1266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success(`Product deleted successfully`);
   }, [addLog]);
 
-  const addProduction = useCallback(async (productId: string, quantity: number, notes?: string) => {
-    const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
-    
-    // Check Recipe and calculate deductions
-    const recipe = recipes.find(r => r.productId === productId && r.isActive);
-    if (recipe) {
-      // PRE-CHECK: Ensure we have enough stock before starting deductions
-      for (const ing of recipe.ingredients) {
-        const material = rawMaterials.find(m => m.id === ing.materialId);
-        const needed = ing.quantity * quantity;
-        if (!material || material.currentStock < needed) {
-          toast.error(`Insufficient ${material?.name || 'Raw Material'}! Need ${needed}${material?.unit || ''}.`);
-          return false; // Prevent production
-        }
-      }
-
-      // EXECUTE DEDUCTIONS
-      for (const ing of recipe.ingredients) {
-        const needed = ing.quantity * quantity;
-        await adjustRawMaterialStock(ing.materialId, 'out', needed, `Auto-deducted for Production: ${batchId}`);
-      }
-    }
-
-    const id = `b${Date.now()}`;
-    const newBatch: ProductionBatch = { 
-      id, batchId, productId, quantity, 
-      date: new Date().toISOString().slice(0, 10), 
-      notes,
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    
-    setBatches(prev => [...prev, newBatch]);
-
-    if (isOnline && hasSupabaseConfig) {
-      await supabase.from('production_batches').insert([toDBBatch(newBatch)]);
-    }
-
-    addLog('create', 'production', id, `Produced ${quantity} units (Batch: ${batchId})`);
-    toast.success(isOnline ? `Production recorded: ${quantity} units` : `Production saved offline: ${quantity} units`);
-    return true;
-  }, [batches.length, addLog, isOnline, recipes, rawMaterials, adjustRawMaterialStock]);
-
-  const updateProduction = useCallback(async (id: string, updates: Partial<ProductionBatch>) => {
-    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : b));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const batch = batches.find(b => b.id === id);
-      if (batch) {
-        await supabase.from('production_batches').update(toDBBatch({ ...batch, ...updates, syncStatus: 'synced' })).eq('id', id);
-      }
-    }
-    addLog('update', 'production', id, `Updated production batch: ${id}`);
-    toast.success(`Production batch updated successfully`);
-  }, [batches, addLog, isOnline]);
-
-  const deleteProduction = useCallback(async (id: string) => {
-    setBatches(prev => prev.filter(b => b.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('production_batches').delete().eq('id', id);
-    }
-    addLog('delete', 'production', id, `Deleted production batch: ${id}`);
-    toast.success(`Production batch deleted successfully`);
-  }, [addLog, isOnline]);
 
   const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
     for (const item of items) {
@@ -1641,6 +1579,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('adjust', 'branch_stock', productId, `Adjusted ${branch} stock by -${quantity}. Reason: ${reason}`);
     toast.success(`Stock adjusted by -${quantity}`);
   }, [currentUser, addLog, isOnline]);
+
+  const addProduction = useCallback(async (productId: string, quantity: number, notes?: string) => {
+    const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
+    
+    // Check Recipe and calculate deductions
+    const recipe = recipes.find(r => r.productId === productId && r.isActive);
+    if (recipe) {
+      // PRE-CHECK: Ensure we have enough stock before starting deductions
+      for (const ing of recipe.ingredients) {
+        const material = rawMaterials.find(m => m.id === ing.materialId);
+        const needed = ing.quantity * quantity;
+        if (!material || material.currentStock < needed) {
+          toast.error(`Insufficient ${material?.name || 'Raw Material'}! Need ${needed}${material?.unit || ''}.`);
+          return false; // Prevent production
+        }
+      }
+
+      // EXECUTE DEDUCTIONS
+      for (const ing of recipe.ingredients) {
+        const needed = ing.quantity * quantity;
+        await adjustRawMaterialStock(ing.materialId, 'out', needed, `Auto-deducted for Production: ${batchId}`);
+      }
+    }
+
+    const id = `b${Date.now()}`;
+    const newBatch: ProductionBatch = { 
+      id, batchId, productId, quantity, 
+      date: new Date().toISOString().slice(0, 10), 
+      notes,
+      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
+    };
+    
+    setBatches(prev => [...prev, newBatch]);
+
+    if (isOnline && hasSupabaseConfig) {
+      await supabase.from('production_batches').insert([toDBBatch(newBatch)]);
+    }
+
+    addLog('create', 'production', id, `Produced ${quantity} units (Batch: ${batchId})`);
+    toast.success(isOnline ? `Production recorded: ${quantity} units` : `Production saved offline: ${quantity} units`);
+    return true;
+  }, [batches.length, addLog, isOnline, recipes, rawMaterials, adjustRawMaterialStock]);
+
+  const updateProduction = useCallback(async (id: string, updates: Partial<ProductionBatch>) => {
+    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : b));
+    if (navigator.onLine && hasSupabaseConfig) {
+      const batch = batches.find(b => b.id === id);
+      if (batch) {
+        await supabase.from('production_batches').update(toDBBatch({ ...batch, ...updates, syncStatus: 'synced' })).eq('id', id);
+      }
+    }
+    addLog('update', 'production', id, `Updated production batch: ${id}`);
+    toast.success(`Production batch updated successfully`);
+  }, [batches, addLog, isOnline]);
+
+  const deleteProduction = useCallback(async (id: string) => {
+    setBatches(prev => prev.filter(b => b.id !== id));
+    if (navigator.onLine && hasSupabaseConfig) {
+      await supabase.from('production_batches').delete().eq('id', id);
+    }
+    addLog('delete', 'production', id, `Deleted production batch: ${id}`);
+    toast.success(`Production batch deleted successfully`);
+  }, [addLog, isOnline]);
 
   const getProductById = useCallback((id: string) => products.find(p => p.id === id), [products]);
 
