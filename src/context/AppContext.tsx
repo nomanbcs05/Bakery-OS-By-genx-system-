@@ -354,26 +354,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(initialState.lastSyncTime || null);
   
   const defaultReceiptSettings: ReceiptSettings = {
-    brandName: '',
-    tagline: '',
+    brandName: "M.A BAKER'S",
+    tagline: 'Quality You Can Trust',
     logoUrl: '',
-    address: '',
-    phone: '',
-    footerMessage1: '',
-    footerMessage2: '',
-    printedBy: '',
-    branch1Location: '',
-    branch1OnlineOrder: '',
+    address: 'Jam Sahib Road, Nawabshah',
+    phone: '0329-7040402',
+    footerMessage1: "Thank you for visiting M.A BAKER'S!",
+    footerMessage2: 'Powered by genx systems +923342826675',
+    printedBy: 'GENX CLOUD POS',
+    branch1Location: 'Jam sahib road',
+    branch1OnlineOrder: '03297040402',
     branch2Location: '',
     branch2OnlineOrder: '',
-    branch1Cashier: '',
+    branch1Cashier: 'Main Staff',
     branch2Cashier: '',
     isLocked: false
   };
 
-  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(
-    (initialState as any).receiptSettings || defaultReceiptSettings
-  );
+  const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(() => {
+    const saved = (initialState as any).receiptSettings || {};
+    return {
+      ...defaultReceiptSettings,
+      ...saved,
+      // Force override with requested information to "save" it now
+      branch1Location: 'Jam sahib road',
+      branch1OnlineOrder: '03297040402',
+      branch2Location: '',
+      branch2OnlineOrder: '',
+      footerMessage1: "Thank you for visiting M.A BAKER'S!"
+    };
+  });
 
   const hasLoaded = React.useRef(false);
   useEffect(() => {
