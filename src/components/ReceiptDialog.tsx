@@ -225,7 +225,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               <span className="font-bold">Day Serial: {paddedDaySerial}</span>
             </div>
             <div className="flex-row font-bold">
-              <span>Business:</span>
+              <span>Restaurant:</span>
               <span className="uppercase">{receiptSettings?.brandName || 'BakeryPOS'}</span>
             </div>
             <div className="flex-row">
@@ -234,7 +234,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row">
               <span>Type:</span>
-              <span className="font-bold uppercase">{branchId === 'factory' ? 'FACTORY SALE' : 'BRANCH POS'}</span>
+              <span className="font-bold uppercase">{branchId === 'factory' || branch.toLowerCase().includes('factory') ? 'WALK IN' : (branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2')}</span>
             </div>
             <div className="flex-row">
               <span>Payment:</span>
