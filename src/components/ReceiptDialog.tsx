@@ -138,12 +138,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   };
 
   useEffect(() => {
-    if (open && autoPrint) {
-      setTimeout(() => {
-        handlePrint();
-      }, 500);
+    if (open) {
+      handlePrint();
+      onClose();
     }
-  }, [open, autoPrint]);
+  }, [open]);
 
   // Normalize branch name for logic comparisons (e.g. "Branch 1" -> "branch_1")
   const branchId = branch.toLowerCase().replace(' ', '_');
@@ -173,17 +172,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
 
   const cashierName = branchId === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-stone-100 border-none p-6 shadow-2xl">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Sales Receipt</DialogTitle>
-          <DialogDescription>Printable sales receipt details</DialogDescription>
-        </DialogHeader>
+    <div style={{ display: 'none' }}>
+      <div ref={receiptRef}>
+        {/* Recopying the structure from below to ensure it's available for handlePrint */}
         <style>{commonStyles}</style>
-        <div className="bg-white text-black p-4 mx-auto w-full max-w-[320px] shadow-sm" ref={receiptRef}>
-          
-          {/* Header Box */}
+        <div className="bg-white text-black p-4 mx-auto w-full max-w-[320px]">
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
               <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" />
@@ -236,7 +232,6 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          {/* Table */}
           <div className="receipt-line"></div>
           <div className="item-table-header">
             <div className="w-qty">Qty</div>
@@ -256,7 +251,6 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             ))}
           </div>
 
-          {/* Totals Section */}
           <div className="receipt-line mt-4"></div>
           <div className="text-[11pt] space-y-1">
             <div className="flex-row">
@@ -275,17 +269,19 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          {/* New Locations Footer Section */}
           <div className="receipt-divider !mt-4"></div>
           <div className="text-[7.5pt] space-y-1 py-1 uppercase leading-tight">
             <div className="flex-row items-center">
-              <span>BRANCH 1: <span className="font-bold underline">{receiptSettings?.branch1Location || 'JAM SAHIB ROAD'}</span></span>
-              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch1OnlineOrder || '03297040402'}</span></span>
+              <span>{branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2'}: <span className="font-bold underline">
+                {branchId === 'branch_1' ? (receiptSettings?.branch1Location || 'JAM SAHIB ROAD') : receiptSettings?.branch2Location}
+              </span></span>
+              <span>ORDER: <span className="phone-pill">
+                {branchId === 'branch_1' ? (receiptSettings?.branch1OnlineOrder || '03297040402') : receiptSettings?.branch2OnlineOrder}
+              </span></span>
             </div>
           </div>
           <div className="receipt-divider"></div>
 
-          {/* Tagline Footer */}
           <div className="receipt-box text-center mt-2">
             <div className="font-bold text-[10pt] mb-1">
               {receiptSettings?.footerMessage1}
@@ -294,17 +290,9 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               {receiptSettings?.footerMessage2}
             </div>
           </div>
-
         </div>
-
-        <DialogFooter className="flex flex-row gap-2 mt-4">
-          <Button variant="outline" onClick={onClose} className="flex-1 bg-white hover:bg-stone-50 border-stone-300">Close Preview</Button>
-          <Button onClick={handlePrint} className="flex-1 bg-black text-white hover:bg-stone-900 border-none">
-            <Printer className="h-4 w-4 mr-2" /> Print Receipt
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
 

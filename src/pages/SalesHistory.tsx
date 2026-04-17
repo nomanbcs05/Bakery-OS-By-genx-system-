@@ -112,46 +112,64 @@ export default function SalesHistory() {
   const printSummary = () => {
     const content = summaryRef.current;
     if (!content) return;
-    const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) return;
-    win.document.write(`
-      <html><head><title>Sales Summary</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; }
-        h1 { font-size: 20px; text-align: center; margin-bottom: 4px; }
-        .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 13px; }
-        th { background: #f5f5f5; font-weight: 600; }
-        .right { text-align: right; }
-        .total-row { font-weight: bold; background: #fef3c7; }
-        @media print { body { margin: 0; } }
-      </style></head><body>
-      <h1>🍞 BakeryOS — Sales Summary</h1>
-      <p class="subtitle">Generated: ${format(new Date(), 'PPP p')}${dateFrom ? ' | From: ' + format(dateFrom, 'PP') : ''}${dateTo ? ' | To: ' + format(dateTo, 'PP') : ''}</p>
-      <table>
-        <tr><th>Branch</th><th class="right">Sales</th><th class="right">Cash</th><th class="right">Card</th><th class="right">Total</th></tr>
-        <tr><td>Branch 1</td><td class="right">${branchSummary.branch_1.count}</td><td class="right">$${branchSummary.branch_1.cash.toFixed(2)}</td><td class="right">$${branchSummary.branch_1.card.toFixed(2)}</td><td class="right">$${branchSummary.branch_1.total.toFixed(2)}</td></tr>
-        <tr><td>Branch 2</td><td class="right">${branchSummary.branch_2.count}</td><td class="right">$${branchSummary.branch_2.cash.toFixed(2)}</td><td class="right">$${branchSummary.branch_2.card.toFixed(2)}</td><td class="right">$${branchSummary.branch_2.total.toFixed(2)}</td></tr>
-        <tr><td>Walk-in</td><td class="right">${branchSummary.factory_walkin.count}</td><td class="right">$${branchSummary.factory_walkin.cash.toFixed(2)}</td><td class="right">$${branchSummary.factory_walkin.card.toFixed(2)}</td><td class="right">$${branchSummary.factory_walkin.total.toFixed(2)}</td></tr>
-        <tr class="total-row"><td>Grand Total</td><td class="right">${grandCount}</td><td class="right">$${Object.values(branchSummary).reduce((s, b) => s + b.cash, 0).toFixed(2)}</td><td class="right">$${Object.values(branchSummary).reduce((s, b) => s + b.card, 0).toFixed(2)}</td><td class="right">$${grandTotal.toFixed(2)}</td></tr>
-      </table>
-      <h2 style="font-size:16px;margin-top:24px;">Detailed Transactions (${filtered.length})</h2>
-      <table>
-        <tr><th>ID</th><th>Date</th><th>Branch</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr>
-        ${filtered.map(sale => `<tr>
-          <td>${sale.id}</td>
-          <td>${sale.date}</td>
-          <td>${getBranchLabel(sale)}</td>
-          <td>${sale.items.map(i => { const p = getProductById(i.productId); return `${p?.name || '?'} x${i.quantity}`; }).join(', ')}</td>
-          <td>${sale.paymentMethod}</td>
-          <td class="right">$${sale.total.toFixed(2)}</td>
-        </tr>`).join('')}
-      </table>
-      <script>window.print();</script>
-      </body></html>
-    `);
-    win.document.close();
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <html><head><title>Sales Summary</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; color: #000; }
+          h1 { font-size: 20px; text-align: center; margin-bottom: 4px; }
+          .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+          th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 13px; }
+          th { background: #f5f5f5; font-weight: 600; }
+          .right { text-align: right; }
+          .total-row { font-weight: bold; background: #fef3c7; }
+          @media print { body { margin: 0; } }
+        </style></head><body>
+        <h1>🍞 BakeryOS — Sales Summary</h1>
+        <p class="subtitle">Generated: ${format(new Date(), 'PPP p')}${dateFrom ? ' | From: ' + format(dateFrom, 'PP') : ''}${dateTo ? ' | To: ' + format(dateTo, 'PP') : ''}</p>
+        <table>
+          <tr><th>Branch</th><th class="right">Sales</th><th class="right">Cash</th><th class="right">Card</th><th class="right">Total</th></tr>
+          <tr><td>Branch 1</td><td class="right">${branchSummary.branch_1.count}</td><td class="right">$${branchSummary.branch_1.cash.toFixed(2)}</td><td class="right">$${branchSummary.branch_1.card.toFixed(2)}</td><td class="right">$${branchSummary.branch_1.total.toFixed(2)}</td></tr>
+          <tr><td>Branch 2</td><td class="right">${branchSummary.branch_2.count}</td><td class="right">$${branchSummary.branch_2.cash.toFixed(2)}</td><td class="right">$${branchSummary.branch_2.card.toFixed(2)}</td><td class="right">$${branchSummary.branch_2.total.toFixed(2)}</td></tr>
+          <tr><td>Walk-in</td><td class="right">${branchSummary.factory_walkin.count}</td><td class="right">$${branchSummary.factory_walkin.cash.toFixed(2)}</td><td class="right">$${branchSummary.factory_walkin.card.toFixed(2)}</td><td class="right">$${branchSummary.factory_walkin.total.toFixed(2)}</td></tr>
+          <tr class="total-row"><td>Grand Total</td><td class="right">${grandCount}</td><td class="right">$${Object.values(branchSummary).reduce((s, b) => s + b.cash, 0).toFixed(2)}</td><td class="right">$${Object.values(branchSummary).reduce((s, b) => s + b.card, 0).toFixed(2)}</td><td class="right">$${grandTotal.toFixed(2)}</td></tr>
+        </table>
+        <h2 style="font-size:16px;margin-top:24px;">Detailed Transactions (${filtered.length})</h2>
+        <table>
+          <tr><th>ID</th><th>Date</th><th>Branch</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr>
+          ${filtered.map(sale => `<tr>
+            <td>${sale.id}</td>
+            <td>${sale.date}</td>
+            <td>${getBranchLabel(sale)}</td>
+            <td>${sale.items.map(i => { const p = getProductById(i.productId); return `${p?.name || '?'} x${i.quantity}`; }).join(', ')}</td>
+            <td>${sale.paymentMethod}</td>
+            <td class="right">$${sale.total.toFixed(2)}</td>
+          </tr>`).join('')}
+        </table>
+        <script>window.onload = () => { window.print(); };</script>
+        </body></html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 5000);
+    }
   };
 
   return (

@@ -115,12 +115,11 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
   };
 
   useEffect(() => {
-    if (open && autoPrint) {
-      setTimeout(() => {
-        handlePrint();
-      }, 500);
+    if (open) {
+      handlePrint();
+      onClose();
     }
-  }, [open, autoPrint]);
+  }, [open]);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -132,51 +131,39 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
     walkin: 'WALK-IN (FACTORY)' 
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-stone-100 border-none p-6 shadow-2xl">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Goods Out Ticket</DialogTitle>
-          <DialogDescription>Dispatch ticket for production items</DialogDescription>
-        </DialogHeader>
+    <div style={{ display: 'none' }}>
+      <div ref={printRef} className="bg-white text-black p-6 mx-auto w-full max-w-[320px] shadow-sm">
         <style>{commonStyles}</style>
-        <div className="bg-white text-black p-6 mx-auto w-full max-w-[320px] shadow-sm" ref={printRef}>
-          
-          <div className="ticket-header">
-            <div className="ticket-title">GOT TICKET</div>
-            <div className="font-bold text-[14pt] uppercase">M.A BAKER'S</div>
-          </div>
+        <div className="ticket-header">
+          <div className="ticket-title">GOT TICKET</div>
+          <div className="font-bold text-[14pt] uppercase">M.A BAKER'S</div>
+        </div>
 
-          <div className="text-center mb-4">
-            <div className="text-[10pt]">{dateStr} | {timeStr}</div>
-            <div className="text-[11pt] font-bold mt-1">DISPATCH TO:</div>
-            <div className="destination-box uppercase">
-              {destLabels[destination] || destination || 'UNSPECIFIED'}
-            </div>
-          </div>
-
-          <div className="border-t-2 border-black">
-            {items.map((item, i) => (
-              <div key={i} className="item-row">
-                <div className="item-qty">{item.quantity}</div>
-                <div className="item-name uppercase">{item.name}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="footer">
-            <div className="font-bold">TOTAL ITEMS: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</div>
-            <div className="mt-2 text-[8pt]">Bakewise ERP - Dispatch System</div>
+        <div className="text-center mb-4">
+          <div className="text-[10pt]">{dateStr} | {timeStr}</div>
+          <div className="text-[11pt] font-bold mt-1">DISPATCH TO:</div>
+          <div className="destination-box uppercase">
+            {destLabels[destination] || destination || 'UNSPECIFIED'}
           </div>
         </div>
 
-        <DialogFooter className="flex flex-row gap-2 mt-4">
-          <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
-          <Button onClick={handlePrint} className="flex-1 bg-black text-white hover:bg-stone-900">
-            <Printer className="h-4 w-4 mr-2" /> Print GOT
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <div className="border-t-2 border-black">
+          {items.map((item, i) => (
+            <div key={i} className="item-row">
+              <div className="item-qty">{item.quantity}</div>
+              <div className="item-name uppercase">{item.name}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="footer">
+          <div className="font-bold">TOTAL ITEMS: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</div>
+          <div className="mt-2 text-[8pt]">Bakewise ERP - Dispatch System</div>
+        </div>
+      </div>
+    </div>
   );
 }

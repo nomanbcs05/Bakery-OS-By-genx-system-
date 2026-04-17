@@ -375,13 +375,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = (initialState as any).receiptSettings || {};
     return {
       ...defaultReceiptSettings,
-      ...saved,
-      // Force override with requested information to "save" it now
-      branch1Location: 'Jam sahib road',
-      branch1OnlineOrder: '03297040402',
-      branch2Location: '',
-      branch2OnlineOrder: '',
-      footerMessage1: "Thank you for visiting M.A BAKER'S!"
+      ...saved
     };
   });
 

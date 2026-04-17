@@ -68,53 +68,53 @@ export default function DispatchSummaryDialog({ open, onClose, date }: DispatchS
     }
   };
 
+  useEffect(() => {
+    if (open) {
+      handlePrint();
+      onClose();
+    }
+  }, [open]);
+
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-stone-50">
-        <div ref={printRef} className="bg-white p-6 rounded shadow-sm">
-          <div className="text-center font-bold text-xl mb-1">{receiptSettings?.brandName || 'BAKEWISE'}</div>
-          <div className="text-center font-bold text-lg border-y py-2 border-black my-4">DAILY DISPATCH SUMMARY</div>
-          
-          <div className="flex justify-between text-sm mb-4">
-            <span>Date: <strong>{date}</strong></span>
-            <span>Total Dispatches: <strong>{todayDispatches.length}</strong></span>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Item Description</th>
-                <th style={{ textAlign: 'right' }}>Total Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaryList.map((item, i) => (
-                <tr key={i}>
-                  <td>{item.name}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{item.quantity}</td>
-                </tr>
-              ))}
-              {summaryList.length === 0 && (
-                <tr>
-                  <td colSpan={2} className="text-center py-8 text-stone-400 italic">No dispatch data for this date</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-          <div className="divider"></div>
-          <div className="text-center text-xs text-stone-500 mt-4">
-            Summary generated on {new Date().toLocaleString()}
-          </div>
+    <div style={{ display: 'none' }}>
+      <div ref={printRef} className="bg-white p-6 rounded shadow-sm">
+        <div className="text-center font-bold text-xl mb-1">{receiptSettings?.brandName || 'BAKEWISE'}</div>
+        <div className="text-center font-bold text-lg border-y py-2 border-black my-4">DAILY DISPATCH SUMMARY</div>
+        
+        <div className="flex justify-between text-sm mb-4">
+          <span>Date: <strong>{date}</strong></span>
+          <span>Total Dispatches: <strong>{todayDispatches.length}</strong></span>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose} className="flex-1">Close</Button>
-          <Button onClick={handlePrint} className="flex-1" disabled={summaryList.length === 0}>
-            <Printer className="h-4 w-4 mr-2" /> Print Summary
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <table>
+          <thead>
+            <tr>
+              <th>Item Description</th>
+              <th style={{ textAlign: 'right' }}>Total Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summaryList.map((item, i) => (
+              <tr key={i}>
+                <td>{item.name}</td>
+                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{item.quantity}</td>
+              </tr>
+            ))}
+            {summaryList.length === 0 && (
+              <tr>
+                <td colSpan={2} className="text-center py-8 text-stone-400 italic">No dispatch data for this date</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <div className="divider"></div>
+        <div className="text-center text-xs text-stone-500 mt-4">
+          Summary generated on {new Date().toLocaleString()}
+        </div>
+      </div>
+    </div>
   );
 }
