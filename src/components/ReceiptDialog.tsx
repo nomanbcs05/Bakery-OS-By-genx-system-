@@ -79,17 +79,19 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       -webkit-print-color-adjust: exact;
     }
     .item-table-header { 
+      border-top: 1.5pt solid #000;
       border-bottom: 1.5pt solid #000; 
       font-weight: bold; 
       display: flex; 
-      margin-bottom: 4pt; 
-      padding-bottom: 2pt;
+      margin-top: 4pt;
+      padding: 2pt 0;
+      font-size: 10.5pt;
     }
-    .w-qty { width: 30px; }
-    .w-item { flex: 1; padding-left: 4px; font-weight: bold; }
-    .w-rate { width: 45px; text-align: right; }
-    .w-amount { width: 65px; text-align: right; font-weight: bold; }
-    .item-row { margin-bottom: 2pt; line-height: 1.1; }
+    .w-qty { width: 35px; text-align: left; }
+    .w-item { flex: 1; text-align: left; padding: 0 2pt; }
+    .w-rate { width: 55px; text-align: right; }
+    .w-amount { width: 65px; text-align: right; }
+    .item-row { display: flex; padding: 2pt 0; align-items: flex-start; line-height: 1.1; }
     
     .phone-pill {
       background: #000 !important;
@@ -246,19 +248,25 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
           </div>
 
-          <div className="receipt-line"></div>
+          <div className="item-table-header">
+            <div className="w-qty">Qty</div>
+            <div className="w-item">Item</div>
+            <div className="w-rate">Rate</div>
+            <div className="w-amount">Amount</div>
+          </div>
           
-          <div className="space-y-2">
+          <div className="min-h-[40px] border-b-1.5pt border-black">
             {items.map((item, i) => (
-              <div key={i} className="item-row">
-                <div className="uppercase font-bold text-[10.5pt]">{item.name}</div>
-                <div className="flex justify-between text-[10pt] pl-1 h-4">
-                  <span>{item.quantity} x {item.unitPrice}</span>
-                  <span className="font-bold">{item.quantity * item.unitPrice}</span>
-                </div>
+              <div key={i} className="item-row text-[10.5pt]">
+                <div className="w-qty font-bold">{item.quantity}</div>
+                <div className="w-item uppercase">{item.name}</div>
+                <div className="w-rate">{item.unitPrice}</div>
+                <div className="w-amount font-bold">{item.quantity * item.unitPrice}</div>
               </div>
             ))}
           </div>
+
+          <div className="receipt-line"></div>
 
           <div className="receipt-line mt-4"></div>
           <div className="text-[11pt] space-y-1">
@@ -279,22 +287,24 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           </div>
 
           <div className="receipt-divider !mt-4"></div>
-          <div className="text-[9pt] font-black uppercase leading-tight py-1">
+          <div className="text-[7.5pt] space-y-1.5 py-1 uppercase leading-tight font-bold">
             <div className="flex justify-between items-center">
-              <span>{branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2'}:</span>
-              <span className="phone-pill">
-                {branchId === 'branch_1' ? (receiptSettings?.branch1OnlineOrder || '03297040402') : receiptSettings?.branch2OnlineOrder}
-              </span>
+              <span>BRANCH 1: <span className="underline">{receiptSettings?.branch1Location || 'JAM SAHIB ROAD'}</span></span>
+              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch1OnlineOrder || '03297040402'}</span></span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>BRANCH 2: <span className="underline">{receiptSettings?.branch2Location || 'DHAMRA ROAD'}</span></span>
+              <span>ORDER: <span className="phone-pill">{receiptSettings?.branch2OnlineOrder || '03093660360'}</span></span>
             </div>
           </div>
           <div className="receipt-divider"></div>
 
-          <div className="receipt-box text-center mt-2">
-            <div className="font-bold text-[10pt] mb-1">
-              {receiptSettings?.footerMessage1}
+          <div className="receipt-box text-center mt-2 border-2 border-black">
+            <div className="font-bold text-[10.5pt] mb-1">
+              {receiptSettings?.footerMessage1 || '!!!! FOR THE LOVE OF FOOD !!!!'}
             </div>
             <div className="text-[9pt] leading-tight font-bold">
-              {receiptSettings?.footerMessage2}
+              {receiptSettings?.footerMessage2 || 'POWERED BY: GENX SYSTMS +923342826675'}
             </div>
           </div>
         </div>
