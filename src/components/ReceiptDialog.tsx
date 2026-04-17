@@ -282,8 +282,8 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             
           </div>
 
-          <div className="receipt-box text-center mt-2 border-2 border-black">
-            <div className="font-bold text-[8.5pt] mb-1 whitespace-nowrap">
+          <div className="receipt-box text-center mt-2 border-2 border-black overflow-hidden">
+            <div className="font-bold text-[8pt] mb-1 truncate whitespace-nowrap">
               {receiptSettings?.footerMessage1 || "Thank you for visiting M.A BAKER'S!"}
             </div>
             <div className="text-[8.5pt] leading-tight font-bold">
