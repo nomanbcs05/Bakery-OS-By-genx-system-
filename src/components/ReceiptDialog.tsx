@@ -23,11 +23,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const commonStyles = `
     body { 
       font-family: 'Courier New', Courier, monospace; 
-      font-size: 9.5pt; 
+      font-size: 9pt; 
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 230px; 
+      width: 220px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -123,7 +123,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <style>
           @page { size: auto; margin: 0; }
           ${commonStyles}
-          body { padding: 5px 12px; }
+          body { padding: 10px 20px; }
         </style></head>
         <body>
           ${content.innerHTML}
