@@ -23,11 +23,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const commonStyles = `
     body { 
       font-family: 'Courier New', Courier, monospace; 
-      font-size: 10pt; 
+      font-size: 9.5pt; 
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 250px; 
+      width: 230px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -87,10 +87,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       padding: 2pt 0;
       font-size: 10.5pt;
     }
-    .w-qty { width: 35px; text-align: left; }
+    .w-qty { width: 25px; text-align: left; }
     .w-item { flex: 1; text-align: left; padding: 0 2pt; }
-    .w-rate { width: 55px; text-align: right; }
-    .w-amount { width: 65px; text-align: right; }
+    .w-rate { width: 45px; text-align: right; }
+    .w-amount { width: 60px; text-align: right; }
     .item-row { display: flex; padding: 2pt 0; align-items: flex-start; line-height: 1.1; }
     
     .phone-pill {
@@ -123,7 +123,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <style>
           @page { size: auto; margin: 0; }
           ${commonStyles}
-          body { padding: 8px 15px; }
+          body { padding: 5px 12px; }
         </style></head>
         <body>
           ${content.innerHTML}
