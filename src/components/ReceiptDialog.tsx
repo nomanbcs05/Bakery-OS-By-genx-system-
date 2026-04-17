@@ -23,11 +23,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const commonStyles = `
     body { 
       font-family: 'Courier New', Courier, monospace; 
-      font-size: 11pt; 
+      font-size: 10pt; 
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 300px; 
+      width: 270px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -44,9 +44,9 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     }
 
     .receipt-box { 
-      border: 1.5pt solid #000 !important; 
-      padding: 6pt; 
-      margin-bottom: 8pt; 
+      border: 1pt solid #000 !important; 
+      padding: 4pt; 
+      margin-bottom: 6pt; 
     }
     .receipt-order-num { 
       border: 2pt solid #000 !important; 
@@ -85,10 +85,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       margin-bottom: 4pt; 
       padding-bottom: 2pt;
     }
-    .w-qty { width: 40px; }
-    .w-item { flex: 1; padding: 0 4px; }
-    .w-rate { width: 60px; text-align: right; }
-    .w-amount { width: 70px; text-align: right; }
+    .w-qty { width: 30px; }
+    .w-item { flex: 1; padding-left: 4px; font-weight: bold; }
+    .w-rate { width: 45px; text-align: right; }
+    .w-amount { width: 65px; text-align: right; font-weight: bold; }
+    .item-row { margin-bottom: 2pt; line-height: 1.1; }
     
     .phone-pill {
       background: #000 !important;
@@ -246,20 +247,15 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           </div>
 
           <div className="receipt-line"></div>
-          <div className="item-table-header">
-            <div className="w-qty">Qty</div>
-            <div className="w-item">Item</div>
-            <div className="w-rate">Rate</div>
-            <div className="w-amount">Amount</div>
-          </div>
           
-          <div className="space-y-1 min-h-[40px]">
+          <div className="space-y-2">
             {items.map((item, i) => (
-              <div key={i} className="flex text-[10pt] leading-[1.2]">
-                <div className="w-qty font-bold">{item.quantity}</div>
-                <div className="w-item uppercase">{item.name}</div>
-                <div className="w-rate">{item.unitPrice}</div>
-                <div className="w-amount font-bold">{(item.quantity * item.unitPrice)}</div>
+              <div key={i} className="item-row">
+                <div className="uppercase font-bold text-[10.5pt]">{item.name}</div>
+                <div className="flex justify-between text-[10pt] pl-1 h-4">
+                  <span>{item.quantity} x {item.unitPrice}</span>
+                  <span className="font-bold">{item.quantity * item.unitPrice}</span>
+                </div>
               </div>
             ))}
           </div>

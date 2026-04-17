@@ -19,11 +19,11 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
   const commonStyles = `
     body { 
       font-family: 'Courier New', Courier, monospace; 
-      font-size: 12pt; 
+      font-size: 10pt; 
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 300px; 
+      width: 270px; 
     }
     .text-center { text-align: center; }
     .font-bold { font-weight: bold; }
@@ -152,11 +152,11 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
           </div>
         </div>
 
-        <div className="border-t-2 border-black">
+        <div className="border-t-2 border-black pt-2">
           {items.map((item, i) => (
-            <div key={i} className="item-row">
-              <div className="item-qty">{item.quantity}</div>
-              <div className="item-name uppercase">{item.name}</div>
+            <div key={i} className="flex justify-between border-b border-dashed border-stone-300 py-1">
+              <div className="font-bold text-[11pt] uppercase">{item.name}</div>
+              <div className="font-black text-[12pt]">x {item.quantity}</div>
             </div>
           ))}
         </div>
