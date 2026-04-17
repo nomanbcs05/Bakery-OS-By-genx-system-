@@ -27,7 +27,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 270px; 
+      width: 250px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -123,7 +123,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <style>
           @page { size: auto; margin: 0; }
           ${commonStyles}
-          body { padding: 10px; }
+          body { padding: 8px 15px; }
         </style></head>
         <body>
           ${content.innerHTML}
@@ -283,10 +283,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           </div>
 
           <div className="receipt-box text-center mt-2 border-2 border-black">
-            <div className="font-bold text-[10.5pt] mb-1">
-              {receiptSettings?.footerMessage1 || '!!!! FOR THE LOVE OF FOOD !!!!'}
+            <div className="font-bold text-[8.5pt] mb-1 whitespace-nowrap">
+              {receiptSettings?.footerMessage1 || "Thank you for visiting M.A BAKER'S!"}
             </div>
-            <div className="text-[9pt] leading-tight font-bold">
+            <div className="text-[8.5pt] leading-tight font-bold">
               {receiptSettings?.footerMessage2 || 'POWERED BY: GENX SYSTMS +923342826675'}
             </div>
           </div>
