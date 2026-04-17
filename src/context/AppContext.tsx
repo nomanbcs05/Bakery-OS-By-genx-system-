@@ -368,6 +368,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     branch2OnlineOrder: '',
     branch1Cashier: 'Main Staff',
     branch2Cashier: '',
+    branch1Address: 'Jam sahib road, nawabshah',
+    branch1Phone: '03297040402',
+    branch2Address: 'Main chowk jam sahib road nawabshah',
+    branch2Phone: '03093660360',
+    dispatchAddress: 'Factory Gate, Nawabshah',
+    dispatchPhone: '03297040402',
     isLocked: false
   };
 

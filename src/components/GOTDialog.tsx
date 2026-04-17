@@ -140,6 +140,8 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
         <div className="ticket-header">
           <div className="ticket-title">GOT TICKET</div>
           <div className="font-bold text-[14pt] uppercase">M.A BAKER'S</div>
+          <div className="text-[9pt] leading-tight mt-1">{receiptSettings?.dispatchAddress}</div>
+          <div className="text-[9pt] font-bold">{receiptSettings?.dispatchPhone}</div>
         </div>
 
         <div className="text-center mb-4">

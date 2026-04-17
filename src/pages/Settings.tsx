@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UserRole } from '@/types';
 
 export default function SettingsPage() {
@@ -371,6 +372,174 @@ export default function SettingsPage() {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Printer className="h-5 w-5" /> Receipt Configuration
+                </CardTitle>
+                <CardDescription>Manage business branding and branch-specific receipt information</CardDescription>
+              </div>
+              <Button onClick={handleSaveReceiptSettings} className="bg-green-600 hover:bg-green-700">
+                <Save className="h-4 w-4 mr-2" /> Save Settings
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="branch_1" className="space-y-6">
+              <TabsList className="grid grid-cols-3 w-full max-w-md">
+                <TabsTrigger value="branch_1">Branch 1</TabsTrigger>
+                <TabsTrigger value="branch_2">Branch 2</TabsTrigger>
+                <TabsTrigger value="dispatch">Dispatch (Factory)</TabsTrigger>
+              </TabsList>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* ─── Global Branding (editable from any tab) ─── */}
+                <div className="space-y-4">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground border-b pb-1">Business Branding</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label>Brand Name</Label>
+                      <Input 
+                        value={formReceiptSettings.brandName} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} 
+                        placeholder="M.A BAKER'S"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tagline</Label>
+                      <Input 
+                        value={formReceiptSettings.tagline} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} 
+                        placeholder="Quality You Can Trust"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Business Logo</Label>
+                      <div className="flex gap-4 items-center">
+                        <Input type="file" accept="image/*" onChange={handleLogoUpload} className="cursor-pointer flex-1" />
+                        {formReceiptSettings.logoUrl && (
+                          <div className="h-10 w-10 border rounded p-1 bg-white">
+                            <img src={formReceiptSettings.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain filter grayscale" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ─── Tab Specific Settings ─── */}
+                <TabsContent value="branch_1" className="mt-0 space-y-4">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-primary border-b pb-1 border-primary/20">Branch 1 Details</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label>Branch Address</Label>
+                      <Input 
+                        value={formReceiptSettings.branch1Address} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Address: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contact Number</Label>
+                      <Input 
+                        value={formReceiptSettings.branch1Phone} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Phone: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cashier Display Name</Label>
+                      <Input 
+                        value={formReceiptSettings.branch1Cashier} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Cashier: e.target.value }))} 
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="branch_2" className="mt-0 space-y-4">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-primary border-b pb-1 border-primary/20">Branch 2 Details</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label>Branch Address</Label>
+                      <Input 
+                        value={formReceiptSettings.branch2Address} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Address: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contact Number</Label>
+                      <Input 
+                        value={formReceiptSettings.branch2Phone} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Phone: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cashier Display Name</Label>
+                      <Input 
+                        value={formReceiptSettings.branch2Cashier} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Cashier: e.target.value }))} 
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="dispatch" className="mt-0 space-y-4">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-primary border-b pb-1 border-primary/20">Factory Dispatch Info</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label>Dispatch Station Address</Label>
+                      <Input 
+                        value={formReceiptSettings.dispatchAddress} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, dispatchAddress: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dispatch Contact</Label>
+                      <Input 
+                        value={formReceiptSettings.dispatchPhone} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, dispatchPhone: e.target.value }))} 
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+              </div>
+
+              <div className="pt-6 border-t grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground border-b pb-1">Receipt Footer</h3>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Footer Message 1</Label>
+                      <Input 
+                        value={formReceiptSettings.footerMessage1} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Footer Message 2</Label>
+                      <Input 
+                        value={formReceiptSettings.footerMessage2} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} 
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                   <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground border-b pb-1">System Info</h3>
+                   <div className="space-y-2">
+                      <Label>Software Credits (shown at bottom)</Label>
+                      <Input 
+                        value={formReceiptSettings.printedBy} 
+                        onChange={e => setFormReceiptSettings(s => ({ ...s, printedBy: e.target.value }))} 
+                      />
+                    </div>
+                </div>
+              </div>
+            </Tabs>
           </CardContent>
         </Card>
 

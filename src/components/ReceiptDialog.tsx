@@ -146,6 +146,19 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
 
   // Normalize branch name for logic comparisons (e.g. "Branch 1" -> "branch_1")
   const branchId = branch.toLowerCase().replace(' ', '_');
+  const cashierName = branchId === 'branch_1' ? receiptSettings?.branch1Cashier : 
+                     branchId === 'branch_2' ? receiptSettings?.branch2Cashier : 
+                     receiptSettings?.branch1Cashier;
+
+  const displayAddress = branchId === 'branch_1' ? receiptSettings?.branch1Address : 
+                         branchId === 'branch_2' ? receiptSettings?.branch2Address : 
+                         branchId === 'factory' ? receiptSettings?.dispatchAddress : 
+                         receiptSettings?.address;
+
+  const displayPhone = branchId === 'branch_1' ? receiptSettings?.branch1Phone : 
+                       branchId === 'branch_2' ? receiptSettings?.branch2Phone : 
+                       branchId === 'factory' ? receiptSettings?.dispatchPhone : 
+                       receiptSettings?.phone;
 
   // Logic for sequential numbering
   const dDate = date ? new Date(date) : new Date();
@@ -170,7 +183,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   const formattedDate = finalDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
   const formattedTime = finalDate.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-  const cashierName = branchId === 'branch_1' ? receiptSettings?.branch1Cashier : receiptSettings?.branch2Cashier;
+  const displayPhoneFinal = displayPhone; // using a consistent name for JSX
 
   if (!open) return null;
 
@@ -193,10 +206,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             )}
             
             <div className="text-[10pt] leading-tight whitespace-pre-line mb-1 font-bold">
-              {receiptSettings?.address}
+              {displayAddress}
             </div>
             <div className="text-[10pt] font-bold">
-              {receiptSettings?.phone}
+              {displayPhoneFinal}
             </div>
             
             <div className="receipt-divider"></div>

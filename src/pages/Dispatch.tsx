@@ -331,16 +331,42 @@ export default function DispatchPage() {
                     })}
                   </TableCell>
                   <TableCell><Badge className="bg-success text-success-foreground">{d.status}</Badge></TableCell>
-                  <TableCell>
+                  <TableCell className="flex gap-1">
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       onClick={() => printHistoryGOT(d.items, d.destination)}
                       className="h-8 w-8 p-0"
-                      title="Print GOT"
+                      title="Reprint GOT"
                     >
                       <Printer className="h-4 w-4" />
                     </Button>
+                    {d.destination === 'walkin' && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          const items = d.items.map(i => ({
+                            name: getProductById(i.productId)?.name || 'Unknown',
+                            quantity: i.quantity,
+                            unitPrice: getProductById(i.productId)?.price || 0
+                          }));
+                          const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+                          setReceiptData({
+                            open: true,
+                            items,
+                            total,
+                            paymentMethod: 'cash', // assume cash for reprint if not stored
+                            saleId: d.id,
+                            date: d.date
+                          });
+                        }}
+                        className="h-8 w-8 p-0 text-primary"
+                        title="View/Reprint Receipt"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

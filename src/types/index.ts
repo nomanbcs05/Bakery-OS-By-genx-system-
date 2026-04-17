@@ -270,6 +270,12 @@ export interface ReceiptSettings {
   branch2OnlineOrder: string;
   branch1Cashier: string;
   branch2Cashier: string;
+  branch1Address: string;
+  branch1Phone: string;
+  branch2Address: string;
+  branch2Phone: string;
+  dispatchAddress: string;
+  dispatchPhone: string;
   isLocked?: boolean;
 }
 
