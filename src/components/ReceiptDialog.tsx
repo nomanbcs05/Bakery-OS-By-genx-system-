@@ -279,14 +279,12 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           </div>
 
           <div className="receipt-divider !mt-4"></div>
-          <div className="text-[7.5pt] space-y-1 py-1 uppercase leading-tight">
-            <div className="flex-row items-center">
-              <span>{branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2'}: <span className="font-bold underline">
-                {branchId === 'branch_1' ? (receiptSettings?.branch1Location || 'JAM SAHIB ROAD') : receiptSettings?.branch2Location}
-              </span></span>
-              <span>ORDER: <span className="phone-pill">
+          <div className="text-[9pt] font-black uppercase leading-tight py-1">
+            <div className="flex justify-between items-center">
+              <span>{branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2'}:</span>
+              <span className="phone-pill">
                 {branchId === 'branch_1' ? (receiptSettings?.branch1OnlineOrder || '03297040402') : receiptSettings?.branch2OnlineOrder}
-              </span></span>
+              </span>
             </div>
           </div>
           <div className="receipt-divider"></div>
