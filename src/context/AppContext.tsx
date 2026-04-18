@@ -1083,17 +1083,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [sales, batches, dispatches, expenses, staffDeductions, salaryVouchers]);
 
-  const forceSync = useCallback(async () => {
-    if (!navigator.onLine) {
-      toast.error('Cannot sync while offline');
-      return;
-    }
-    
-    toast.loading('Force syncing data...');
-    await syncOfflineData();
-    toast.dismiss();
-    toast.success('System fully synchronized');
-  }, [syncOfflineData]);
 
   const seedDatabase = useCallback(async () => {
     if (!navigator.onLine || !hasSupabaseConfig) {
