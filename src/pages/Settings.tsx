@@ -68,7 +68,9 @@ export default function SettingsPage() {
         .getPublicUrl(filePath);
 
       setFormReceiptSettings(s => ({ ...s, logoUrl: publicUrl }));
-      toast.success("Logo uploaded successfully!");
+      // Auto-save to global settings immediately
+      updateReceiptSettings({ ...formReceiptSettings, logoUrl: publicUrl });
+      toast.success("Logo uploaded and saved successfully!");
     } catch (error: any) {
       console.error('Error uploading logo:', error);
       toast.error(error.message || "Failed to upload logo. Make sure the 'business_assets' bucket exists and is public.");

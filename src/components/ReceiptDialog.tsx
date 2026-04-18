@@ -154,20 +154,31 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <div id="print-root">
             ${content.innerHTML}
           </div>
-          <script>
-            window.onload = () => { 
-              setTimeout(() => {
-                window.print();
-                window.onafterprint = () => {
-                  window.close();
-                };
-              }, 250);
-            };
-          </script>
         </body>
         </html>
       `);
       doc.close();
+
+      // Wait for images to load before printing
+      const images = iframe.contentWindow?.document.querySelectorAll('img');
+      if (images && images.length > 0) {
+        const promises = Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        });
+        Promise.all(promises).then(() => {
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+          }, 300);
+        });
+      } else {
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 300);
+      }
 
       setTimeout(() => {
         if (document.body.contains(iframe)) {
@@ -233,7 +244,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <div className="print-container bg-white text-black">
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
-              <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" />
+              <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" crossOrigin="anonymous" />
             ) : (
                <div className="text-[18pt] font-black uppercase mb-1">{receiptSettings?.brandName || "M.A BAKER'S"}</div>
             )}
