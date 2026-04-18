@@ -366,6 +366,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 mt-4">
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Footer Message 1</Label><Input value={formReceiptSettings.footerMessage1 || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} className="bg-white h-9" /></div>
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Footer Message 2</Label><Input value={formReceiptSettings.footerMessage2 || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Printed By Watermark</Label><Input value={formReceiptSettings.printedBy || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, printedBy: e.target.value }))} className="bg-white h-9" /></div>
                     </div>
                   </div>
 
