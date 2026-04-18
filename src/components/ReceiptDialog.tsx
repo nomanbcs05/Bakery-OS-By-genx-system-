@@ -128,7 +128,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <style>
             @page { 
               size: auto; 
-              margin: 0; 
+              margin: 0mm; 
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 260px;
+              overflow: visible !important;
+              height: auto !important;
             }
             * {
               margin: 0;
@@ -136,10 +143,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               box-sizing: border-box;
             }
             body { 
-              margin: 0 !important;
-              padding: 0 !important;
               width: 260px;
-              overflow: hidden;
             }
             ${commonStyles}
             /* Override any padding from Tailwind classes in the printed content */

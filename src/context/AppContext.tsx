@@ -543,7 +543,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           { data: sdData },
           { data: svData },
           { data: purchasesData },
-          { data: recipesData }
+          { data: recipesData },
+          { data: settingsData }
         ] = await Promise.all([
           supabase.from('products').select('*'),
           supabase.from('raw_materials').select('*'),
@@ -558,7 +559,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           supabase.from('staff_deductions').select('*'),
           supabase.from('salary_vouchers').select('*'),
           supabase.from('purchases').select('*'),
-          supabase.from('recipes').select('*')
+          supabase.from('recipes').select('*'),
+          supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle()
         ]);
 
         // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
@@ -600,6 +602,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
             return merged;
           });
+        }
+
+        if (settingsData?.settings) {
+          setReceiptSettings(prev => ({
+            ...prev,
+            ...settingsData.settings,
+            isLocked: true
+          }));
         }
         
         if (dData && dData.length > 0) {
@@ -1791,11 +1801,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Logged out successfully');
   };
 
-  const updateReceiptSettings = useCallback((settings: Partial<ReceiptSettings>) => {
-    setReceiptSettings(prev => ({ ...prev, ...settings, isLocked: true }));
-    toast.success('Receipt information saved permanently');
-    addLog('update', 'receipt_settings', 'system', 'Locked receipt information permanently');
-  }, [addLog]);
+  const updateReceiptSettings = useCallback(async (settings: Partial<ReceiptSettings>) => {
+    const updatedSettings = { ...receiptSettings, ...settings, isLocked: true };
+    setReceiptSettings(updatedSettings);
+    
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase
+          .from('app_settings')
+          .upsert({ id: 'receipt_config', settings: updatedSettings, updated_at: new Date().toISOString() });
+      } catch (error) {
+        console.error('Failed to sync settings to cloud:', error);
+      }
+    }
+    
+    toast.success('Receipt information saved permanently to cloud');
+    addLog('update', 'receipt_settings', 'system', 'Locked and synced receipt information');
+  }, [addLog, isOnline, receiptSettings]);
 
   return (
     <AppContext.Provider value={{

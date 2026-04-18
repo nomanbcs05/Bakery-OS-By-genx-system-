@@ -97,11 +97,24 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
         <html><head><title>GOT Ticket</title>
         <style>
           @page { size: auto; margin: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 270px;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
           ${commonStyles}
-          body { padding: 15px; }
         </style></head>
         <body>
-          ${content.innerHTML}
+          <div style="padding: 10px;">
+            ${content.innerHTML}
+          </div>
           <script>window.onload = () => { window.print(); };</script>
         </body></html>
       `);
