@@ -339,10 +339,31 @@ VALUES ('receipt_config', '{"brandName": "M.A BAKER''S", "tagline": "Quality You
 ON CONFLICT (id) DO NOTHING;
 
 -- Add to Realtime
+-- Enable Realtime for all tables
 DO $$ 
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'app_settings') THEN
-    -- Disable RLS for all tables to ensure seamless synchronization across all devices
+  -- Re-create the publication to ensure it includes all tables
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE 
+    products, 
+    production_batches, 
+    dispatches, 
+    sales, 
+    expenses, 
+    audit_logs, 
+    profiles, 
+    raw_materials, 
+    raw_material_adjustments, 
+    recipes, 
+    branch_stock_adjustments, 
+    staff_members, 
+    staff_deductions, 
+    salary_vouchers, 
+    purchases, 
+    app_settings;
+END $$;
+
+-- Disable RLS for all tables to ensure seamless synchronization across all devices
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE production_batches DISABLE ROW LEVEL SECURITY;
 ALTER TABLE dispatches DISABLE ROW LEVEL SECURITY;

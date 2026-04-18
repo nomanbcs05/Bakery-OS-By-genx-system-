@@ -735,12 +735,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newSale = fromDBSale(payload.new as DBSale);
           setSales(prev => {
-            if (prev.find(s => s.id === newSale.id)) return prev;
-            return [...prev, newSale];
+            const index = prev.findIndex(s => s.id === newSale.id);
+            if (index === -1) return [...prev, newSale];
+            const next = [...prev];
+            next[index] = newSale;
+            return next;
           });
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = (payload.old as { id: string }).id;
+          setSales(prev => prev.filter(s => s.id !== oldId));
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (payload) => {
@@ -831,6 +837,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
             next[index] = newRecipe;
             return next;
           });
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          fetchAllProfiles(); // Refresh the full user list to ensure roles/passcodes stay synced
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newSettings = (payload.new as any).settings;
+          if (newSettings) {
+            setReceiptSettings(prev => ({
+              ...prev,
+              ...newSettings,
+              isLocked: true
+            }));
+          }
         }
       })
       .subscribe();
