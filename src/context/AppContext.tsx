@@ -223,11 +223,14 @@ const toDBProduct = (p: Product): DBProduct => ({
 const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
   id: b.id, batch_id: b.batchId, product_id: b.productId, quantity: b.quantity, date: b.date, notes: b.notes, sync_status: b.syncStatus
 });
-const toDBSale = (s: Sale): DBSale => ({
-  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, payment_method: s.paymentMethod, 
-  customer_name: s.customerName, customer_phone: s.customerPhone, is_credit_paid: s.isCreditPaid,
-  date: s.date, sync_status: s.syncStatus
-});
+const toDBSale = (s: Sale): any => {
+  const result: any = {
+    id: s.id, type: s.type, items: s.items, total: s.total, payment_method: s.paymentMethod, 
+    date: s.date, sync_status: s.syncStatus
+  };
+  if (s.branch) result.branch = s.branch;
+  return result;
+};
 const toDBExpense = (e: Expense): DBExpense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branch_id: e.branchId, sync_status: e.syncStatus
 });
@@ -1314,7 +1317,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       setSales(prev => [...prev, walkinSale]);
       if (isOnline && hasSupabaseConfig) {
-        await supabase.from('sales').insert([toDBSale(walkinSale)]);
+        const { error } = await supabase.from('sales').insert([toDBSale(walkinSale)]);
+        if (error) {
+          setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
+        }
       }
       return walkinSale.id;
     }
@@ -1357,9 +1363,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isOnline && hasSupabaseConfig) {
       const { error } = await supabase.from('sales').insert([toDBSale(newSale)]);
       if (error) {
-        console.error('Failed to sync sale to cloud:', error);
-        toast.error(`Sale saved locally, but cloud sync failed: ${error.message}`);
-        // Keep offline status if cloud fails
         setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
       }
     }

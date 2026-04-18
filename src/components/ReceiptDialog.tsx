@@ -118,17 +118,48 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     const doc = iframe.contentWindow?.document;
     if (doc) {
       doc.open();
+      // Use exact sizing for thermal paper (approx 80mm or 58mm)
+      // 280px is good for 80mm. 
       doc.write(`
-        <html><head><title>Receipt</title>
-        <style>
-          @page { size: auto; margin: 0; }
-          ${commonStyles}
-          body { padding: 10px 12px; }
-        </style></head>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Receipt</title>
+          <style>
+            @page { 
+              size: auto; 
+              margin: 0; 
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body { 
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 280px;
+              overflow: hidden;
+            }
+            ${commonStyles}
+            /* Override any padding from Tailwind classes in the printed content */
+            .p-4 { padding: 4px !important; }
+            .mx-auto { margin-left: auto !important; margin-right: auto !important; }
+          </style>
+        </head>
         <body>
-          ${content.innerHTML}
-          <script>window.onload = () => { window.print(); };</script>
-        </body></html>
+          <div id="print-root">
+            ${content.innerHTML}
+          </div>
+          <script>
+            window.onload = () => { 
+              setTimeout(() => {
+                window.print();
+              }, 100);
+            };
+          </script>
+        </body>
+        </html>
       `);
       doc.close();
 
