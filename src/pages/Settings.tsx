@@ -1,7 +1,7 @@
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, Mail, Shield, Lock, Printer, Save, Cloud, CloudOff, ChefHat, Wallet } from 'lucide-react';
+import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save, Cloud, CloudOff, ChefHat, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Navigate } from 'react-router-dom';
@@ -73,6 +73,41 @@ export default function SettingsPage() {
       return;
     }
     await updateUserPin(userId, newPin);
+  };
+
+  const { createStaffMember } = useApp();
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+
+  const handleCreateProfile = async (role: UserRole) => {
+    setIsCreatingProfile(true);
+    try {
+      let name = '';
+      let email = '';
+      let branchId: any = undefined;
+
+      if (role === 'production_manager') {
+        name = 'Production Manager';
+        email = 'production@bakewise.com';
+      } else if (role === 'accountant') {
+        name = 'Accountant';
+        email = 'accountant@bakewise.com';
+      } else if (role === 'branch_staff') {
+        const count = allUsers.filter(u => u.role === 'branch_staff').length;
+        branchId = count === 0 ? 'branch_1' : 'branch_2';
+        name = branchId === 'branch_1' ? 'Branch 1 POS' : 'Branch 2 POS';
+        email = `${branchId}@bakewise.com`;
+      } else if (role === 'admin') {
+        name = 'Additional Admin';
+        email = `admin${Date.now()}@bakewise.com`;
+      }
+
+      await createStaffMember(name, email, 'bakewise123', role, branchId, '0000');
+      toast.success(`${name} profile created successfully`);
+    } catch (error: any) {
+      toast.error('Failed to create profile');
+    } finally {
+      setIsCreatingProfile(false);
+    }
   };
 
   const handleSaveReceiptSettings = () => {
@@ -160,10 +195,27 @@ export default function SettingsPage() {
                           {role === 'accountant' && <Wallet className="h-4 w-4 text-green-500" />}
                           {role.replace('_', ' ')}
                         </CardTitle>
-                        <Badge variant="outline" className="text-[9px] uppercase">{userProfiles.length} Total</Badge>
+                        <div className="flex items-center gap-2">
+                           <Badge variant="outline" className="text-[9px] uppercase">{userProfiles.length} Total</Badge>
+                           <Button 
+                             variant="ghost" 
+                             size="icon" 
+                             className="h-6 w-6 rounded-full hover:bg-slate-100" 
+                             onClick={() => handleCreateProfile(role as UserRole)}
+                             disabled={isCreatingProfile}
+                             title={`Add ${role.replace('_', ' ')} profile`}
+                           >
+                             <UserPlus className="h-3 w-3" />
+                           </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {userProfiles.length === 0 && (
+                        <div className="py-2 text-center">
+                          <p className="text-[10px] text-muted-foreground italic mb-2">No profiles created for this role</p>
+                        </div>
+                      )}
                       {userProfiles.map(u => (
                         <div key={u.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 group transition-all hover:bg-white hover:shadow-sm">
                           <div className="flex flex-col">
