@@ -326,7 +326,6 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
 }
 
