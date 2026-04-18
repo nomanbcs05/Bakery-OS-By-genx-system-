@@ -134,21 +134,21 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               margin: 0 !important;
               padding: 0 !important;
               width: 260px;
-              overflow: visible !important;
               height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
             }
             * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body { 
-              width: 260px;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              -webkit-print-color-adjust: exact;
             }
             ${commonStyles}
-            /* Override any padding from Tailwind classes in the printed content */
-            .p-4 { padding: 4px !important; }
-            .mx-auto { margin-left: auto !important; margin-right: auto !important; }
+            .print-container {
+              width: 100%;
+              padding: 5px !important;
+            }
           </style>
         </head>
         <body>
@@ -226,11 +226,9 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   if (!open) return null;
 
   return (
-    <div style={{ display: 'none' }}>
+    <div style={{ display: 'none', visibility: 'hidden', height: 0, overflow: 'hidden' }}>
       <div ref={receiptRef}>
-        {/* Recopying the structure from below to ensure it's available for handlePrint */}
-        <style>{commonStyles}</style>
-        <div className="bg-white text-black p-4 mx-auto w-full max-w-[320px]">
+        <div className="print-container bg-white text-black">
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
               <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" />
@@ -324,6 +322,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             <div className="text-[8.5pt] leading-tight font-bold">
               {receiptSettings?.footerMessage2 || 'POWERED BY: GENX SYSTMS +923342826675'}
             </div>
+          </div>
           </div>
         </div>
       </div>

@@ -102,17 +102,22 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
             padding: 0 !important;
             width: 270px;
             height: auto !important;
+            min-height: 0 !important;
             overflow: visible !important;
           }
           * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
           }
           ${commonStyles}
+          .print-container {
+            width: 100%;
+            padding: 10px !important;
+          }
         </style></head>
         <body>
-          <div style="padding: 10px;">
+          <div class="print-container">
             ${content.innerHTML}
           </div>
           <script>window.onload = () => { window.print(); };</script>
@@ -148,9 +153,8 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
   if (!open) return null;
 
   return (
-    <div style={{ display: 'none' }}>
-      <div ref={printRef} className="bg-white text-black p-6 mx-auto w-full max-w-[320px] shadow-sm">
-        <style>{commonStyles}</style>
+    <div style={{ display: 'none', visibility: 'hidden', height: 0, overflow: 'hidden' }}>
+      <div ref={printRef} className="bg-white text-black">
         <div className="ticket-header">
           <div className="ticket-title">GOT TICKET</div>
           <div className="font-bold text-[14pt] uppercase">M.A BAKER'S</div>
