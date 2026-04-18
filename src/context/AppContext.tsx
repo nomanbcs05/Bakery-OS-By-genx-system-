@@ -224,12 +224,19 @@ const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
   id: b.id, batch_id: b.batchId, product_id: b.productId, quantity: b.quantity, date: b.date, notes: b.notes, sync_status: b.syncStatus
 });
 const toDBSale = (s: Sale): any => {
-  const result: any = {
-    id: s.id, type: s.type, items: s.items, total: s.total, payment_method: s.paymentMethod, 
-    date: s.date, sync_status: s.syncStatus
+  return {
+    id: s.id,
+    type: s.type,
+    branch: s.branch,
+    items: s.items,
+    total: s.total,
+    payment_method: s.paymentMethod,
+    customer_name: s.customerName,
+    customer_phone: s.customerPhone,
+    is_credit_paid: s.isCreditPaid,
+    date: s.date,
+    sync_status: 'synced' // Explicitly set to synced when uploading
   };
-  if (s.branch) result.branch = s.branch;
-  return result;
 };
 const toDBExpense = (e: Expense): DBExpense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branch_id: e.branchId, sync_status: e.syncStatus
@@ -388,7 +395,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   });
 
-  const hasLoaded = React.useRef(false);
+  const forceSync = useCallback(async () => {
+    if (!navigator.onLine || !hasSupabaseConfig) return;
+    
+    try {
+      // Sync pending sales
+      const pendingSales = sales.filter(s => s.syncStatus === 'pending');
+      if (pendingSales.length > 0) {
+        for (const sale of pendingSales) {
+          await supabase.from('sales').upsert([toDBSale(sale)]);
+        }
+        setSales(prev => prev.map(s => s.syncStatus === 'pending' ? { ...s, syncStatus: 'synced' } : s));
+      }
+
+      // Sync pending expenses
+      const pendingExpenses = expenses.filter(e => e.syncStatus === 'pending');
+      if (pendingExpenses.length > 0) {
+        for (const exp of pendingExpenses) {
+          await supabase.from('expenses').upsert([toDBExpense(exp)]);
+        }
+        setExpenses(prev => prev.map(e => e.syncStatus === 'pending' ? { ...e, syncStatus: 'synced' } : e));
+      }
+      
+      setLastSyncTime(new Date().toISOString());
+    } catch (err) {
+      console.error('Sync error:', err);
+    }
+  }, [sales, expenses, hasSupabaseConfig]);
+
   useEffect(() => {
     hasLoaded.current = true;
   }, []);
@@ -715,6 +749,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         
         setLastSyncTime(new Date().toISOString());
+        
+        // After fetching, immediately push any local-only data that might exist
+        setTimeout(() => {
+          forceSync();
+        }, 1000);
       } catch (error: any) {
         console.error('Supabase fetch error:', error);
         if (hasSupabaseConfig) {
@@ -1823,6 +1862,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Business data in STORAGE_KEY is intentionally preserved
     toast.success('Logged out successfully');
   };
+
 
   const updateReceiptSettings = useCallback(async (settings: Partial<ReceiptSettings>) => {
     const updatedSettings = { ...receiptSettings, ...settings, isLocked: true };
