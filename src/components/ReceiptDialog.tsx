@@ -27,7 +27,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       color: #000; 
       margin: 0; 
       padding: 0; 
-      width: 280px; 
+      width: 260px; 
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -138,7 +138,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             body { 
               margin: 0 !important;
               padding: 0 !important;
-              width: 280px;
+              width: 260px;
               overflow: hidden;
             }
             ${commonStyles}
