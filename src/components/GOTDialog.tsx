@@ -161,7 +161,7 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
   if (!open) return null;
 
   return (
-    <div style={{ display: 'none', visibility: 'hidden', height: 0, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', left: '-9999px', top: 0, opacity: 0, pointerEvents: 'none' }}>
       <div ref={printRef} className="bg-white text-black">
         <div className="ticket-header">
           <div className="ticket-title">GOT TICKET</div>

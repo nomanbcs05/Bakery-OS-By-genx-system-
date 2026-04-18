@@ -107,11 +107,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     if (!content) return;
     
     const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.position = 'absolute';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '80mm';
+    iframe.style.height = '100%';
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
@@ -230,7 +230,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   if (!open) return null;
 
   return (
-    <div style={{ display: 'none', visibility: 'hidden', height: 0, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', left: '-9999px', top: 0, opacity: 0, pointerEvents: 'none' }}>
       <div ref={receiptRef}>
         <div className="print-container bg-white text-black">
           <div className="receipt-box text-center">
