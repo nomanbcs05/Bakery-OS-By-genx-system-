@@ -70,6 +70,9 @@ const AppRoutes = () => {
           selectedProfile.role === 'branch_staff' ? (
             <Navigate to={selectedProfile.branchId === 'branch_2' ? '/pos/branch-2' : '/pos/branch-1'} replace />
           ) :
+          selectedProfile.role === 'production_manager' ? (
+            <Navigate to="/production" replace />
+          ) :
           <Dashboard />
         } />
         

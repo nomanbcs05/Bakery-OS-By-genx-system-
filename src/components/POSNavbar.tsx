@@ -85,7 +85,7 @@ export function POSNavbar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Dashboard', 'Raw Materials', 'Purchases', 'Production', 'Recipes (BOM)', 'Production Stock', 'Dispatch'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Recipes (BOM)', 'Production Stock', 'Dispatch'].includes(item.title);
     if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
     return false;
   });
@@ -102,7 +102,7 @@ export function POSNavbar() {
 
   const filteredManagementNav = managementNav.filter(item => {
     if (isRole(['admin'])) return item.title !== 'Branch Settings';
-    if (isRole(['production_manager'])) return ['Reports'].includes(item.title);
+    if (isRole(['production_manager'])) return false;
     if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts', 'Credits'].includes(item.title);
     if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses', 'Branch Settings'].includes(item.title);
     return false;
