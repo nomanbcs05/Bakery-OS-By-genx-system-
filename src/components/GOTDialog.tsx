@@ -96,11 +96,11 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
       doc.write(`
         <html><head><title>GOT Ticket</title>
         <style>
-          @page { size: auto; margin: 0; }
+          @page { size: 80mm auto; margin: 0; }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            width: 270px;
+            width: 80mm !important;
             height: auto !important;
             min-height: 0 !important;
             overflow: visible !important;
@@ -112,15 +112,23 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
           }
           ${commonStyles}
           .print-container {
-            width: 100%;
-            padding: 10px !important;
+            width: 80mm !important;
+            padding: 2mm !important;
+            margin: 0 !important;
           }
         </style></head>
         <body>
           <div class="print-container">
             ${content.innerHTML}
           </div>
-          <script>window.onload = () => { window.print(); };</script>
+          <script>
+            window.onload = () => { 
+              setTimeout(() => {
+                window.print();
+                window.onafterprint = () => { window.close(); };
+              }, 250);
+            };
+          </script>
         </body></html>
       `);
       doc.close();

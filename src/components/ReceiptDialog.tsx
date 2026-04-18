@@ -127,27 +127,28 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <title>Receipt</title>
           <style>
             @page { 
-              size: auto; 
+              size: 80mm auto; 
               margin: 0mm; 
             }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
-              width: 260px;
+              width: 80mm !important;
               height: auto !important;
               min-height: 0 !important;
               overflow: visible !important;
+              -webkit-print-color-adjust: exact;
             }
             * {
               margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
-              -webkit-print-color-adjust: exact;
             }
             ${commonStyles}
             .print-container {
-              width: 100%;
-              padding: 5px !important;
+              width: 80mm !important;
+              padding: 2mm !important;
+              margin: 0 !important;
             }
           </style>
         </head>
@@ -159,7 +160,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             window.onload = () => { 
               setTimeout(() => {
                 window.print();
-              }, 100);
+                window.onafterprint = () => {
+                  window.close();
+                };
+              }, 250);
             };
           </script>
         </body>
@@ -261,7 +265,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row font-bold">
               <span>Restaurant:</span>
-              <span className="uppercase">{receiptSettings?.brandName || 'BakeryPOS'}</span>
+              <span className="uppercase">{receiptSettings?.brandName || "M.A BAKER'S"}</span>
             </div>
             <div className="flex-row">
               <span>Cashier:</span>
