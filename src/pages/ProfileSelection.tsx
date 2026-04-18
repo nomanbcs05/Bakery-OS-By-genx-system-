@@ -58,20 +58,26 @@ const VIRTUAL_PROFILES = [
 ];
 
 export default function ProfileSelection() {
-  const { selectProfile, verifyPin, selectedProfile, logout } = useApp();
+  const { selectProfile, verifyPin, selectedProfile, logout, allUsers } = useApp();
   const [step, setStep] = useState<'select' | 'pin'>('select');
   const [pin, setPin] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [selectedProfileLocal, setSelectedProfileLocal] = useState<any>(null);
 
   const handleProfileClick = (profile: any) => {
+    // Find the real user from allUsers to get the correct PIN
+    const realUser = allUsers.find(u => 
+      u.role === profile.role && 
+      (profile.branchId ? u.branchId === profile.branchId : true)
+    );
+    
     const userProfile = {
       id: profile.id,
       name: profile.name,
       email: '',
       role: profile.role,
       branchId: profile.branchId,
-      pinCode: '0000'
+      pinCode: realUser?.pinCode || '0000'
     };
     setSelectedProfileLocal({ ...userProfile, ...profile });
     selectProfile(userProfile);

@@ -1143,7 +1143,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const verifyPin = useCallback((pin: string): boolean => {
-    if (selectedProfile && (pin === '0000' || selectedProfile.pinCode === pin)) {
+    if (selectedProfile && selectedProfile.pinCode === pin) {
       setIsProfileLocked(false);
       return true;
     }
