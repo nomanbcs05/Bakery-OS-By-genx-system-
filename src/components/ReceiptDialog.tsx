@@ -107,11 +107,11 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     if (!content) return;
     
     const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
+    iframe.style.position = 'fixed';
     iframe.style.left = '-9999px';
     iframe.style.top = '0';
     iframe.style.width = '80mm';
-    iframe.style.height = '100%';
+    iframe.style.height = '1000px'; 
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
@@ -128,16 +128,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <style>
             @page { 
               size: 80mm auto; 
-              margin: 0mm; 
+              margin: 0; 
             }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
               width: 80mm !important;
               height: auto !important;
-              min-height: 0 !important;
               overflow: visible !important;
-              -webkit-print-color-adjust: exact;
             }
             * {
               margin: 0 !important;
@@ -148,7 +146,6 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             .print-container {
               width: 80mm !important;
               padding: 2mm !important;
-              margin: 0 !important;
             }
           </style>
         </head>

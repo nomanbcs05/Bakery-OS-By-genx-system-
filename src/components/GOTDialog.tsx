@@ -83,10 +83,10 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
     
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '80mm';
+    iframe.style.height = '1000px'; 
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
@@ -102,7 +102,6 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
             padding: 0 !important;
             width: 80mm !important;
             height: auto !important;
-            min-height: 0 !important;
             overflow: visible !important;
           }
           * {
@@ -114,7 +113,6 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
           .print-container {
             width: 80mm !important;
             padding: 2mm !important;
-            margin: 0 !important;
           }
         </style></head>
         <body>
