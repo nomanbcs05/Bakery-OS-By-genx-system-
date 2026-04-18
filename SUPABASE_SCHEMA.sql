@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS products (
   is_active BOOLEAN DEFAULT true,
   created_at DATE DEFAULT CURRENT_DATE
 );
-
 -- Safely add missing columns to products if they were created previously
 DO $$ 
 BEGIN
