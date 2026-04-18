@@ -1,7 +1,7 @@
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save, Cloud, CloudOff, ChefHat, Wallet } from 'lucide-react';
+import { User, Settings as SettingsIcon, ShieldCheck, Database, Trash2, Globe, Wifi, WifiOff, LogOut, Users, UserPlus, Mail, Shield, Lock, Printer, Save, Cloud, CloudOff, ChefHat, Wallet, Upload, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Navigate } from 'react-router-dom';
@@ -37,6 +37,46 @@ export default function SettingsPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [formReceiptSettings, setFormReceiptSettings] = useState(receiptSettings);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo image must be less than 2MB");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `business-logo-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('business_assets')
+        .upload(filePath, file, { 
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('business_assets')
+        .getPublicUrl(filePath);
+
+      setFormReceiptSettings(s => ({ ...s, logoUrl: publicUrl }));
+      toast.success("Logo uploaded successfully!");
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      toast.error(error.message || "Failed to upload logo. Make sure the 'business_assets' bucket exists and is public.");
+    } finally {
+      setIsUploadingLogo(false);
+      event.target.value = '';
+    }
+  };
 
   useEffect(() => {
     setFormReceiptSettings(receiptSettings);
@@ -359,7 +399,58 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Brand Name</Label><Input value={formReceiptSettings.brandName || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} className="bg-white h-9" /></div>
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Tagline</Label><Input value={formReceiptSettings.tagline || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} className="bg-white h-9" /></div>
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Business Logo (URL)</Label><Input value={formReceiptSettings.logoUrl || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, logoUrl: e.target.value }))} className="bg-white h-9" placeholder="https://..." /></div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label className="text-[10px] uppercase font-bold text-slate-500">Business Logo</Label>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 border rounded-xl bg-white shadow-sm">
+                          {formReceiptSettings.logoUrl ? (
+                            <div className="h-20 w-20 rounded-lg border bg-slate-50 flex items-center justify-center overflow-hidden shrink-0 group relative">
+                              <img src={formReceiptSettings.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Button variant="ghost" size="icon" className="text-white hover:text-white hover:bg-white/20" onClick={() => setFormReceiptSettings(s => ({...s, logoUrl: ''}))}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-20 w-20 rounded-lg border border-dashed bg-slate-50 flex items-center justify-center text-slate-300 shrink-0">
+                              <Image className="h-10 w-10 text-slate-200" />
+                            </div>
+                          )}
+                          <div className="flex-1 w-full space-y-3">
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Input 
+                                value={formReceiptSettings.logoUrl || ''} 
+                                onChange={e => setFormReceiptSettings(s => ({ ...s, logoUrl: e.target.value }))} 
+                                className="bg-slate-50 border-slate-200 h-10 text-sm" 
+                                placeholder="Paste logo URL (optional)" 
+                              />
+                              <div className="flex gap-2">
+                                <Button 
+                                  type="button"
+                                  variant="outline" 
+                                  className="h-10 gap-2 font-bold text-xs uppercase tracking-wider px-4 shrink-0 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                                  disabled={isUploadingLogo}
+                                  onClick={() => document.getElementById('logo-upload')?.click()}
+                                >
+                                  {isUploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                  Upload Logo
+                                </Button>
+                                <input 
+                                  id="logo-upload" 
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={handleLogoUpload} 
+                                />
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                              <span className="h-1 w-1 rounded-full bg-slate-300"></span> 
+                              Recommended: PNG with transparent background. Max 2MB.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Main Form Address</Label><Input value={formReceiptSettings.address || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} className="bg-white h-9" /></div>
                       <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Main Phone</Label><Input value={formReceiptSettings.phone || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} className="bg-white h-9" /></div>
                     </div>
