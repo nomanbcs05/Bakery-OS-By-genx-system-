@@ -63,9 +63,14 @@ export default function SettingsPage() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      let { data: { publicUrl } } = supabase.storage
         .from('business_assets')
         .getPublicUrl(filePath);
+
+      // Explicitly ensure the URL uses the public endpoint to prevent 400 errors
+      if (publicUrl && !publicUrl.includes('/public/')) {
+        publicUrl = publicUrl.replace('/v1/object/business_assets/', '/v1/object/public/business_assets/');
+      }
 
       setFormReceiptSettings(s => ({ ...s, logoUrl: publicUrl }));
       // Auto-save to global settings immediately
