@@ -110,14 +110,16 @@ export default function DispatchPage() {
 
   const [historyItems, setHistoryItems] = useState<{ name: string; quantity: number }[]>([]);
   const [historyDest, setHistoryDest] = useState('');
+  const [historyToken, setHistoryToken] = useState<number | undefined>(undefined);
   const [showHistoryGOT, setShowHistoryGOT] = useState(false);
 
-  const printHistoryGOT = (items: any[], dest: string) => {
+  const printHistoryGOT = (items: any[], dest: string, token?: number) => {
     setHistoryItems(items.map(i => ({ 
       name: getProductById(i.productId)?.name || 'Unknown', 
       quantity: i.quantity 
     })));
     setHistoryDest(dest);
+    setHistoryToken(token);
     setShowHistoryGOT(true);
   };
 
@@ -289,6 +291,7 @@ export default function DispatchPage() {
         open={showGOT}
         onClose={() => setShowGOT(false)}
         destination={destination}
+        tokenNumber={dispatches.filter(d => d.date === new Date().toISOString().slice(0, 10)).length + 1}
         items={items.map(i => ({ 
           name: getProductById(i.productId)?.name || 'Unknown', 
           quantity: i.quantity 
@@ -335,7 +338,7 @@ export default function DispatchPage() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => printHistoryGOT(d.items, d.destination)}
+                      onClick={() => printHistoryGOT(d.items, d.destination, d.tokenNumber)}
                       className="h-8 w-8 p-0"
                       title="Reprint GOT"
                     >
@@ -381,6 +384,7 @@ export default function DispatchPage() {
         open={showHistoryGOT}
         onClose={() => setShowHistoryGOT(false)}
         destination={historyDest}
+        tokenNumber={historyToken}
         items={historyItems}
       />
     </div>

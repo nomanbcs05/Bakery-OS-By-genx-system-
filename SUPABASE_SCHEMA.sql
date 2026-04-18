@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS dispatches (
   date DATE NOT NULL,
   status TEXT DEFAULT 'confirmed',
   items JSONB NOT NULL, -- Array of {productId, quantity}
+  token_number INTEGER,
   sync_status TEXT DEFAULT 'synced'
 );
 

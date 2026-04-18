@@ -184,7 +184,7 @@ const fromDBExpense = (e: DBExpense): Expense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branchId: e.branch_id, syncStatus: e.sync_status || 'synced'
 });
 const fromDBDispatch = (d: DBDispatch): Dispatch => ({
-  id: d.id, destination: d.destination, date: d.date, status: d.status, items: d.items, syncStatus: d.sync_status || 'synced'
+  id: d.id, destination: d.destination, date: d.date, status: d.status, items: d.items, tokenNumber: d.token_number, syncStatus: d.sync_status || 'synced'
 });
 const fromDBLog = (l: DBAuditLog): AuditLog => ({
   id: l.id, action: l.action, entity: l.entity, entityId: l.entity_id, details: l.details, userId: l.user_id, timestamp: l.timestamp
@@ -235,7 +235,7 @@ const toDBExpense = (e: Expense): DBExpense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branch_id: e.branchId, sync_status: e.syncStatus
 });
 const toDBDispatch = (d: Dispatch): DBDispatch => ({
-  id: d.id, destination: d.destination, date: d.date, status: d.status, items: d.items, sync_status: d.syncStatus
+  id: d.id, destination: d.destination, date: d.date, status: d.status, items: d.items, token_number: d.tokenNumber, sync_status: d.syncStatus
 });
 const toDBLog = (l: AuditLog): DBAuditLog => ({
   id: l.id, action: l.action, entity: l.entity, entity_id: l.entityId, details: l.details, user_id: l.userId, timestamp: l.timestamp
@@ -1289,9 +1289,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     const id = `d${Date.now()}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const todayDispatches = dispatches.filter(d => d.date === today);
+    const tokenNumber = todayDispatches.length + 1;
+
     const dispatch: Dispatch = { 
-      id, destination, date: new Date().toISOString().slice(0, 10), 
+      id, destination, date: today, 
       status: 'confirmed', items,
+      tokenNumber,
       syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
     };
     
@@ -1325,10 +1330,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return walkinSale.id;
     }
 
-    addLog('create', 'dispatch', id, `Created dispatch to ${destination}`);
-    toast.success(`Dispatch recorded`);
+    addLog('create', 'dispatch', id, `Created dispatch to ${destination} (Token #${tokenNumber})`);
+    toast.success(`Dispatch recorded (Token #${tokenNumber})`);
     return true;
-  }, [stock, products, isOnline, addLog, hasSupabaseConfig]);
+  }, [stock, products, dispatches, isOnline, addLog, hasSupabaseConfig]);
 
   const payCreditSale = useCallback(async (id: string) => {
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));

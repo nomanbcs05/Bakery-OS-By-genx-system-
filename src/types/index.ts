@@ -77,6 +77,7 @@ export interface Dispatch {
   date: string;
   status: 'pending' | 'confirmed';
   items: DispatchItem[];
+  tokenNumber?: number;
   syncStatus: 'synced' | 'pending';
 }
 
@@ -207,6 +208,7 @@ export interface DBDispatch {
   date: string;
   status: 'pending' | 'confirmed';
   items: DispatchItem[];
+  token_number?: number;
   sync_status: 'synced' | 'pending';
 }
 

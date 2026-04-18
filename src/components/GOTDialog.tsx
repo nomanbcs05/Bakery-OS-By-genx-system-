@@ -9,10 +9,11 @@ interface GOTDialogProps {
   onClose: () => void;
   items: { name: string; quantity: number }[];
   destination: string;
+  tokenNumber?: number;
   autoPrint?: boolean;
 }
 
-export default function GOTDialog({ open, onClose, items, destination, autoPrint }: GOTDialogProps) {
+export default function GOTDialog({ open, onClose, items, destination, tokenNumber, autoPrint }: GOTDialogProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { receiptSettings } = useApp();
 
@@ -146,6 +147,11 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
 
         <div className="text-center mb-4">
           <div className="text-[10pt]">{dateStr} | {timeStr}</div>
+          {tokenNumber && (
+            <div className="text-[20pt] font-black underline my-1">
+              TOKEN #: {tokenNumber}
+            </div>
+          )}
           <div className="text-[11pt] font-bold mt-1">DISPATCH TO:</div>
           <div className="destination-box uppercase">
             {destLabels[destination] || destination || 'UNSPECIFIED'}
@@ -163,7 +169,7 @@ export default function GOTDialog({ open, onClose, items, destination, autoPrint
 
         <div className="footer">
           <div className="font-bold">TOTAL ITEMS: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</div>
-          <div className="mt-2 text-[8pt]">Bakewise ERP - Dispatch System</div>
+          <div className="mt-2 text-[8pt]">Bakewise ERP - Dispatch System by genx systems +923342826675</div>
         </div>
       </div>
     </div>
