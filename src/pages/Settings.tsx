@@ -355,26 +355,37 @@ export default function SettingsPage() {
 
                 <div className="space-y-6">
                   <div className="p-4 border rounded-xl bg-slate-50/50 space-y-4">
-                    <h3 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Global Branding</h3>
+                    <h3 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Global Branding & Layout</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Brand Name</Label><Input value={formReceiptSettings.brandName} onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} className="bg-white h-9" /></div>
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Tagline</Label><Input value={formReceiptSettings.tagline} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Brand Name</Label><Input value={formReceiptSettings.brandName || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, brandName: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Tagline</Label><Input value={formReceiptSettings.tagline || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, tagline: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Business Logo (URL)</Label><Input value={formReceiptSettings.logoUrl || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, logoUrl: e.target.value }))} className="bg-white h-9" placeholder="https://..." /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Main Form Address</Label><Input value={formReceiptSettings.address || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, address: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Main Phone</Label><Input value={formReceiptSettings.phone || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, phone: e.target.value }))} className="bg-white h-9" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/60 mt-4">
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Footer Message 1</Label><Input value={formReceiptSettings.footerMessage1 || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage1: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Footer Message 2</Label><Input value={formReceiptSettings.footerMessage2 || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, footerMessage2: e.target.value }))} className="bg-white h-9" /></div>
                     </div>
                   </div>
 
                   <TabsContent value="branch_1" className="mt-0 p-4 border rounded-xl bg-slate-50/50 space-y-4">
                     <h3 className="font-bold text-xs uppercase tracking-widest text-primary">Branch 1 Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Address</Label><Input value={formReceiptSettings.branch1Address} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Address: e.target.value }))} className="bg-white h-9" /></div>
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Phone</Label><Input value={formReceiptSettings.branch1Phone} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Phone: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Address</Label><Input value={formReceiptSettings.branch1Address || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Address: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Phone</Label><Input value={formReceiptSettings.branch1Phone || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Phone: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Location Name</Label><Input value={formReceiptSettings.branch1Location || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Location: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Cashier / Staff</Label><Input value={formReceiptSettings.branch1Cashier || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch1Cashier: e.target.value }))} className="bg-white h-9" /></div>
                     </div>
                   </TabsContent>
 
                   <TabsContent value="branch_2" className="mt-0 p-4 border rounded-xl bg-slate-50/50 space-y-4">
                     <h3 className="font-bold text-xs uppercase tracking-widest text-primary">Branch 2 Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Address</Label><Input value={formReceiptSettings.branch2Address} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Address: e.target.value }))} className="bg-white h-9" /></div>
-                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Phone</Label><Input value={formReceiptSettings.branch2Phone} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Phone: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Address</Label><Input value={formReceiptSettings.branch2Address || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Address: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Phone</Label><Input value={formReceiptSettings.branch2Phone || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Phone: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Location Name</Label><Input value={formReceiptSettings.branch2Location || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Location: e.target.value }))} className="bg-white h-9" /></div>
+                      <div className="space-y-1.5"><Label className="text-[10px] uppercase font-bold text-slate-500">Cashier / Staff</Label><Input value={formReceiptSettings.branch2Cashier || ''} onChange={e => setFormReceiptSettings(s => ({ ...s, branch2Cashier: e.target.value }))} className="bg-white h-9" /></div>
                     </div>
                   </TabsContent>
 
