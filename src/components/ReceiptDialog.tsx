@@ -266,7 +266,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row">
               <span>Cashier:</span>
-              <span>{cashierName || 'GenX Cloud POS'}</span>
+              <span>{cashierName || 'GENX ERP & POS SYSTEMS'}</span>
             </div>
             <div className="flex-row">
               <span>Type:</span>

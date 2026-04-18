@@ -371,7 +371,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     phone: '0329-7040402',
     footerMessage1: "Thank you for visiting M.A BAKER'S!",
     footerMessage2: 'Powered by genx systems +923342826675',
-    printedBy: 'GENX CLOUD POS',
+    printedBy: 'GENX ERP & POS SYSTEMS',
     branch1Location: 'Jam sahib road',
     branch1OnlineOrder: '03297040402',
     branch2Location: '',
