@@ -110,6 +110,22 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSetupAllProfiles = async () => {
+    const roles: UserRole[] = ['production_manager', 'branch_staff', 'accountant'];
+    for (const role of roles) {
+      const existing = allUsers.filter(u => u.role === role);
+      if (existing.length === 0) {
+        await handleCreateProfile(role);
+      }
+    }
+    // Also create second branch staff if only one exists
+    const branchStaff = allUsers.filter(u => u.role === 'branch_staff');
+    if (branchStaff.length === 1) {
+      await handleCreateProfile('branch_staff');
+    }
+    toast.success('All default profiles checked and initialized where missing.');
+  };
+
   const handleSaveReceiptSettings = () => {
     updateReceiptSettings(formReceiptSettings);
   };
@@ -181,7 +197,25 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <Card className="bg-slate-50 border-none shadow-none">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">Quick Setup</p>
+                      <p className="text-[10px] text-muted-foreground">Instantly create primary profiles for all system roles</p>
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={handleSetupAllProfiles} disabled={isCreatingProfile} className="h-8 text-xs font-bold uppercase tracking-widest px-4">
+                    Setup All Profiles
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {['admin', 'production_manager', 'branch_staff', 'accountant'].map(role => {
                 const userProfiles = allUsers.filter(u => u.role === role);
                 return (
@@ -212,8 +246,17 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {userProfiles.length === 0 && (
-                        <div className="py-2 text-center">
-                          <p className="text-[10px] text-muted-foreground italic mb-2">No profiles created for this role</p>
+                        <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed rounded-xl border-slate-200 bg-slate-50/50">
+                          <p className="text-[10px] text-muted-foreground italic mb-3 font-medium">No {role.replace('_', ' ')} profile found</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 text-[10px] font-bold uppercase tracking-wider bg-white"
+                            onClick={() => handleCreateProfile(role as UserRole)}
+                            disabled={isCreatingProfile}
+                          >
+                            <UserPlus className="h-3 w-3 mr-2" /> Initialize Primary {role.replace('_', ' ')}
+                          </Button>
                         </div>
                       )}
                       {userProfiles.map(u => (
