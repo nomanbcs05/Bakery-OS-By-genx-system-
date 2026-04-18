@@ -395,6 +395,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   });
 
+  const hasLoaded = React.useRef(false);
+
   const forceSync = useCallback(async () => {
     if (!navigator.onLine || !hasSupabaseConfig) return;
     
