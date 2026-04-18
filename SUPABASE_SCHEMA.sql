@@ -335,7 +335,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 -- Initialize with default settings if not exists
 INSERT INTO app_settings (id, settings)
-VALUES ('receipt_config', '{"brandName": "M.A BAKER''S", "tagline": "Quality You Can Trust", "logoUrl": "", "address": "Jam Sahib Road, Nawabshah", "phone": "0329-7040402", "footerMessage1": "Thank you for visiting M.A BAKER''S!", "footerMessage2": "Powered by genx systems +923342826675", "printedBy": "GENX CLOUD POS", "branch1Address": "Jam sahib road, nawabshah", "branch1Phone": "03297040402", "branch2Address": "Main chowk jam sahib road nawabshah", "branch2Phone": "03093660360", "dispatchAddress": "Factory Gate, Nawabshah", "dispatchPhone": "03297040402"}')
+VALUES ('receipt_config', '{"brandName": "M.A BAKER''S", "tagline": "Quality You Can Trust", "logoUrl": "", "address": "Jam Sahib Road, Nawabshah", "phone": "0329-7040402", "footerMessage1": "Thank you for visiting M.A BAKER''S!", "footerMessage2": "Powered by genx systems +923342826675", "printedBy": "GENX ERP & POS SYSTEMS", "branch1Address": "Jam sahib road, nawabshah", "branch1Phone": "03297040402", "branch2Address": "Main chowk jam sahib road nawabshah", "branch2Phone": "03093660360", "dispatchAddress": "Factory Gate, Nawabshah", "dispatchPhone": "03297040402"}')
 ON CONFLICT (id) DO NOTHING;
 
 -- Add to Realtime
