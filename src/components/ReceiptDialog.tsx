@@ -36,12 +36,18 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     
     .receipt-logo {
       max-height: 80pt !important;
-      max-width: 100% !important;
-      margin: 0 auto 8pt auto;
+      max-width: 80% !important;
+      margin: 0 auto 6pt auto;
       display: block;
       object-fit: contain;
-      filter: grayscale(1) contrast(1.5) brightness(1.1);
-      -webkit-filter: grayscale(1) contrast(1.5) brightness(1.1);
+      text-align: center;
+    }
+    .receipt-logo-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 4pt;
     }
 
     .receipt-box { 
@@ -244,17 +250,17 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
         <div className="print-container bg-white text-black">
           <div className="receipt-box text-center">
             {receiptSettings?.logoUrl ? (
-              <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" crossOrigin="anonymous" />
-            ) : (
-               <div className="text-[18pt] font-black uppercase mb-1">{receiptSettings?.brandName || "M.A BAKER'S"}</div>
-            )}
-            
-            {receiptSettings?.logoUrl && (
-              <div className="text-[12pt] font-black uppercase mb-1">{receiptSettings?.brandName || "M.A BAKER'S"}</div>
-            )}
+              <div className="receipt-logo-wrapper">
+                <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" crossOrigin="anonymous" />
+              </div>
+            ) : null}
+
+            <div className="text-[13pt] font-black uppercase mb-1" style={{color:'#000', fontWeight:900, letterSpacing:'1px'}}>
+              {receiptSettings?.brandName || "M.A BAKER'S"}
+            </div>
 
             {receiptSettings?.tagline && (
-              <div className="text-[8pt] italic mb-1 uppercase tracking-widest">{receiptSettings.tagline}</div>
+              <div className="text-[8pt] italic mb-1 uppercase tracking-widest" style={{color:'#c08000'}}>{receiptSettings.tagline}</div>
             )}
             
             <div className="receipt-divider"></div>
