@@ -250,7 +250,7 @@ const toDBRawMaterial = (m: RawMaterial): DBRawMaterial => ({
   id: m.id, name: m.name, category: m.category, unit: m.unit, current_stock: m.currentStock, min_stock_level: m.minStockLevel, cost_per_unit: m.costPerUnit, supplier_name: m.supplierName, is_active: m.isActive, last_updated: m.lastUpdated
 });
 const toDBRawAdjustment = (a: RawMaterialAdjustment): DBRawMaterialAdjustment => ({
-  id: a.id, material_id: a.materialId, type: a.type, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: a.syncStatus
+  id: a.id, material_id: a.materialId, type: a.type, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: a.sync_status
 });
 const toDBBranchAdjustment = (a: BranchStockAdjustment): DBBranchStockAdjustment => ({
   id: a.id, product_id: a.productId, branch: a.branch, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: 'synced'
@@ -265,7 +265,7 @@ const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
   id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
 });
 const toDBPurchase = (p: Purchase): DBPurchase => ({
-  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amount_paid, payment_method: p.payment_method, 
+  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
   vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
 });
 
@@ -798,6 +798,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newS = { ...receiptSettings, ...s };
     setReceiptSettings(newS);
     if (isOnline && hasSupabaseConfig) await supabase.from('app_settings').upsert([{ id: 'receipt_config', settings: newS }]);
+  };
+
+  const selectProfile = (profile: User) => {
+    setSelectedProfile(profile);
+    setIsProfileLocked(true);
+    localStorage.setItem('bakewise_selected_profile', JSON.stringify(profile));
+  };
+
+  const verifyPin = (pin: string) => {
+    if (selectedProfile && selectedProfile.pinCode === pin) {
+      setIsProfileLocked(false);
+      return true;
+    }
+    return false;
+  };
+
+  const lockProfile = () => {
+    setIsProfileLocked(true);
+    setSelectedProfile(null);
+    localStorage.removeItem('bakewise_selected_profile');
+  };
+
+  const switchUser = (role: UserRole, branchId?: 'branch_1' | 'branch_2') => {
+    const user = allUsers.find(u => u.role === role && (branchId ? u.branchId === branchId : true));
+    if (user) {
+      selectProfile(user);
+    }
   };
 
   const addStaffMember = async (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => {
