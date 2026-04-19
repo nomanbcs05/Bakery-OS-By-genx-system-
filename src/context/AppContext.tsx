@@ -167,6 +167,9 @@ const AppContext = createContext<AppContextType | null>(null);
 const STORAGE_KEY = 'bakewise_erp_state';
 const AUTH_STORAGE_KEY = 'bakewise_auth_state';
 
+// Flag to temporarily disable offline database (localStorage) for online-only testing
+const DISABLE_OFFLINE_DB = true;
+
 // Helper to convert DB objects to CamelCase
 const fromDBProduct = (p: DBProduct): Product => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, isActive: p.is_active, createdAt: p.created_at
@@ -226,13 +229,13 @@ const toDBSale = (s: Sale): any => {
   return {
     id: s.id,
     type: s.type,
-    branch: s.branch,
+    branch: s.branch || null,
     items: s.items,
     total: s.total,
     payment_method: s.paymentMethod,
-    customer_name: s.customerName,
-    customer_phone: s.customerPhone,
-    is_credit_paid: s.isCreditPaid,
+    customer_name: s.customerName || null,
+    customer_phone: s.customerPhone || null,
+    is_credit_paid: s.isCreditPaid ?? false,
     date: s.date,
     sync_status: 'synced'
   };
@@ -265,7 +268,7 @@ const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
   id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
 });
 const toDBPurchase = (p: Purchase): DBPurchase => ({
-  id: p.id, material_id: p.material_id, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.payment_method, 
+  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
   vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
 });
 
@@ -277,6 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   
   const loadBusinessData = (): Partial<AppState> => {
+    if (DISABLE_OFFLINE_DB) return {};
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return {};
@@ -389,12 +393,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const pending = items.filter(i => i.syncStatus === 'pending');
       if (pending.length === 0) return;
       try {
-        const { error } = await supabase.from(table).upsert(pending.map(i => toDB({ ...i, syncStatus: 'synced' })));
+        const payload = pending.map(i => toDB({ ...i, syncStatus: 'synced' }));
+        const { error } = await supabase.from(table).upsert(payload);
         if (!error) {
           setter((prev: any[]) => prev.map(i => i.syncStatus === 'pending' ? { ...i, syncStatus: 'synced' } : i));
           syncCount += pending.length;
+        } else {
+          console.error(`Supabase ${table} sync error:`, error.message, error.details);
         }
-      } catch (err) { console.error(`${table} sync error:`, err); }
+      } catch (err) { console.error(`${table} execution sync error:`, err); }
     };
 
     await Promise.all([
@@ -436,7 +443,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return [...remoteMapped, ...localOnly];
     };
 
-    // Fetch tables independently to ensure one failure doesn't block others
+    // Fetch tables independently
     const pData = await fetchTable('products', 'created_at');
     if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
 
@@ -484,14 +491,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     setLastSyncTime(new Date().toISOString());
     setIsLoading(false);
-    
-    // Attempt push of local changes after every pull
     setTimeout(() => syncOfflineData(), 1000);
   }, [currentUser, hasSupabaseConfig, syncOfflineData]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Faster sync heartbeats (15s)
   useEffect(() => {
     if (isOnline && hasSupabaseConfig && currentUser) {
       const pullInterval = setInterval(() => fetchData(), 15000);
@@ -614,6 +618,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
           }
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'dispatches' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const d = fromDBDispatch(p.new as DBDispatch);
+            setDispatches(prev => {
+              const idx = prev.findIndex(x => x.id === d.id);
+              if (idx === -1) return [...prev, d];
+              const next = [...prev]; next[idx] = d; return next;
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const pr = fromDBProduct(p.new as DBProduct);
+            setProducts(prev => {
+              const idx = prev.findIndex(x => x.id === pr.id);
+              if (idx === -1) return [...prev, pr];
+              const next = [...prev]; next[idx] = pr; return next;
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'raw_materials' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const rm = fromDBRawMaterial(p.new as DBRawMaterial);
+            setRawMaterials(prev => {
+              const idx = prev.findIndex(x => x.id === rm.id);
+              if (idx === -1) return [...prev, rm];
+              const next = [...prev]; next[idx] = rm; return next;
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const st = fromDBStaff(p.new as DBStaffMember);
+            setStaff(prev => {
+              const idx = prev.findIndex(x => x.id === st.id);
+              if (idx === -1) return [...prev, st];
+              const next = [...prev]; next[idx] = st; return next;
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const data = p.new as any;
+            if (data.id === 'receipt_config' && data.settings) {
+              setReceiptSettings(prev => ({ ...prev, ...data.settings, isLocked: true }));
+            }
+          }
+        })
         .subscribe((status) => {
           if (status !== 'SUBSCRIBED' && retryCount < maxRetries) {
             retryCount++;
@@ -628,7 +680,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [hasSupabaseConfig, isOnline]);
 
   useEffect(() => {
-    if (!hasLoaded.current) return;
+    if (!hasLoaded.current || DISABLE_OFFLINE_DB) return;
     const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases]);
@@ -735,10 +787,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (mat) {
         const newStock = type === 'in' ? mat.currentStock + quantity : mat.currentStock - quantity;
         try {
-          await Promise.all([
-            supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(adj)]),
-            supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId)
-          ]);
+          const { error } = await supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(adj)]);
+          await supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId);
+          if (error) throw error;
         } catch (err) {
           setRawMaterialAdjustments(prev => prev.map(a => a.id === id ? { ...a, syncStatus: 'pending' } : a));
         }
@@ -751,7 +802,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newR: Recipe = { ...r, id: `rcp${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setRecipes(prev => [...prev, newR]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('recipes').upsert([toDBRecipe(newR)]); } catch (err) {
+      try {
+        const { error } = await supabase.from('recipes').upsert([toDBRecipe(newR)]);
+        if (error) throw error;
+      } catch (err) {
         setRecipes(prev => prev.map(rc => rc.id === newR.id ? { ...rc, syncStatus: 'pending' } : rc));
       }
     }
@@ -786,7 +840,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newBatch: ProductionBatch = { id, batchId, productId, quantity, date: new Date().toISOString().slice(0, 10), notes, syncStatus: isOnline ? 'synced' : 'pending' };
     setBatches(prev => [...prev, newBatch]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('production_batches').upsert([toDBBatch(newBatch)]); } catch (err) {
+      try {
+        const { error } = await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
+        if (error) throw error;
+      } catch (err) {
         setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
       }
     }
@@ -817,7 +874,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDispatches(prev => [...prev, dispatch]);
     if (isOnline && hasSupabaseConfig) {
       try {
-        await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+        const { error } = await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+        if (error) throw error;
       } catch (err) {
         setDispatches(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
       }
@@ -833,7 +891,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSales(prev => [...prev, walkinSale]);
       if (isOnline && hasSupabaseConfig) {
         try {
-          await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+          const { error } = await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+          if (error) throw error;
         } catch (err) {
           setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
         }
@@ -873,7 +932,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newE: Expense = { ...e, id: `e${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setExpenses(prev => [...prev, newE]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('expenses').upsert([toDBExpense(newE)]); } catch (err) {
+      try {
+        const { error } = await supabase.from('expenses').upsert([toDBExpense(newE)]);
+        if (error) throw error;
+      } catch (err) {
         setExpenses(prev => prev.map(ex => ex.id === newE.id ? { ...ex, syncStatus: 'pending' } : ex));
       }
     }
@@ -956,7 +1018,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newD: StaffDeduction = { ...d, id: `sd${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setStaffDeductions(prev => [...prev, newD]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('staff_deductions').upsert([toDBDeduction(newD)]); } catch (err) {
+      try {
+        const { error } = await supabase.from('staff_deductions').upsert([toDBDeduction(newD)]);
+        if (error) throw error;
+      } catch (err) {
         setStaffDeductions(prev => prev.map(sd => sd.id === newD.id ? { ...sd, syncStatus: 'pending' } : sd));
       }
     }
@@ -981,7 +1046,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newV: SalaryVoucher = { ...v, id: `sv${Date.now()}`, status: 'paid', syncStatus: isOnline ? 'synced' : 'pending' };
     setSalaryVouchers(prev => [...prev, newV]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('salary_vouchers').upsert([toDBVoucher(newV)]); } catch (err) {
+      try {
+        const { error } = await supabase.from('salary_vouchers').upsert([toDBVoucher(newV)]);
+        if (error) throw error;
+      } catch (err) {
         setSalaryVouchers(prev => prev.map(sv => sv.id === newV.id ? { ...sv, syncStatus: 'pending' } : sv));
       }
     }
