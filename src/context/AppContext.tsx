@@ -564,39 +564,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const fetchData = async () => {
       try {
+        const fetchTable = async (table: string, select = '*') => {
+          try {
+            const { data, error } = await supabase.from(table).select(select);
+            if (error) {
+              console.warn(`Failed to fetch ${table}:`, error.message);
+              return null;
+            }
+            return data;
+          } catch (e) {
+            console.warn(`Error fetching ${table}:`, e);
+            return null;
+          }
+        };
+
         const [
-          { data: pData },
-          { data: rmData },
-          { data: rmaData },
-          { data: bData },
-          { data: dData },
-          { data: sData },
-          { data: eData },
-          { data: lData },
-          { data: bsaData },
-          { data: stData },
-          { data: sdData },
-          { data: svData },
-          { data: purchasesData },
-          { data: recipesData },
-          { data: settingsData }
+          pData, rmData, rmaData, bData, dData, sData, eData, lData, bsaData, stData, sdData, svData, purchasesData, recipesData, settingsResponse
         ] = await Promise.all([
-          supabase.from('products').select('*'),
-          supabase.from('raw_materials').select('*'),
-          supabase.from('raw_material_adjustments').select('*'),
-          supabase.from('production_batches').select('*'),
-          supabase.from('dispatches').select('*'),
-          supabase.from('sales').select('*'),
-          supabase.from('expenses').select('*'),
-          supabase.from('audit_logs').select('*'),
-          supabase.from('branch_stock_adjustments').select('*'),
-          supabase.from('staff_members').select('*'),
-          supabase.from('staff_deductions').select('*'),
-          supabase.from('salary_vouchers').select('*'),
-          supabase.from('purchases').select('*'),
-          supabase.from('recipes').select('*'),
+          fetchTable('products'),
+          fetchTable('raw_materials'),
+          fetchTable('raw_material_adjustments'),
+          fetchTable('production_batches'),
+          fetchTable('dispatches'),
+          fetchTable('sales'),
+          fetchTable('expenses'),
+          fetchTable('audit_logs'),
+          fetchTable('branch_stock_adjustments'),
+          fetchTable('staff_members'),
+          fetchTable('staff_deductions'),
+          fetchTable('salary_vouchers'),
+          fetchTable('purchases'),
+          fetchTable('recipes'),
           supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle()
         ]);
+
+        const settingsData = settingsResponse?.data;
 
         // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
         if (pData && pData.length > 0) {

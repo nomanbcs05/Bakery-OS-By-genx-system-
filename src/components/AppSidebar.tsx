@@ -175,15 +175,26 @@ export function AppSidebar() {
                   {selectedProfile.role.replace('_', ' ')}
                 </Badge>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground"
-                onClick={lockProfile}
-                title="Switch Profile"
-              >
-                <UserCircle className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                  onClick={lockProfile}
+                  title="Switch Profile"
+                >
+                  <UserCircle className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn("h-8 w-8", isOnline ? "text-green-500" : "text-amber-500")}
+                  onClick={() => forceSync()}
+                  title={isOnline ? "Force Cloud Sync" : "You are Offline"}
+                >
+                  <Cloud className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </>
         )}
