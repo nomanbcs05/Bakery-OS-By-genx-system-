@@ -265,7 +265,7 @@ const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
   id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
 });
 const toDBPurchase = (p: Purchase): DBPurchase => ({
-  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
+  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amount_paid, payment_method: p.payment_method, 
   vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
 });
 
@@ -617,6 +617,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isOnline && hasSupabaseConfig) await supabase.from('audit_logs').insert([toDBLog(log)]);
   }, [currentUser, isOnline]);
 
+  const getProductById = useCallback((id: string) => products.find(p => p.id === id), [products]);
+  
+  const getInventorySnapshots = useCallback((): InventorySnapshot[] => {
+    return products.map(p => {
+      const s = stock[p.id] || { production: 0, branch_1: 0, branch_2: 0 };
+      const totalProduced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
+      const totalDispatched = dispatches.flatMap(d => d.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
+      const totalSold = sales.flatMap(sl => sl.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
+      return { productId: p.id, totalProduced, totalDispatched, totalSold, productionStock: s.production, branch1Stock: s.branch_1, branch2Stock: s.branch_2 };
+    });
+  }, [products, stock, batches, dispatches, sales]);
+
   const addProduct = async (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => {
     const newP: Product = { ...p, id: `p${Date.now()}`, createdAt: new Date().toISOString(), isActive: true };
     setProducts(prev => [...prev, newP]);
@@ -702,6 +714,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isOnline && hasSupabaseConfig) await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(adj)]);
   };
 
+  const addProduction = async (productId: string, quantity: number, notes?: string) => {
+    const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
+    const id = `b${Date.now()}`;
+    const newBatch: ProductionBatch = { id, batchId, productId, quantity, date: new Date().toISOString().slice(0, 10), notes, syncStatus: isOnline ? 'synced' : 'pending' };
+    setBatches(prev => [...prev, newBatch]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
+    return true;
+  };
+
   const updateProduction = async (id: string, u: Partial<ProductionBatch>) => {
     setBatches(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
     const updated = batches.find(b => b.id === id);
@@ -711,6 +732,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteProduction = async (id: string) => {
     setBatches(prev => prev.filter(b => b.id !== id));
     if (isOnline && hasSupabaseConfig) await supabase.from('production_batches').delete().eq('id', id);
+  };
+
+  const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
+    const id = `d${Date.now()}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const todayDispatches = dispatches.filter(d => d.date === today);
+    const tokenNumber = todayDispatches.length + 1;
+    const dispatch: Dispatch = { id, destination, date: today, status: 'confirmed', items, tokenNumber, syncStatus: isOnline ? 'synced' : 'pending' };
+    setDispatches(prev => [...prev, dispatch]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+
+    if (destination === 'walkin') {
+      const saleItems: SaleItem[] = items.map(i => {
+        const product = products.find(p => p.id === i.productId);
+        return { productId: i.productId, quantity: i.quantity, unitPrice: product?.price || 0 };
+      });
+      const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
+      const walkinSale: Sale = { id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName, customerPhone, isCreditPaid: true, date: today, syncStatus: isOnline ? 'synced' : 'pending' };
+      setSales(prev => [...prev, walkinSale]);
+      if (isOnline && hasSupabaseConfig) await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+      return walkinSale.id;
+    }
+    return true;
   };
 
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
