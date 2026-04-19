@@ -250,7 +250,7 @@ const toDBRawMaterial = (m: RawMaterial): DBRawMaterial => ({
   id: m.id, name: m.name, category: m.category, unit: m.unit, current_stock: m.currentStock, min_stock_level: m.minStockLevel, cost_per_unit: m.costPerUnit, supplier_name: m.supplierName, is_active: m.isActive, last_updated: m.lastUpdated
 });
 const toDBRawAdjustment = (a: RawMaterialAdjustment): DBRawMaterialAdjustment => ({
-  id: a.id, material_id: a.materialId, type: a.type, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: a.sync_status
+  id: a.id, material_id: a.materialId, type: a.type, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: a.syncStatus
 });
 const toDBBranchAdjustment = (a: BranchStockAdjustment): DBBranchStockAdjustment => ({
   id: a.id, product_id: a.productId, branch: a.branch, quantity: a.quantity, reason: a.reason, date: a.date, user_id: a.userId, sync_status: 'synced'
@@ -265,7 +265,7 @@ const toDBVoucher = (v: SalaryVoucher): DBSalaryVoucher => ({
   id: v.id, staff_id: v.staffId, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, sync_status: v.syncStatus
 });
 const toDBPurchase = (p: Purchase): DBPurchase => ({
-  id: p.id, material_id: p.materialId, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.paymentMethod, 
+  id: p.id, material_id: p.material_id, quantity: p.quantity, total_cost: p.totalCost, amount_paid: p.amountPaid, payment_method: p.payment_method, 
   vendor_name: p.vendorName, vendor_city: p.vendorCity, date: p.date, sync_status: p.syncStatus
 });
 
@@ -418,62 +418,84 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fetchData = useCallback(async () => {
     if (!currentUser || !hasSupabaseConfig) return;
 
-    try {
-      const fetchTable = async (table: string) => {
-        const { data, error } = await supabase.from(table).select('*');
+    const fetchTable = async (table: string, orderField: string = 'date') => {
+      try {
+        const { data, error } = await supabase.from(table).select('*').order(orderField, { ascending: false }).limit(1000);
         if (error) throw error;
         return data;
-      };
+      } catch (err) {
+        console.warn(`Failed to fetch ${table}:`, err);
+        return null;
+      }
+    };
 
-      const [
-        pData, rmData, rmaData, bData, dData, sData, eData, lData, bsaData, stData, sdData, svData, purchasesData, recipesData, settingsResponse
-      ] = await Promise.all([
-        fetchTable('products'), fetchTable('raw_materials'), fetchTable('raw_material_adjustments'),
-        fetchTable('production_batches'), fetchTable('dispatches'), fetchTable('sales'),
-        fetchTable('expenses'), fetchTable('audit_logs'), fetchTable('branch_stock_adjustments'),
-        fetchTable('staff_members'), fetchTable('staff_deductions'), fetchTable('salary_vouchers'),
-        fetchTable('purchases'), fetchTable('recipes'),
-        supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle()
-      ]);
+    const merge = (remote: any[], local: any[], fromDB: (d: any) => any) => {
+      if (!remote) return local;
+      const remoteMapped = remote.map(fromDB);
+      const localOnly = local.filter(l => !remoteMapped.find(r => r.id === l.id));
+      return [...remoteMapped, ...localOnly];
+    };
 
-      const merge = (remote: any[], local: any[], fromDB: (d: any) => any) => {
-        const remoteMapped = remote.map(fromDB);
-        const localOnly = local.filter(l => !remoteMapped.find(r => r.id === l.id));
-        return [...remoteMapped, ...localOnly];
-      };
+    // Fetch tables independently to ensure one failure doesn't block others
+    const pData = await fetchTable('products', 'created_at');
+    if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
 
-      if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
-      if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
-      if (rmaData) setRawMaterialAdjustments(prev => merge(rmaData, prev, fromDBRawAdjustment));
-      if (bData) setBatches(prev => merge(bData, prev, fromDBBatch));
-      if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
-      if (sData) setSales(prev => merge(sData, prev, fromDBSale));
-      if (eData) setExpenses(prev => merge(eData, prev, fromDBExpense));
-      if (lData) setAuditLogs(lData.map(fromDBLog));
-      if (bsaData) setBranchStockAdjustments(prev => merge(bsaData, prev, fromDBBranchAdjustment));
-      if (stData) setStaff(prev => merge(stData, prev, fromDBStaff));
-      if (sdData) setStaffDeductions(prev => merge(sdData, prev, fromDBDeduction));
-      if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
-      if (purchasesData) setPurchases(prev => merge(purchasesData, prev, fromDBPurchase));
-      if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
-      if (settingsResponse?.data?.settings) setReceiptSettings(prev => ({ ...prev, ...settingsResponse.data.settings, isLocked: true }));
-      
-      setLastSyncTime(new Date().toISOString());
-      setTimeout(() => syncOfflineData(), 1000);
-    } catch (error: any) {
-      console.error('Fetch error:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    const rmData = await fetchTable('raw_materials', 'last_updated');
+    if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
+
+    const sData = await fetchTable('sales', 'date');
+    if (sData) setSales(prev => merge(sData, prev, fromDBSale));
+
+    const bData = await fetchTable('production_batches', 'date');
+    if (bData) setBatches(prev => merge(bData, prev, fromDBBatch));
+
+    const dData = await fetchTable('dispatches', 'date');
+    if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
+
+    const eData = await fetchTable('expenses', 'date');
+    if (eData) setExpenses(prev => merge(eData, prev, fromDBExpense));
+
+    const rmaData = await fetchTable('raw_material_adjustments', 'date');
+    if (rmaData) setRawMaterialAdjustments(prev => merge(rmaData, prev, fromDBRawAdjustment));
+
+    const lData = await fetchTable('audit_logs', 'timestamp');
+    if (lData) setAuditLogs(lData.map(fromDBLog));
+
+    const bsaData = await fetchTable('branch_stock_adjustments', 'date');
+    if (bsaData) setBranchStockAdjustments(prev => merge(bsaData, prev, fromDBBranchAdjustment));
+
+    const stData = await fetchTable('staff_members', 'created_at');
+    if (stData) setStaff(prev => merge(stData, prev, fromDBStaff));
+
+    const sdData = await fetchTable('staff_deductions', 'date');
+    if (sdData) setStaffDeductions(prev => merge(sdData, prev, fromDBDeduction));
+
+    const svData = await fetchTable('salary_vouchers', 'date');
+    if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
+
+    const purchasesData = await fetchTable('purchases', 'date');
+    if (purchasesData) setPurchases(prev => merge(purchasesData, prev, fromDBPurchase));
+
+    const recipesData = await fetchTable('recipes', 'id');
+    if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
+
+    const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
+    if (settingsData?.settings) setReceiptSettings(prev => ({ ...prev, ...settingsData.settings, isLocked: true }));
+
+    setLastSyncTime(new Date().toISOString());
+    setIsLoading(false);
+    
+    // Attempt push of local changes after every pull
+    setTimeout(() => syncOfflineData(), 1000);
   }, [currentUser, hasSupabaseConfig, syncOfflineData]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Aggressive sync heartbeats (30s)
+  // Faster sync heartbeats (15s)
   useEffect(() => {
     if (isOnline && hasSupabaseConfig && currentUser) {
-      const pullInterval = setInterval(() => fetchData(), 30000);
-      const pushInterval = setInterval(() => syncOfflineData(), 30000);
+      const pullInterval = setInterval(() => fetchData(), 15000);
+      const pushInterval = setInterval(() => syncOfflineData(), 15000);
       return () => { clearInterval(pullInterval); clearInterval(pushInterval); };
     }
   }, [isOnline, hasSupabaseConfig, currentUser, fetchData, syncOfflineData]);
@@ -553,43 +575,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (!navigator.onLine || !hasSupabaseConfig) return;
-    const channel = supabase.channel('realtime-erp')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (p) => {
-        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-          const s = fromDBSale(p.new as DBSale);
-          setSales(prev => {
-            const idx = prev.findIndex(x => x.id === s.id);
-            if (idx === -1) return [...prev, s];
-            const next = [...prev]; next[idx] = s; return next;
-          });
-        } else if (p.eventType === 'DELETE') {
-          setSales(prev => prev.filter(s => s.id !== (p.old as any).id));
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (p) => {
-        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-          const b = fromDBBatch(p.new as DBProductionBatch);
-          setBatches(prev => {
-            const idx = prev.findIndex(x => x.id === b.id);
-            if (idx === -1) return [...prev, b];
-            const next = [...prev]; next[idx] = b; return next;
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (p) => {
-        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-          const e = fromDBExpense(p.new as DBExpense);
-          setExpenses(prev => {
-            const idx = prev.findIndex(x => x.id === e.id);
-            if (idx === -1) return [...prev, e];
-            const next = [...prev]; next[idx] = e; return next;
-          });
-        }
-      })
-      .subscribe();
+    if (!hasSupabaseConfig || !isOnline) return;
+    
+    let retryCount = 0;
+    const maxRetries = 5;
+
+    const setupRealtime = () => {
+      const channel = supabase.channel('realtime-erp')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const s = fromDBSale(p.new as DBSale);
+            setSales(prev => {
+              const idx = prev.findIndex(x => x.id === s.id);
+              if (idx === -1) return [...prev, s];
+              const next = [...prev]; next[idx] = s; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setSales(prev => prev.filter(s => s.id !== (p.old as any).id));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const b = fromDBBatch(p.new as DBProductionBatch);
+            setBatches(prev => {
+              const idx = prev.findIndex(x => x.id === b.id);
+              if (idx === -1) return [...prev, b];
+              const next = [...prev]; next[idx] = b; return next;
+            });
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const e = fromDBExpense(p.new as DBExpense);
+            setExpenses(prev => {
+              const idx = prev.findIndex(x => x.id === e.id);
+              if (idx === -1) return [...prev, e];
+              const next = [...prev]; next[idx] = e; return next;
+            });
+          }
+        })
+        .subscribe((status) => {
+          if (status !== 'SUBSCRIBED' && retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(setupRealtime, 2000 * retryCount);
+          }
+        });
+      return channel;
+    };
+
+    const channel = setupRealtime();
     return () => { supabase.removeChannel(channel); };
-  }, [hasSupabaseConfig]);
+  }, [hasSupabaseConfig, isOnline]);
 
   useEffect(() => {
     if (!hasLoaded.current) return;
@@ -614,7 +650,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     const log: AuditLog = { id: `log-${Date.now()}`, action, entity, entityId, details, userId: currentUser.id, timestamp: new Date().toISOString() };
     setAuditLogs(prev => [...prev, log]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('audit_logs').insert([toDBLog(log)]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('audit_logs').insert([toDBLog(log)]);
+      } catch (err) { console.warn('Failed to log to cloud'); }
+    }
   }, [currentUser, isOnline]);
 
   const getProductById = useCallback((id: string) => products.find(p => p.id === id), [products]);
@@ -632,39 +672,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addProduct = async (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => {
     const newP: Product = { ...p, id: `p${Date.now()}`, createdAt: new Date().toISOString(), isActive: true };
     setProducts(prev => [...prev, newP]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('products').upsert([toDBProduct(newP)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('products').upsert([toDBProduct(newP)]); } catch (err) { console.error('Product sync error'); }
+    }
     addLog('create', 'product', newP.id, `Added product ${newP.name}`);
   };
 
   const updateProduct = async (id: string, u: Partial<Product>) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, ...u } : p));
     const updated = products.find(p => p.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('products').upsert([toDBProduct({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('products').upsert([toDBProduct({ ...updated, ...u })]); } catch (err) { console.error('Product sync error'); }
+    }
     addLog('update', 'product', id, `Updated product`);
   };
 
   const deleteProduct = async (id: string) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: false } : p));
-    if (isOnline && hasSupabaseConfig) await supabase.from('products').update({ is_active: false }).eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('products').update({ is_active: false }).eq('id', id); } catch (err) { console.error('Product delete error'); }
+    }
     addLog('delete', 'product', id, `Soft deleted product`);
   };
 
   const addRawMaterial = async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
     const newM: RawMaterial = { ...m, id: `rm${Date.now()}`, lastUpdated: new Date().toISOString(), isActive: true, currentStock: 0 };
     setRawMaterials(prev => [...prev, newM]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('raw_materials').upsert([toDBRawMaterial(newM)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('raw_materials').upsert([toDBRawMaterial(newM)]); } catch (err) { console.error('Material sync error'); }
+    }
     addLog('create', 'raw_material', newM.id, `Added material ${newM.name}`);
   };
 
   const updateRawMaterial = async (id: string, u: Partial<RawMaterial>) => {
     setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, ...u, lastUpdated: new Date().toISOString() } : m));
     const updated = rawMaterials.find(m => m.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('raw_materials').upsert([toDBRawMaterial({ ...updated, ...u, lastUpdated: new Date().toISOString() })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('raw_materials').upsert([toDBRawMaterial({ ...updated, ...u, lastUpdated: new Date().toISOString() })]); } catch (err) { console.error('Material sync error'); }
+    }
   };
 
   const deleteRawMaterial = async (id: string) => {
     setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, isActive: false } : m));
-    if (isOnline && hasSupabaseConfig) await supabase.from('raw_materials').update({ is_active: false }).eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('raw_materials').update({ is_active: false }).eq('id', id); } catch (err) { console.error('Material delete error'); }
+    }
   };
 
   const adjustRawMaterialStock = async (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => {
@@ -682,10 +734,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const mat = rawMaterials.find(m => m.id === materialId);
       if (mat) {
         const newStock = type === 'in' ? mat.currentStock + quantity : mat.currentStock - quantity;
-        await Promise.all([
-          supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(adj)]),
-          supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId)
-        ]);
+        try {
+          await Promise.all([
+            supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(adj)]),
+            supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId)
+          ]);
+        } catch (err) {
+          setRawMaterialAdjustments(prev => prev.map(a => a.id === id ? { ...a, syncStatus: 'pending' } : a));
+        }
       }
     }
     return true;
@@ -694,24 +750,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addRecipe = async (r: Omit<Recipe, 'id' | 'syncStatus'>) => {
     const newR: Recipe = { ...r, id: `rcp${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setRecipes(prev => [...prev, newR]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('recipes').upsert([toDBRecipe(newR)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('recipes').upsert([toDBRecipe(newR)]); } catch (err) {
+        setRecipes(prev => prev.map(rc => rc.id === newR.id ? { ...rc, syncStatus: 'pending' } : rc));
+      }
+    }
   };
 
   const updateRecipe = async (id: string, u: Partial<Recipe>) => {
     setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
     const updated = recipes.find(r => r.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('recipes').upsert([toDBRecipe({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('recipes').upsert([toDBRecipe({ ...updated, ...u })]); } catch (err) { console.error('Recipe sync error'); }
+    }
   };
 
   const deleteRecipe = async (id: string) => {
     setRecipes(prev => prev.filter(r => r.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('recipes').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('recipes').delete().eq('id', id); } catch (err) { console.error('Recipe delete error'); }
+    }
   };
 
   const adjustBranchStock = async (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => {
     const adj: BranchStockAdjustment = { id: `bsa${Date.now()}`, productId, branch, quantity, reason, date: new Date().toISOString(), userId: currentUser?.id || 'system' };
     setBranchStockAdjustments(prev => [...prev, adj]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(adj)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(adj)]); } catch (err) { console.error('Stock adjustment sync error'); }
+    }
   };
 
   const addProduction = async (productId: string, quantity: number, notes?: string) => {
@@ -719,19 +785,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const id = `b${Date.now()}`;
     const newBatch: ProductionBatch = { id, batchId, productId, quantity, date: new Date().toISOString().slice(0, 10), notes, syncStatus: isOnline ? 'synced' : 'pending' };
     setBatches(prev => [...prev, newBatch]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('production_batches').upsert([toDBBatch(newBatch)]); } catch (err) {
+        setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
+      }
+    }
     return true;
   };
 
   const updateProduction = async (id: string, u: Partial<ProductionBatch>) => {
     setBatches(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
     const updated = batches.find(b => b.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('production_batches').upsert([toDBBatch({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('production_batches').upsert([toDBBatch({ ...updated, ...u })]); } catch (err) { console.error('Production sync error'); }
+    }
   };
 
   const deleteProduction = async (id: string) => {
     setBatches(prev => prev.filter(b => b.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('production_batches').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('production_batches').delete().eq('id', id); } catch (err) { console.error('Production delete error'); }
+    }
   };
 
   const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
@@ -741,7 +815,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const tokenNumber = todayDispatches.length + 1;
     const dispatch: Dispatch = { id, destination, date: today, status: 'confirmed', items, tokenNumber, syncStatus: isOnline ? 'synced' : 'pending' };
     setDispatches(prev => [...prev, dispatch]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+      } catch (err) {
+        setDispatches(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
+      }
+    }
 
     if (destination === 'walkin') {
       const saleItems: SaleItem[] = items.map(i => {
@@ -751,7 +831,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
       const walkinSale: Sale = { id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName, customerPhone, isCreditPaid: true, date: today, syncStatus: isOnline ? 'synced' : 'pending' };
       setSales(prev => [...prev, walkinSale]);
-      if (isOnline && hasSupabaseConfig) await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+      if (isOnline && hasSupabaseConfig) {
+        try {
+          await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+        } catch (err) {
+          setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
+        }
+      }
       return walkinSale.id;
     }
     return true;
@@ -763,8 +849,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newSale: Sale = { id, type, branch, items, total, paymentMethod, date: new Date().toISOString().slice(0, 10), syncStatus: isOnline ? 'synced' : 'pending' };
     setSales(prev => [...prev, newSale]);
     if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
-      if (error) setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
+      try {
+        const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
+        if (error) throw error;
+      } catch (err) {
+        setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
+      }
     }
     addLog('create', 'sale', id, `Sale Rs. ${total}`);
     return id;
@@ -772,7 +862,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refundSale = async (id: string) => {
     setSales(prev => prev.filter(s => s.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('sales').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('sales').delete().eq('id', id); } catch (err) { console.error('Sale refund error'); }
+    }
     addLog('refund', 'sale', id, `Refunded sale`);
     return true;
   };
@@ -780,24 +872,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addExpense = async (e: Omit<Expense, 'id'>) => {
     const newE: Expense = { ...e, id: `e${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setExpenses(prev => [...prev, newE]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('expenses').upsert([toDBExpense(newE)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('expenses').upsert([toDBExpense(newE)]); } catch (err) {
+        setExpenses(prev => prev.map(ex => ex.id === newE.id ? { ...ex, syncStatus: 'pending' } : ex));
+      }
+    }
   };
 
   const updateExpense = async (id: string, u: Partial<Expense>) => {
     setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...u } : e));
     const updated = expenses.find(e => e.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('expenses').upsert([toDBExpense({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('expenses').upsert([toDBExpense({ ...updated, ...u })]); } catch (err) { console.error('Expense sync error'); }
+    }
   };
 
   const deleteExpense = async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('expenses').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('expenses').delete().eq('id', id); } catch (err) { console.error('Expense delete error'); }
+    }
   };
 
   const updateReceiptSettings = async (s: Partial<ReceiptSettings>) => {
     const newS = { ...receiptSettings, ...s };
     setReceiptSettings(newS);
-    if (isOnline && hasSupabaseConfig) await supabase.from('app_settings').upsert([{ id: 'receipt_config', settings: newS }]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('app_settings').upsert([{ id: 'receipt_config', settings: newS }]); } catch (err) { console.error('Settings sync error'); }
+    }
   };
 
   const selectProfile = (profile: User) => {
@@ -830,51 +932,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addStaffMember = async (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => {
     const newS: StaffMember = { ...s, id: `st${Date.now()}`, isActive: true, createdAt: new Date().toISOString() };
     setStaff(prev => [...prev, newS]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('staff_members').upsert([toDBStaff(newS)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_members').upsert([toDBStaff(newS)]); } catch (err) { console.error('Staff sync error'); }
+    }
   };
 
   const updateStaffMember = async (id: string, u: Partial<StaffMember>) => {
     setStaff(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
     const updated = staff.find(s => s.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('staff_members').upsert([toDBStaff({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_members').upsert([toDBStaff({ ...updated, ...u })]); } catch (err) { console.error('Staff sync error'); }
+    }
   };
 
   const deleteStaffMember = async (id: string) => {
     setStaff(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
-    if (isOnline && hasSupabaseConfig) await supabase.from('staff_members').update({ is_active: false }).eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_members').update({ is_active: false }).eq('id', id); } catch (err) { console.error('Staff delete error'); }
+    }
   };
 
   const addStaffDeduction = async (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => {
     const newD: StaffDeduction = { ...d, id: `sd${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setStaffDeductions(prev => [...prev, newD]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').upsert([toDBDeduction(newD)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_deductions').upsert([toDBDeduction(newD)]); } catch (err) {
+        setStaffDeductions(prev => prev.map(sd => sd.id === newD.id ? { ...sd, syncStatus: 'pending' } : sd));
+      }
+    }
   };
 
   const updateStaffDeduction = async (id: string, u: Partial<StaffDeduction>) => {
     setStaffDeductions(prev => prev.map(d => d.id === id ? { ...d, ...u } : d));
     const updated = staffDeductions.find(d => d.id === id);
-    if (updated && isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').upsert([toDBDeduction({ ...updated, ...u })]);
+    if (updated && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_deductions').upsert([toDBDeduction({ ...updated, ...u })]); } catch (err) { console.error('Deduction sync error'); }
+    }
   };
 
   const deleteStaffDeduction = async (id: string) => {
     setStaffDeductions(prev => prev.filter(d => d.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('staff_deductions').delete().eq('id', id); } catch (err) { console.error('Deduction delete error'); }
+    }
   };
 
   const createSalaryVoucher = async (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => {
     const newV: SalaryVoucher = { ...v, id: `sv${Date.now()}`, status: 'paid', syncStatus: isOnline ? 'synced' : 'pending' };
     setSalaryVouchers(prev => [...prev, newV]);
-    if (isOnline && hasSupabaseConfig) await supabase.from('salary_vouchers').upsert([toDBVoucher(newV)]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('salary_vouchers').upsert([toDBVoucher(newV)]); } catch (err) {
+        setSalaryVouchers(prev => prev.map(sv => sv.id === newV.id ? { ...sv, syncStatus: 'pending' } : sv));
+      }
+    }
   };
 
   const deleteSalaryVoucher = async (id: string) => {
     setSalaryVouchers(prev => prev.filter(v => v.id !== id));
-    if (isOnline && hasSupabaseConfig) await supabase.from('salary_vouchers').delete().eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('salary_vouchers').delete().eq('id', id); } catch (err) { console.error('Voucher delete error'); }
+    }
   };
 
   const payCreditSale = async (id: string) => {
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true } : s));
-    if (isOnline && hasSupabaseConfig) await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id); } catch (err) { console.error('Credit payment sync error'); }
+    }
   };
 
   const addPurchase = async (p: Omit<Purchase, 'id' | 'syncStatus'>) => {
@@ -883,10 +1007,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRawMaterials(prev => prev.map(m => m.id === p.materialId ? { ...m, currentStock: m.currentStock + p.quantity } : m));
     if (isOnline && hasSupabaseConfig) {
       const mat = rawMaterials.find(m => m.id === p.materialId);
-      await Promise.all([
-        supabase.from('purchases').upsert([toDBPurchase(newP)]),
-        supabase.from('raw_materials').update({ current_stock: (mat?.currentStock || 0) + p.quantity }).eq('id', p.materialId)
-      ]);
+      try {
+        await Promise.all([
+          supabase.from('purchases').upsert([toDBPurchase(newP)]),
+          supabase.from('raw_materials').update({ current_stock: (mat?.currentStock || 0) + p.quantity }).eq('id', p.materialId)
+        ]);
+      } catch (err) {
+        setPurchases(prev => prev.map(pur => pur.id === newP.id ? { ...pur, syncStatus: 'pending' } : pur));
+      }
     }
   };
 
