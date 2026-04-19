@@ -400,8 +400,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           syncCount += pending.length;
         } else {
           console.error(`Supabase ${table} sync error:`, error.message, error.details);
+          toast.error(`Sync Error (${table}): ${error.message}`);
         }
-      } catch (err) { console.error(`${table} execution sync error:`, err); }
+      } catch (err: any) { 
+        console.error(`${table} execution sync error:`, err);
+        toast.error(`System Error: ${err.message || 'Unknown error'}`);
+      }
     };
 
     await Promise.all([
@@ -911,7 +915,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
         if (error) throw error;
-      } catch (err) {
+      } catch (err: any) {
+        console.error('Sale sync failed:', err);
+        toast.error(`Sale failed to sync: ${err.message || 'Unknown error'}`);
         setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
       }
     }
