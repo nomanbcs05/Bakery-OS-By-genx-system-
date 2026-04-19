@@ -182,7 +182,7 @@ export default function Dashboard() {
                   <Tooltip 
                     contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 5px 20px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 700 }}
                     cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
+                    formatter={(value: number) => [`Rs. ${(value || 0).toLocaleString()}`, 'Revenue']}
                   />
                   <Area type="monotone" dataKey="sales" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
                 </AreaChart>
