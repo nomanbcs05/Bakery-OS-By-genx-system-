@@ -12,9 +12,9 @@ export default function Dashboard() {
   if (!currentUser) return <Navigate to="/login" replace />;
 
   const today = new Date().toISOString().slice(0, 10);
-  const todaySales = sales.filter(s => s.date === today);
-  const todayBatches = batches.filter(b => b.date === today);
-  const todayDispatches = dispatches.filter(d => d.date === today);
+  const todaySales = sales.filter(s => s.date && s.date.split('T')[0] === today);
+  const todayBatches = batches.filter(b => b.date && b.date.split('T')[0] === today);
+  const todayDispatches = dispatches.filter(d => d.date && d.date.split('T')[0] === today);
   const snapshots = getInventorySnapshots();
   
   const totalRevenue = todaySales
