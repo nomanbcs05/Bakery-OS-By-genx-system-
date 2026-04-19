@@ -256,7 +256,7 @@ export default function Dashboard() {
                     </h4>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-                        {sale.branch === 'factory_walkin' ? 'Walk-in' : sale.branch === 'branch_1' ? 'Branch 1' : 'Branch 2'}
+                        {sale.type === 'factory_walkin' ? 'Walk-in' : sale.branch === 'branch_1' ? 'Branch 1' : 'Branch 2'}
                       </span>
                       <span className="h-1 w-1 rounded-full bg-slate-200" />
                       <span className="text-[9px] font-medium text-slate-400 capitalize">{sale.paymentMethod}</span>

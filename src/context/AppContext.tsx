@@ -5,7 +5,7 @@ import type {
   RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings, Recipe, DBRecipe,
   StaffMember, StaffDeduction, SalaryVoucher,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
-  DBStaffMember, DBStaffDeduction, DBSalaryVoucher
+  DBStaffMember, DBStaffDeduction, DBSalaryVoucher, Purchase, DBPurchase
 } from '@/types';
 import { toast } from 'sonner';
 import { supabase, hasSupabaseConfig } from '@/lib/supabase';
@@ -103,6 +103,7 @@ interface AppState {
   staffDeductions: StaffDeduction[];
   salaryVouchers: SalaryVoucher[];
   recipes: Recipe[];
+  purchases: Purchase[];
 }
 
 interface AppContextType extends AppState {
@@ -156,9 +157,7 @@ interface AppContextType extends AppState {
   deleteStaffDeduction: (id: string) => Promise<void>;
   createSalaryVoucher: (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => Promise<void>;
   deleteSalaryVoucher: (id: string) => Promise<void>;
-  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<boolean>;
   payCreditSale: (id: string) => Promise<void>;
-  purchases: Purchase[];
   addPurchase: (p: Omit<Purchase, 'id' | 'syncStatus'>) => Promise<void>;
   hasSupabaseConfig: boolean;
 }
@@ -768,6 +767,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     fetchData();
   }, [currentUser]);
+
+  // Background Heartbeat Sync: Ensure all terminals push data every 30 seconds
+  useEffect(() => {
+    if (isOnline && hasSupabaseConfig) {
+      const interval = setInterval(() => {
+        forceSync();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isOnline, hasSupabaseConfig, forceSync]);
 
   // Real-time subscriptions
   useEffect(() => {
