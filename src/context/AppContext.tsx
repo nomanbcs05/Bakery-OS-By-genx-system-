@@ -383,6 +383,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const hasLoaded = React.useRef(false);
+  
+  // Refs to keep sync functions stable and avoid infinite loops
+  const salesRef = React.useRef(sales);
+  const batchesRef = React.useRef(batches);
+  const dispatchesRef = React.useRef(dispatches);
+  const expensesRef = React.useRef(expenses);
+  const staffDeductionsRef = React.useRef(staffDeductions);
+  const salaryVouchersRef = React.useRef(salaryVouchers);
+  const purchasesRef = React.useRef(purchases);
+  const recipesRef = React.useRef(recipes);
+  const rawMaterialAdjustmentsRef = React.useRef(rawMaterialAdjustments);
+
+  useEffect(() => { salesRef.current = sales; }, [sales]);
+  useEffect(() => { batchesRef.current = batches; }, [batches]);
+  useEffect(() => { dispatchesRef.current = dispatches; }, [dispatches]);
+  useEffect(() => { expensesRef.current = expenses; }, [expenses]);
+  useEffect(() => { staffDeductionsRef.current = staffDeductions; }, [staffDeductions]);
+  useEffect(() => { salaryVouchersRef.current = salaryVouchers; }, [salaryVouchers]);
+  useEffect(() => { purchasesRef.current = purchases; }, [purchases]);
+  useEffect(() => { recipesRef.current = recipes; }, [recipes]);
+  useEffect(() => { rawMaterialAdjustmentsRef.current = rawMaterialAdjustments; }, [rawMaterialAdjustments]);
 
   const syncOfflineData = useCallback(async () => {
     if (!hasSupabaseConfig || !navigator.onLine) return;
@@ -409,22 +430,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     await Promise.all([
-      syncTable('sales', sales, toDBSale, setSales),
-      syncTable('production_batches', batches, toDBBatch, setBatches),
-      syncTable('dispatches', dispatches, toDBDispatch, setDispatches),
-      syncTable('expenses', expenses, toDBExpense, setExpenses),
-      syncTable('staff_deductions', staffDeductions, toDBDeduction, setStaffDeductions),
-      syncTable('salary_vouchers', salaryVouchers, toDBVoucher, setSalaryVouchers),
-      syncTable('purchases', purchases, toDBPurchase, setPurchases),
-      syncTable('recipes', recipes, toDBRecipe, setRecipes),
-      syncTable('raw_material_adjustments', rawMaterialAdjustments, toDBRawAdjustment, setRawMaterialAdjustments)
+      syncTable('sales', salesRef.current, toDBSale, setSales),
+      syncTable('production_batches', batchesRef.current, toDBBatch, setBatches),
+      syncTable('dispatches', dispatchesRef.current, toDBDispatch, setDispatches),
+      syncTable('expenses', expensesRef.current, toDBExpense, setExpenses),
+      syncTable('staff_deductions', staffDeductionsRef.current, toDBDeduction, setStaffDeductions),
+      syncTable('salary_vouchers', salaryVouchersRef.current, toDBVoucher, setSalaryVouchers),
+      syncTable('purchases', purchasesRef.current, toDBPurchase, setPurchases),
+      syncTable('recipes', recipesRef.current, toDBRecipe, setRecipes),
+      syncTable('raw_material_adjustments', rawMaterialAdjustmentsRef.current, toDBRawAdjustment, setRawMaterialAdjustments)
     ]);
 
     if (syncCount > 0) {
       toast.success(`Synced ${syncCount} records`);
       setLastSyncTime(new Date().toISOString());
     }
-  }, [sales, batches, dispatches, expenses, staffDeductions, salaryVouchers, purchases, recipes, rawMaterialAdjustments]);
+  }, [hasSupabaseConfig]); // Stable dependency
 
   const fetchData = useCallback(async () => {
     if (!currentUser || !hasSupabaseConfig) return;
@@ -498,11 +519,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => syncOfflineData(), 1000);
   }, [currentUser, hasSupabaseConfig, syncOfflineData]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    if (currentUser && hasSupabaseConfig) {
+      fetchData(); 
+    }
+  }, [currentUser, hasSupabaseConfig, fetchData]);
 
   useEffect(() => {
     if (isOnline && hasSupabaseConfig && currentUser) {
-      const pullInterval = setInterval(() => fetchData(), 15000);
+      const pullInterval = setInterval(() => fetchData(), 30000); // Poll less frequently when realtime is on
       const pushInterval = setInterval(() => syncOfflineData(), 15000);
       return () => { clearInterval(pullInterval); clearInterval(pushInterval); };
     }
