@@ -996,7 +996,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingSales = sales.filter(s => s.syncStatus === 'pending');
     if (pendingSales.length > 0) {
       try {
-        const { error } = await supabase.from('sales').insert(
+        const { error } = await supabase.from('sales').upsert(
           pendingSales.map(s => toDBSale({ ...s, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1010,7 +1010,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingBatches = batches.filter(b => b.syncStatus === 'pending');
     if (pendingBatches.length > 0) {
       try {
-        const { error } = await supabase.from('production_batches').insert(
+        const { error } = await supabase.from('production_batches').upsert(
           pendingBatches.map(b => toDBBatch({ ...b, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1024,7 +1024,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingDispatches = dispatches.filter(d => d.syncStatus === 'pending');
     if (pendingDispatches.length > 0) {
       try {
-        const { error } = await supabase.from('dispatches').insert(
+        const { error } = await supabase.from('dispatches').upsert(
           pendingDispatches.map(d => toDBDispatch({ ...d, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1038,7 +1038,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingExpenses = expenses.filter(e => e.syncStatus === 'pending');
     if (pendingExpenses.length > 0) {
       try {
-        const { error } = await supabase.from('expenses').insert(
+        const { error } = await supabase.from('expenses').upsert(
           pendingExpenses.map(e => toDBExpense({ ...e, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1052,7 +1052,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingDeductions = staffDeductions.filter(d => d.syncStatus === 'pending');
     if (pendingDeductions.length > 0) {
       try {
-        const { error } = await supabase.from('staff_deductions').insert(
+        const { error } = await supabase.from('staff_deductions').upsert(
           pendingDeductions.map(d => toDBDeduction({ ...d, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1066,7 +1066,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingVouchers = salaryVouchers.filter(v => v.syncStatus === 'pending');
     if (pendingVouchers.length > 0) {
       try {
-        const { error } = await supabase.from('salary_vouchers').insert(
+        const { error } = await supabase.from('salary_vouchers').upsert(
           pendingVouchers.map(v => toDBVoucher({ ...v, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1080,7 +1080,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pendingPurchases = purchases.filter(p => p.syncStatus === 'pending');
     if (pendingPurchases.length > 0) {
       try {
-        const { error } = await supabase.from('purchases').insert(
+        const { error } = await supabase.from('purchases').upsert(
           pendingPurchases.map(p => toDBPurchase({ ...p, syncStatus: 'synced' }))
         );
         if (!error) {
@@ -1318,30 +1318,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProducts(prev => [...prev, newProduct]);
     
     if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('products').insert([toDBProduct(newProduct)]);
+      const { error } = await supabase.from('products').upsert([toDBProduct(newProduct)]);
+      if (error) console.error('Product sync error:', error);
     }
     
     addLog('create', 'product', id, `Created product: ${p.name}`);
     toast.success(`Product "${p.name}" created`);
-  }, [addLog]);
+  }, [addLog, hasSupabaseConfig]);
 
   const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     if (navigator.onLine && hasSupabaseConfig) {
       const product = products.find(p => p.id === id);
       if (product) {
-        await supabase.from('products').update(toDBProduct({ ...product, ...updates })).eq('id', id);
+        await supabase.from('products').upsert(toDBProduct({ ...product, ...updates })).eq('id', id);
       }
     }
     addLog('update', 'product', id, `Updated product: ${updates.name || id}`);
     toast.success(`Product updated successfully`);
-  }, [products, addLog]);
+  }, [products, addLog, hasSupabaseConfig]);
 
   const deleteProduct = useCallback(async (id: string, soft = true) => {
     if (soft) {
       setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: false } : p));
       if (navigator.onLine && hasSupabaseConfig) {
-        await supabase.from('products').update({ is_active: false }).eq('id', id);
+        await supabase.from('products').upsert({ id, is_active: false }).eq('id', id);
       }
     } else {
       setProducts(prev => prev.filter(p => p.id !== id));
@@ -1351,7 +1352,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     addLog('delete', 'product', id, `${soft ? 'Soft deleted' : 'Deleted'} product: ${id}`);
     toast.success(`Product deleted successfully`);
-  }, [addLog]);
+  }, [addLog, hasSupabaseConfig]);
 
 
   const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
@@ -1377,7 +1378,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDispatches(prev => [...prev, dispatch]);
 
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('dispatches').insert([toDBDispatch(dispatch)]);
+      const { error } = await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
+      if (error) {
+        console.error('Dispatch sync error:', error);
+        setDispatches(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
+      }
     }
 
     if (destination === 'walkin') {
@@ -1396,8 +1401,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       setSales(prev => [...prev, walkinSale]);
       if (isOnline && hasSupabaseConfig) {
-        const { error } = await supabase.from('sales').insert([toDBSale(walkinSale)]);
+        const { error } = await supabase.from('sales').upsert([toDBSale(walkinSale)]);
         if (error) {
+          console.error('Walk-in sale sync error:', error);
           setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
         }
       }
@@ -1412,10 +1418,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const payCreditSale = useCallback(async (id: string) => {
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));
     if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id);
+      const sale = sales.find(s => s.id === id);
+      if (sale) {
+        await supabase.from('sales').upsert(toDBSale({ ...sale, isCreditPaid: true, syncStatus: 'synced' })).eq('id', id);
+      }
     }
     toast.success('Credit payment recorded');
-  }, [isOnline]);
+  }, [isOnline, sales, hasSupabaseConfig]);
 
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
     if (type === 'branch' && branch) {
@@ -1440,8 +1449,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSales(prev => [...prev, newSale]);
 
     if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('sales').insert([toDBSale(newSale)]);
+      const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
       if (error) {
+        console.error('Sale sync error:', error);
         setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
       }
     }
@@ -1449,7 +1459,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('create', 'sale', id, `Sale of Rs. ${total.toFixed(2)} at ${branch || 'factory'}`);
     toast.success(isOnline ? `Sale recorded: Rs. ${total.toFixed(2)}` : `Sale saved offline: Rs. ${total.toFixed(2)}`);
     return id;
-  }, [stock, addLog, isOnline]);
+  }, [stock, addLog, isOnline, hasSupabaseConfig]);
 
   const refundSale = useCallback(async (id: string) => {
     const sale = sales.find(s => s.id === id);
@@ -1462,7 +1472,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('delete', 'sale', id, `Refunded/Deleted sale: ${id} at ${sale.branch || 'factory'}`);
     toast.success(`Sale refunded successfully`);
     return true;
-  }, [sales, addLog, isOnline]);
+  }, [sales, addLog, isOnline, hasSupabaseConfig]);
 
   const addExpense = useCallback(async (e: Omit<Expense, 'id'>) => {
     const id = `e${Date.now()}`;
@@ -1474,24 +1484,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenses(prev => [...prev, newExpense]);
     
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('expenses').insert([toDBExpense(newExpense)]);
+      const { error } = await supabase.from('expenses').upsert([toDBExpense(newExpense)]);
+      if (error) {
+        console.error('Expense sync error:', error);
+        setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, syncStatus: 'pending' } : exp));
+      }
     }
     
     addLog('create', 'expense', id, `Expense: ${e.title} - Rs. ${e.amount}`);
     toast.success(isOnline ? `Expense recorded: ${e.amount}` : `Expense saved offline: ${e.amount}`);
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, hasSupabaseConfig]);
 
   const updateExpense = useCallback(async (id: string, updates: Partial<Expense>) => {
     setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : e));
     if (navigator.onLine && hasSupabaseConfig) {
       const expense = expenses.find(e => e.id === id);
       if (expense) {
-        await supabase.from('expenses').update(toDBExpense({ ...expense, ...updates, syncStatus: 'synced' })).eq('id', id);
+        await supabase.from('expenses').upsert(toDBExpense({ ...expense, ...updates, syncStatus: 'synced' })).eq('id', id);
       }
     }
     addLog('update', 'expense', id, `Updated expense: ${id}`);
     toast.success(`Expense updated successfully`);
-  }, [expenses, addLog, isOnline]);
+  }, [expenses, addLog, isOnline, hasSupabaseConfig]);
 
   const deleteExpense = useCallback(async (id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
@@ -1500,7 +1514,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     addLog('delete', 'expense', id, `Deleted expense: ${id}`);
     toast.success(`Expense deleted successfully`);
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, hasSupabaseConfig]);
 
   const addPurchase = useCallback(async (p: Omit<Purchase, 'id' | 'syncStatus'>) => {
     const id = `pur${Date.now()}`;
@@ -1523,14 +1537,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // 3. Sync to DB if online
     if (isOnline && hasSupabaseConfig) {
       try {
-        const { error } = await supabase.from('purchases').insert([toDBPurchase(newPurchase)]);
+        const { error } = await supabase.from('purchases').upsert([toDBPurchase(newPurchase)]);
         if (error) throw error;
 
         // Also update material stock in DB
         const currentMaterial = rawMaterials.find(m => m.id === p.materialId);
         if (currentMaterial) {
           await supabase.from('raw_materials')
-            .update({ current_stock: currentMaterial.currentStock + p.quantity, last_updated: new Date().toISOString() })
+            .upsert(toDBRawMaterial({ ...currentMaterial, currentStock: currentMaterial.currentStock + p.quantity, lastUpdated: new Date().toISOString() }))
             .eq('id', p.materialId);
         }
       } catch (err) {
@@ -1553,21 +1567,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     setRecipes(prev => [...prev, newRecipe]);
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('recipes').insert([toDBRecipe(newRecipe)]);
+      const { error } = await supabase.from('recipes').upsert([toDBRecipe(newRecipe)]);
+      if (error) {
+        console.error('Recipe sync error:', error);
+        setRecipes(prev => prev.map(rec => rec.id === id ? { ...rec, syncStatus: 'pending' } : rec));
+      }
     }
     toast.success(`Recipe saved!`);
-  }, [isOnline]);
+  }, [isOnline, hasSupabaseConfig]);
 
   const updateRecipe = useCallback(async (id: string, updates: Partial<Recipe>) => {
     setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : r));
     if (isOnline && hasSupabaseConfig) {
       const recipe = recipes.find(r => r.id === id);
       if (recipe) {
-        await supabase.from('recipes').update(toDBRecipe({ ...recipe, ...updates, syncStatus: 'synced' })).eq('id', id);
+        await supabase.from('recipes').upsert(toDBRecipe({ ...recipe, ...updates, syncStatus: 'synced' })).eq('id', id);
       }
     }
     toast.success(`Recipe updated!`);
-  }, [recipes, isOnline]);
+  }, [recipes, isOnline, hasSupabaseConfig]);
 
   const deleteRecipe = useCallback(async (id: string) => {
     setRecipes(prev => prev.filter(r => r.id !== id));
@@ -1575,7 +1593,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await supabase.from('recipes').delete().eq('id', id);
     }
     toast.success(`Recipe deleted!`);
-  }, [isOnline]);
+  }, [isOnline, hasSupabaseConfig]);
 
   const addRawMaterial = useCallback(async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
     const id = `rm${Date.now()}`;
@@ -1588,32 +1606,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     setRawMaterials(prev => [...prev, newRM]);
     if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('raw_materials').insert([toDBRawMaterial(newRM)]);
+      const { error } = await supabase.from('raw_materials').upsert([toDBRawMaterial(newRM)]);
+      if (error) console.error('Raw material sync error:', error);
     }
     addLog('create', 'raw_material', id, `Added raw material: ${m.name}`);
     toast.success(`Raw material "${m.name}" added`);
-  }, [addLog]);
+  }, [addLog, hasSupabaseConfig]);
 
   const updateRawMaterial = useCallback(async (id: string, updates: Partial<RawMaterial>) => {
     setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, ...updates, lastUpdated: new Date().toISOString() } : m));
     if (navigator.onLine && hasSupabaseConfig) {
       const material = rawMaterials.find(m => m.id === id);
       if (material) {
-        await supabase.from('raw_materials').update(toDBRawMaterial({ ...material, ...updates, lastUpdated: new Date().toISOString() })).eq('id', id);
+        await supabase.from('raw_materials').upsert(toDBRawMaterial({ ...material, ...updates, lastUpdated: new Date().toISOString() })).eq('id', id);
       }
     }
     addLog('update', 'raw_material', id, `Updated raw material: ${id}`);
     toast.success(`Raw material updated`);
-  }, [rawMaterials, addLog]);
+  }, [rawMaterials, addLog, hasSupabaseConfig]);
 
   const deleteRawMaterial = useCallback(async (id: string) => {
     setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, isActive: false } : m));
     if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('raw_materials').update({ is_active: false }).eq('id', id);
+      await supabase.from('raw_materials').upsert({ id, is_active: false }).eq('id', id);
     }
     addLog('delete', 'raw_material', id, `Soft deleted raw material: ${id}`);
     toast.success(`Raw material deleted`);
-  }, [addLog]);
+  }, [addLog, hasSupabaseConfig]);
 
   const adjustRawMaterialStock = useCallback(async (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => {
     const material = rawMaterials.find(m => m.id === materialId);
@@ -1641,15 +1660,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRawMaterialAdjustments(prev => [...prev, newAdj]);
 
     if (isOnline && hasSupabaseConfig) {
-      await Promise.all([
-        supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId),
-        supabase.from('raw_material_adjustments').insert([toDBRawAdjustment(newAdj)])
-      ]);
+      const { error: mError } = await supabase.from('raw_materials').upsert(toDBRawMaterial({ ...material, currentStock: newStock, lastUpdated: new Date().toISOString() })).eq('id', materialId);
+      const { error: aError } = await supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(newAdj)]);
+      
+      if (mError || aError) {
+        console.error('Adjustment sync error:', mError || aError);
+        setRawMaterialAdjustments(prev => prev.map(adj => adj.id === adjId ? { ...adj, syncStatus: 'pending' } : adj));
+      }
     }
 
     toast.success(`Stock adjusted for ${material.name}`);
     return true;
-  }, [rawMaterials, currentUser, isOnline, addLog]);
+  }, [rawMaterials, currentUser, isOnline, hasSupabaseConfig]);
 
   const adjustBranchStock = useCallback(async (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => {
     const id = `bsa${Date.now()}`;
@@ -1666,12 +1688,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBranchStockAdjustments(prev => [...prev, newAdj]);
     
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('branch_stock_adjustments').insert([toDBBranchAdjustment(newAdj)]);
+      await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(newAdj)]);
     }
     
     addLog('adjust', 'branch_stock', productId, `Adjusted ${branch} stock by -${quantity}. Reason: ${reason}`);
     toast.success(`Stock adjusted by -${quantity}`);
-  }, [currentUser, addLog, isOnline]);
+  }, [currentUser, addLog, isOnline, hasSupabaseConfig]);
 
   const addProduction = useCallback(async (productId: string, quantity: number, notes?: string) => {
     const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
@@ -1707,25 +1729,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBatches(prev => [...prev, newBatch]);
 
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('production_batches').insert([toDBBatch(newBatch)]);
+      const { error } = await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
+      if (error) {
+        console.error('Production sync error:', error);
+        setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
+      }
     }
 
     addLog('create', 'production', id, `Produced ${quantity} units (Batch: ${batchId})`);
     toast.success(isOnline ? `Production recorded: ${quantity} units` : `Production saved offline: ${quantity} units`);
     return true;
-  }, [batches.length, addLog, isOnline, recipes, rawMaterials, adjustRawMaterialStock]);
+  }, [batches.length, addLog, isOnline, hasSupabaseConfig, recipes, rawMaterials, adjustRawMaterialStock]);
 
   const updateProduction = useCallback(async (id: string, updates: Partial<ProductionBatch>) => {
     setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : b));
     if (navigator.onLine && hasSupabaseConfig) {
       const batch = batches.find(b => b.id === id);
       if (batch) {
-        await supabase.from('production_batches').update(toDBBatch({ ...batch, ...updates, syncStatus: 'synced' })).eq('id', id);
+        await supabase.from('production_batches').upsert(toDBBatch({ ...batch, ...updates, syncStatus: 'synced' })).eq('id', id);
       }
     }
     addLog('update', 'production', id, `Updated production batch: ${id}`);
     toast.success(`Production batch updated successfully`);
-  }, [batches, addLog, isOnline]);
+  }, [batches, addLog, isOnline, hasSupabaseConfig]);
 
   const deleteProduction = useCallback(async (id: string) => {
     setBatches(prev => prev.filter(b => b.id !== id));
@@ -1734,7 +1760,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     addLog('delete', 'production', id, `Deleted production batch: ${id}`);
     toast.success(`Production batch deleted successfully`);
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, hasSupabaseConfig]);
 
   const getProductById = useCallback((id: string) => products.find(p => p.id === id), [products]);
 
@@ -1788,43 +1814,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (navigator.onLine && hasSupabaseConfig) {
       const staffMember = staff.find(s => s.id === id);
       if (staffMember) {
-        await supabase.from('staff_members').update(toDBStaff({ ...staffMember, ...updates })).eq('id', id);
+        await supabase.from('staff_members').upsert(toDBStaff({ ...staffMember, ...updates })).eq('id', id);
       }
     }
     addLog('update', 'staff', id, `Updated staff member: ${id}`);
     toast.success(`Staff updated`);
-  }, [staff, addLog]);
+  }, [staff, addLog, hasSupabaseConfig]);
 
   const deleteStaffMember = useCallback(async (id: string) => {
     setStaff(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
     if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('staff_members').update({ is_active: false }).eq('id', id);
+      await supabase.from('staff_members').upsert({ id, is_active: false }).eq('id', id);
     }
     addLog('delete', 'staff', id, `Soft deleted staff member: ${id}`);
     toast.success(`Staff member deleted`);
-  }, [addLog]);
+  }, [addLog, hasSupabaseConfig]);
 
   const addStaffDeduction = useCallback(async (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => {
     const id = `sd-${Date.now()}`;
     const newDeduction: StaffDeduction = { ...d, id, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
     setStaffDeductions(prev => [...prev, newDeduction]);
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('staff_deductions').insert([toDBDeduction(newDeduction)]);
+      const { error } = await supabase.from('staff_deductions').upsert([toDBDeduction(newDeduction)]);
+      if (error) {
+        console.error('Staff deduction sync error:', error);
+        setStaffDeductions(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
+      }
     }
     addLog('create', 'staff_deduction', id, `Deduction for staff ${d.staffId}: Rs. ${d.amount}`);
     toast.success(`Deduction/Advance recorded`);
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, hasSupabaseConfig]);
 
   const updateStaffDeduction = useCallback(async (id: string, updates: Partial<StaffDeduction>) => {
     setStaffDeductions(prev => prev.map(d => d.id === id ? { ...d, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : d));
     if (navigator.onLine && hasSupabaseConfig) {
        const deduction = staffDeductions.find(d => d.id === id);
        if (deduction) {
-         await supabase.from('staff_deductions').update(toDBDeduction({ ...deduction, ...updates, syncStatus: 'synced' })).eq('id', id);
+         await supabase.from('staff_deductions').upsert(toDBDeduction({ ...deduction, ...updates, syncStatus: 'synced' })).eq('id', id);
        }
     }
     toast.success(`Deduction updated`);
-  }, [staffDeductions, isOnline]);
+  }, [staffDeductions, isOnline, hasSupabaseConfig]);
 
   const deleteStaffDeduction = useCallback(async (id: string) => {
     setStaffDeductions(prev => prev.filter(d => d.id !== id));
@@ -1832,18 +1862,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await supabase.from('staff_deductions').delete().eq('id', id);
     }
     toast.success(`Deduction deleted`);
-  }, []);
+  }, [hasSupabaseConfig]);
 
   const createSalaryVoucher = useCallback(async (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => {
     const id = `sv-${Date.now()}`;
     const newVoucher: SalaryVoucher = { ...v, id, status: 'paid', syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
     setSalaryVouchers(prev => [...prev, newVoucher]);
     if (isOnline && hasSupabaseConfig) {
-      await supabase.from('salary_vouchers').insert([toDBVoucher(newVoucher)]);
+      const { error } = await supabase.from('salary_vouchers').upsert([toDBVoucher(newVoucher)]);
+      if (error) {
+        console.error('Salary voucher sync error:', error);
+        setSalaryVouchers(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
+      }
     }
     addLog('create', 'salary_voucher', id, `Salary paid to staff ${v.staffId}: Rs. ${v.amount}`);
     toast.success(`Salary payment recorded`);
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, hasSupabaseConfig]);
 
   const deleteSalaryVoucher = useCallback(async (id: string) => {
     setSalaryVouchers(prev => prev.filter(v => v.id !== id));
