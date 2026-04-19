@@ -269,13 +269,13 @@ export default function Purchases() {
                   </TableCell>
                   <TableCell className="px-6 py-4 text-right">
                     <div className="flex flex-col items-end">
-                      <span className="font-bold text-slate-800 text-xs">Rs. {p.totalCost.toLocaleString()}</span>
-                      <span className="text-[9px] text-green-600 font-bold">Paid: {p.amountPaid.toLocaleString()}</span>
+                      <span className="font-bold text-slate-800 text-xs">Rs. {(p.totalCost || 0).toLocaleString()}</span>
+                      <span className="text-[9px] text-green-600 font-bold">Paid: {(p.amountPaid || 0).toLocaleString()}</span>
                     </div>
                   </TableCell>
                   <TableCell className="px-6 py-4 text-right">
                     <span className={`font-black text-xs ${p.totalCost - p.amountPaid > 0 ? 'text-red-500' : 'text-slate-300'}`}>
-                      {p.totalCost - p.amountPaid > 0 ? `Rs. ${(p.totalCost - p.amountPaid).toLocaleString()}` : 'Cleared'}
+                      {p.totalCost - p.amountPaid > 0 ? `Rs. ${( (p.totalCost || 0) - (p.amountPaid || 0) ).toLocaleString()}` : 'Cleared'}
                     </span>
                   </TableCell>
                 </TableRow>

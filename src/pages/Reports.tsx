@@ -336,7 +336,7 @@ export default function Reports() {
                      <TableRow key={p.name} className="hover:bg-slate-50/50 transition-colors border-slate-50">
                        <TableCell className="px-6 py-3 font-bold text-slate-700 text-xs">{p.name}</TableCell>
                        <TableCell className="px-6 py-3 text-right font-semibold text-slate-500 text-xs">{p.quantity}</TableCell>
-                       <TableCell className="px-6 py-3 text-right font-black text-slate-800 text-xs">Rs. {p.revenue.toLocaleString()}</TableCell>
+                       <TableCell className="px-6 py-3 text-right font-black text-slate-800 text-xs">Rs. {(p.revenue || 0).toLocaleString()}</TableCell>
                      </TableRow>
                    ))}
                  </TableBody>

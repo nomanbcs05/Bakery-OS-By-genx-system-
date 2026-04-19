@@ -210,7 +210,7 @@ const fromDBVoucher = (v: DBSalaryVoucher): SalaryVoucher => ({
   id: v.id, staffId: v.staff_id, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, syncStatus: v.sync_status || 'synced'
 });
 const fromDBPurchase = (p: DBPurchase): Purchase => ({
-  id: p.id, materialId: p.material_id, quantity: p.quantity, totalCost: p.total_cost, amount_paid: p.amount_paid, paymentMethod: p.payment_method, 
+  id: p.id, materialId: p.material_id, quantity: p.quantity, totalCost: p.total_cost, amountPaid: p.amount_paid, paymentMethod: p.payment_method, 
   vendorName: p.vendor_name, vendorCity: p.vendor_city, date: p.date, syncStatus: p.sync_status || 'synced'
 });
 
@@ -346,7 +346,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [staff, setStaff] = useState<StaffMember[]>(initialState.staff || []);
   const [staffDeductions, setStaffDeductions] = useState<StaffDeduction[]>(initialState.staffDeductions || []);
   const [salaryVouchers, setSalaryVouchers] = useState<SalaryVoucher[]>(initialState.salaryVouchers || []);
-  const [purchases, setPurchases] = useState<Purchase[]>(initialState.purchases || []);
+  const [purchases, setPurchases] = useState<Purchase[]>(() => {
+    const rawPurchases = initialState.purchases || [];
+    return rawPurchases.map((p: any) => ({
+      ...p,
+      amountPaid: p.amountPaid !== undefined ? p.amountPaid : (p.amount_paid !== undefined ? p.amount_paid : 0)
+    }));
+  });
   const [recipes, setRecipes] = useState<Recipe[]>(initialState.recipes || []);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialState.auditLogs || []);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -506,7 +512,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
 
     const purchasesData = await fetchTable('purchases', 'date');
-    if (purchasesData) setPurchases(prev => merge(purchasesData, prev, fromDBPurchase));
+    if (purchasesData) {
+      const sanitized = purchasesData.map(fromDBPurchase);
+      setPurchases(prev => merge(sanitized, prev, (d) => d));
+    }
 
     const recipesData = await fetchTable('recipes', 'id');
     if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
@@ -696,9 +705,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         })
         .subscribe((status) => {
-          if (status !== 'SUBSCRIBED' && retryCount < maxRetries) {
-            retryCount++;
-            setTimeout(setupRealtime, 2000 * retryCount);
+          if (status === 'SUBSCRIBED') {
+            console.log('Realtime subscribed successfully');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('Realtime subscription error');
           }
         });
       return channel;
