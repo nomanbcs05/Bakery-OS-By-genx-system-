@@ -95,7 +95,7 @@ export default function Dashboard() {
                </div>
              </div>
              <div className="flex items-end justify-between">
-               <h3 className="text-[26px] font-black leading-tight tracking-tight">Rs. {totalRevenue.toLocaleString()}</h3>
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">Rs. {(totalRevenue || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter">
                   {todaySales.length} TRX
                </div>
@@ -112,7 +112,7 @@ export default function Dashboard() {
                </div>
              </div>
              <div className="flex items-end justify-between">
-               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalProduced.toLocaleString()}</h3>
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalProduced || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[9px] font-bold tracking-tighter uppercase">
                  {todayBatches.length} Batches
                </div>
@@ -129,7 +129,7 @@ export default function Dashboard() {
                </div>
              </div>
              <div className="flex items-end justify-between">
-               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalDispatched.toLocaleString()}</h3>
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalDispatched || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter uppercase">
                  {todayDispatches.length} Trips
                </div>
@@ -146,7 +146,7 @@ export default function Dashboard() {
                </div>
              </div>
              <div className="flex items-end justify-between">
-               <h3 className="text-[26px] font-black leading-tight tracking-tight">{totalSold.toLocaleString()}</h3>
+               <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalSold || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-success/20 text-success text-[9px] font-bold tracking-tighter uppercase">
                   Units Sold
                </div>
@@ -264,7 +264,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-black text-slate-900">Rs. {sale.total.toLocaleString()}</span>
+                  <span className="text-sm font-black text-slate-900">Rs. {(sale.total || 0).toLocaleString()}</span>
                 </div>
               </div>
             ))}
