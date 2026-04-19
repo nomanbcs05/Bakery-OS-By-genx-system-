@@ -62,7 +62,7 @@ export function AppSidebar() {
   });
 
   const filteredSalesNav = salesNav.filter(item => {
-    if (isRole(['admin'])) return true;
+    if (isRole(['admin'])) return false;
     if (isRole(['branch_staff'])) {
       if (selectedProfile.branchId === 'branch_1') return item.title === 'Branch 1 POS';
       if (selectedProfile.branchId === 'branch_2') return item.title === 'Branch 2 POS';
