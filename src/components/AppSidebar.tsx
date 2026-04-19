@@ -110,13 +110,24 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <ChefHat className="h-5 w-5 text-primary-foreground" />
-          </div>
+          {receiptSettings?.logoUrl ? (
+            <img 
+              src={receiptSettings.logoUrl} 
+              alt="Brand Logo" 
+              className="h-9 w-9 rounded-lg object-contain bg-white p-1 border border-sidebar-border shadow-sm"
+              crossOrigin="anonymous"
+            />
+          ) : (
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <ChefHat className="h-5 w-5 text-primary-foreground" />
+            </div>
+          )}
           {!collapsed && (
             <div>
-              <h1 className="font-bold text-sidebar-foreground text-base leading-tight">BakeryOS</h1>
-              <p className="text-[11px] text-sidebar-foreground/50">Production & POS</p>
+              <h1 className="font-bold text-sidebar-foreground text-base leading-tight">
+                {receiptSettings?.brandName || "BakeryOS"}
+              </h1>
+              <p className="text-[11px] text-sidebar-foreground/50">{receiptSettings?.tagline || 'Production & POS'}</p>
             </div>
           )}
         </div>
