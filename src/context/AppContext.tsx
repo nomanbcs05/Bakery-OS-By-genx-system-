@@ -107,10 +107,10 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
-  addProduct: (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => void;
+  addProduct: (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string, soft?: boolean) => Promise<void>;
-  addRawMaterial: (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => void;
+  addRawMaterial: (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => Promise<void>;
   updateRawMaterial: (id: string, updates: Partial<RawMaterial>) => Promise<void>;
   deleteRawMaterial: (id: string) => Promise<void>;
   adjustRawMaterialStock: (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => Promise<boolean>;
@@ -120,14 +120,14 @@ interface AppContextType extends AppState {
   deleteRecipe: (id: string) => Promise<void>;
   
   branchStockAdjustments: BranchStockAdjustment[];
-  adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => void;
+  adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => Promise<void>;
   addProduction: (productId: string, quantity: number, notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<string | boolean>;
   createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => Promise<string | false> | string | false;
   refundSale: (id: string) => Promise<boolean>;
-  addExpense: (e: Omit<Expense, 'id'>) => void;
+  addExpense: (e: Omit<Expense, 'id'>) => Promise<void>;
   updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   getProductById: (id: string) => Product | undefined;
@@ -147,7 +147,7 @@ interface AppContextType extends AppState {
   logout: () => Promise<void>;
   forceSync: () => Promise<void>;
   seedDatabase: () => Promise<void>;
-  updateReceiptSettings: (settings: Partial<ReceiptSettings>) => void;
+  updateReceiptSettings: (settings: Partial<ReceiptSettings>) => Promise<void>;
   // Staff & Accounts
   addStaffMember: (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => Promise<void>;
   updateStaffMember: (id: string, updates: Partial<StaffMember>) => Promise<void>;
@@ -207,7 +207,7 @@ const fromDBVoucher = (v: DBSalaryVoucher): SalaryVoucher => ({
   id: v.id, staffId: v.staff_id, amount: v.amount, month: v.month, year: v.year, date: v.date, status: v.status, syncStatus: v.sync_status || 'synced'
 });
 const fromDBPurchase = (p: DBPurchase): Purchase => ({
-  id: p.id, materialId: p.material_id, quantity: p.quantity, totalCost: p.total_cost, amountPaid: p.amount_paid, paymentMethod: p.payment_method, 
+  id: p.id, materialId: p.material_id, quantity: p.quantity, totalCost: p.total_cost, amount_paid: p.amount_paid, paymentMethod: p.payment_method, 
   vendorName: p.vendor_name, vendorCity: p.vendor_city, date: p.date, syncStatus: p.sync_status || 'synced'
 });
 
@@ -234,7 +234,7 @@ const toDBSale = (s: Sale): any => {
     customer_phone: s.customerPhone,
     is_credit_paid: s.isCreditPaid,
     date: s.date,
-    sync_status: 'synced' // Explicitly set to synced when uploading
+    sync_status: 'synced'
   };
 };
 const toDBExpense = (e: Expense): DBExpense => ({
@@ -276,29 +276,24 @@ const toDBRecipe = (r: Recipe): DBRecipe => ({
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   
-  // Load BUSINESS data from local storage (products, sales, expenses, etc.)
-  // This data persists across logins/logouts and profile switches
   const loadBusinessData = (): Partial<AppState> => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return {};
       const parsed = JSON.parse(saved);
-      if (typeof parsed !== 'object' || parsed === null) return {};
-      return parsed;
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
     } catch (e) {
       console.error('Failed to load business data from localStorage', e);
       return {};
     }
   };
 
-  // Load AUTH data separately (currentUser, selectedProfile)
   const loadAuthData = (): { currentUser?: User | null; selectedProfile?: User | null } => {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
       if (!saved) return {};
       const parsed = JSON.parse(saved);
-      if (typeof parsed !== 'object' || parsed === null) return {};
-      return parsed;
+      return typeof parsed === 'object' && parsed !== null ? parsed : {};
     } catch (e) {
       return {};
     }
@@ -307,29 +302,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const initialState = loadBusinessData();
   const initialAuth = loadAuthData();
 
-  // Auth state — separate from business data
   const [currentUser, setCurrentUser] = useState<User | null>(initialAuth.currentUser || null);
   const [selectedProfile, setSelectedProfile] = useState<User | null>(() => {
     const saved = localStorage.getItem('bakewise_selected_profile');
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
-      }
+      try { return JSON.parse(saved); } catch (e) { return null; }
     }
     return initialAuth.selectedProfile || null;
   });
   const [isProfileLocked, setIsProfileLocked] = useState(true);
 
-  // BUSINESS DATA — these persist FOREVER until user explicitly clears
   const [products, setProducts] = useState<Product[]>(() => {
     const defaultMenu = [...sampleProducts];
     if (initialState.products && initialState.products.length > 0) {
       initialState.products.forEach(p => {
-        if (!defaultMenu.find(m => m.id === p.id)) {
-          defaultMenu.push(p);
-        }
+        if (!defaultMenu.find(m => m.id === p.id)) defaultMenu.push(p);
       });
     }
     return defaultMenu;
@@ -388,63 +375,129 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [receiptSettings, setReceiptSettings] = useState<ReceiptSettings>(() => {
     const saved = (initialState as any).receiptSettings || {};
-    return {
-      ...defaultReceiptSettings,
-      ...saved
-    };
+    return { ...defaultReceiptSettings, ...saved };
   });
 
   const hasLoaded = React.useRef(false);
 
-  const forceSync = useCallback(async () => {
-    if (!navigator.onLine || !hasSupabaseConfig) return;
+  const syncOfflineData = useCallback(async () => {
+    if (!hasSupabaseConfig || !navigator.onLine) return;
     
-    try {
-      // Sync pending sales
-      const pendingSales = sales.filter(s => s.syncStatus === 'pending');
-      if (pendingSales.length > 0) {
-        for (const sale of pendingSales) {
-          await supabase.from('sales').upsert([toDBSale(sale)]);
-        }
-        setSales(prev => prev.map(s => s.syncStatus === 'pending' ? { ...s, syncStatus: 'synced' } : s));
-      }
+    let syncCount = 0;
 
-      // Sync pending expenses
-      const pendingExpenses = expenses.filter(e => e.syncStatus === 'pending');
-      if (pendingExpenses.length > 0) {
-        for (const exp of pendingExpenses) {
-          await supabase.from('expenses').upsert([toDBExpense(exp)]);
+    const syncTable = async (table: string, items: any[], toDB: (item: any) => any, setter: (val: any) => void) => {
+      const pending = items.filter(i => i.syncStatus === 'pending');
+      if (pending.length === 0) return;
+      try {
+        const { error } = await supabase.from(table).upsert(pending.map(i => toDB({ ...i, syncStatus: 'synced' })));
+        if (!error) {
+          setter((prev: any[]) => prev.map(i => i.syncStatus === 'pending' ? { ...i, syncStatus: 'synced' } : i));
+          syncCount += pending.length;
         }
-        setExpenses(prev => prev.map(e => e.syncStatus === 'pending' ? { ...e, syncStatus: 'synced' } : e));
-      }
+      } catch (err) { console.error(`${table} sync error:`, err); }
+    };
+
+    await Promise.all([
+      syncTable('sales', sales, toDBSale, setSales),
+      syncTable('production_batches', batches, toDBBatch, setBatches),
+      syncTable('dispatches', dispatches, toDBDispatch, setDispatches),
+      syncTable('expenses', expenses, toDBExpense, setExpenses),
+      syncTable('staff_deductions', staffDeductions, toDBDeduction, setStaffDeductions),
+      syncTable('salary_vouchers', salaryVouchers, toDBVoucher, setSalaryVouchers),
+      syncTable('purchases', purchases, toDBPurchase, setPurchases),
+      syncTable('recipes', recipes, toDBRecipe, setRecipes),
+      syncTable('raw_material_adjustments', rawMaterialAdjustments, toDBRawAdjustment, setRawMaterialAdjustments)
+    ]);
+
+    if (syncCount > 0) {
+      toast.success(`Synced ${syncCount} records`);
+      setLastSyncTime(new Date().toISOString());
+    }
+  }, [sales, batches, dispatches, expenses, staffDeductions, salaryVouchers, purchases, recipes, rawMaterialAdjustments]);
+
+  const fetchData = useCallback(async () => {
+    if (!currentUser || !hasSupabaseConfig) return;
+
+    try {
+      const fetchTable = async (table: string) => {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) throw error;
+        return data;
+      };
+
+      const [
+        pData, rmData, rmaData, bData, dData, sData, eData, lData, bsaData, stData, sdData, svData, purchasesData, recipesData, settingsResponse
+      ] = await Promise.all([
+        fetchTable('products'), fetchTable('raw_materials'), fetchTable('raw_material_adjustments'),
+        fetchTable('production_batches'), fetchTable('dispatches'), fetchTable('sales'),
+        fetchTable('expenses'), fetchTable('audit_logs'), fetchTable('branch_stock_adjustments'),
+        fetchTable('staff_members'), fetchTable('staff_deductions'), fetchTable('salary_vouchers'),
+        fetchTable('purchases'), fetchTable('recipes'),
+        supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle()
+      ]);
+
+      const merge = (remote: any[], local: any[], fromDB: (d: any) => any) => {
+        const remoteMapped = remote.map(fromDB);
+        const localOnly = local.filter(l => !remoteMapped.find(r => r.id === l.id));
+        return [...remoteMapped, ...localOnly];
+      };
+
+      if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
+      if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
+      if (rmaData) setRawMaterialAdjustments(prev => merge(rmaData, prev, fromDBRawAdjustment));
+      if (bData) setBatches(prev => merge(bData, prev, fromDBBatch));
+      if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
+      if (sData) setSales(prev => merge(sData, prev, fromDBSale));
+      if (eData) setExpenses(prev => merge(eData, prev, fromDBExpense));
+      if (lData) setAuditLogs(lData.map(fromDBLog));
+      if (bsaData) setBranchStockAdjustments(prev => merge(bsaData, prev, fromDBBranchAdjustment));
+      if (stData) setStaff(prev => merge(stData, prev, fromDBStaff));
+      if (sdData) setStaffDeductions(prev => merge(sdData, prev, fromDBDeduction));
+      if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
+      if (purchasesData) setPurchases(prev => merge(purchasesData, prev, fromDBPurchase));
+      if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
+      if (settingsResponse?.data?.settings) setReceiptSettings(prev => ({ ...prev, ...settingsResponse.data.settings, isLocked: true }));
       
       setLastSyncTime(new Date().toISOString());
-    } catch (err) {
-      console.error('Sync error:', err);
+      setTimeout(() => syncOfflineData(), 1000);
+    } catch (error: any) {
+      console.error('Fetch error:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [sales, expenses, hasSupabaseConfig]);
+  }, [currentUser, hasSupabaseConfig, syncOfflineData]);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Aggressive sync heartbeats (30s)
   useEffect(() => {
-    hasLoaded.current = true;
-  }, []);
+    if (isOnline && hasSupabaseConfig && currentUser) {
+      const pullInterval = setInterval(() => fetchData(), 30000);
+      const pushInterval = setInterval(() => syncOfflineData(), 30000);
+      return () => { clearInterval(pullInterval); clearInterval(pushInterval); };
+    }
+  }, [isOnline, hasSupabaseConfig, currentUser, fetchData, syncOfflineData]);
 
-  // Derive stock from all historical data
+  const forceSync = useCallback(async () => {
+    if (!navigator.onLine || !hasSupabaseConfig) return;
+    toast.loading('Syncing...');
+    try {
+      await syncOfflineData();
+      await fetchData();
+      toast.dismiss();
+      toast.success('Synced');
+    } catch (err) {
+      toast.dismiss();
+      toast.error('Sync failed');
+    }
+  }, [syncOfflineData, fetchData]);
+
+  useEffect(() => { hasLoaded.current = true; }, []);
+
   const stock = React.useMemo(() => {
     const map: StockMap = {};
-    
-    // Initialize
-    products.forEach(p => {
-      map[p.id] = { production: 0, branch_1: 0, branch_2: 0 };
-    });
-
-    // Add production
-    batches.forEach(b => {
-      if (map[b.productId]) {
-        map[b.productId].production += b.quantity;
-      }
-    });
-
-    // Subtract dispatches and add to branches
+    products.forEach(p => { map[p.id] = { production: 0, branch_1: 0, branch_2: 0 }; });
+    batches.forEach(b => { if (map[b.productId]) map[b.productId].production += b.quantity; });
     dispatches.forEach(d => {
       d.items.forEach(item => {
         if (map[item.productId]) {
@@ -454,8 +507,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
     });
-
-    // Subtract sales
     sales.forEach(s => {
       s.items.forEach(item => {
         if (map[item.productId]) {
@@ -464,1532 +515,342 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
     });
-
-    // Subtract branch stock adjustments (wastage, damage, morning count adjustments)
-    branchStockAdjustments.forEach(adj => {
-      if (map[adj.productId]) {
-        map[adj.productId][adj.branch] -= adj.quantity;
-      }
-    });
-
+    branchStockAdjustments.forEach(adj => { if (map[adj.productId]) map[adj.productId][adj.branch] -= adj.quantity; });
     return map;
   }, [products, batches, dispatches, sales, branchStockAdjustments]);
 
-  // Auth and Data Fetching
   useEffect(() => {
-    // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-        fetchAllUsers(); // Fetch all profiles for the selection wall
-      } else {
-        setIsLoading(false);
-      }
+      if (session?.user) fetchUserProfile(session.user.id);
+      else setIsLoading(false);
     });
-
-    // Listen for auth changes — NEVER touch business data here
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-        fetchAllUsers();
-      } else {
-        // Only clear auth state, NEVER touch products/sales/expenses etc.
-        setCurrentUser(null);
-        setSelectedProfile(null);
-        setAllUsers([]);
-        setIsLoading(false);
-      }
+      if (session?.user) fetchUserProfile(session.user.id);
+      else { setCurrentUser(null); setSelectedProfile(null); setAllUsers([]); setIsLoading(false); }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      if (data) {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (!error && data) {
         setCurrentUser({
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          role: data.role as UserRole,
-          branchId: data.branch_id,
-          pinCode: data.pin_code,
-          avatarUrl: data.avatar_url
+          id: data.id, name: data.name, email: data.email, role: data.role as UserRole,
+          branchId: data.branch_id, pinCode: data.pin_code, avatarUrl: data.avatar_url
         });
-        
-        // Always fetch all users when a session is active to populate the profile selection screen
         fetchAllUsers();
       }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
   };
 
   const fetchAllUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('role', { ascending: true }); // Admin first
-      
-      if (error) throw error;
-      if (data) {
-        setAllUsers(data.map(d => ({
-          id: d?.id || '',
-          name: d?.name || 'Unknown',
-          email: d?.email || '',
-          role: (d?.role as UserRole) || 'branch_staff',
-          branchId: d?.branch_id,
-          pinCode: d?.pin_code,
-          avatarUrl: d?.avatar_url
-        })));
-      }
-    } catch (error) {
-      console.error('Error fetching all profiles:', error);
-    }
+    const { data } = await supabase.from('profiles').select('*').order('role');
+    if (data) setAllUsers(data.map(d => ({
+      id: d.id, name: d.name, email: d.email, role: d.role as UserRole,
+      branchId: d.branch_id, pinCode: d.pin_code, avatarUrl: d.avatar_url
+    })));
   };
 
-  // Fetch data from Supabase on mount
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchData = async () => {
-      try {
-        const fetchTable = async (table: string, select = '*') => {
-          try {
-            const { data, error } = await supabase.from(table).select(select);
-            if (error) {
-              console.warn(`Failed to fetch ${table}:`, error.message);
-              return null;
-            }
-            return data;
-          } catch (e) {
-            console.warn(`Error fetching ${table}:`, e);
-            return null;
-          }
-        };
-
-        const [
-          pData, rmData, rmaData, bData, dData, sData, eData, lData, bsaData, stData, sdData, svData, purchasesData, recipesData, settingsResponse
-        ] = await Promise.all([
-          fetchTable('products'),
-          fetchTable('raw_materials'),
-          fetchTable('raw_material_adjustments'),
-          fetchTable('production_batches'),
-          fetchTable('dispatches'),
-          fetchTable('sales'),
-          fetchTable('expenses'),
-          fetchTable('audit_logs'),
-          fetchTable('branch_stock_adjustments'),
-          fetchTable('staff_members'),
-          fetchTable('staff_deductions'),
-          fetchTable('salary_vouchers'),
-          fetchTable('purchases'),
-          fetchTable('recipes'),
-          supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle()
-        ]);
-
-        const settingsData = settingsResponse?.data;
-
-        // MERGE strategy: cloud data + local-only data. NEVER replace local with empty cloud.
-        if (pData && pData.length > 0) {
-          const remoteProducts = pData.map(fromDBProduct);
-          setProducts(prev => {
-            const offlineProducts = prev.filter(local => !remoteProducts.find(r => r.id === local.id));
-            return [...remoteProducts, ...offlineProducts];
-          });
-        }
-
-        if (rmData && rmData.length > 0) {
-          const remoteRM = rmData.map(fromDBRawMaterial);
-          setRawMaterials(prev => {
-            const offline = prev.filter(local => !remoteRM.find(r => r.id === local.id));
-            return [...remoteRM, ...offline];
-          });
-        }
-
-        if (rmaData && rmaData.length > 0) {
-          const remoteAdjustments = rmaData.map(fromDBRawAdjustment);
-          setRawMaterialAdjustments(prev => {
-            const merged = [...prev];
-            remoteAdjustments.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-        
-        if (bData && bData.length > 0) {
-          const remoteBatches = bData.map(fromDBBatch);
-          setBatches(prev => {
-            const merged = [...prev];
-            remoteBatches.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-
-        if (settingsData?.settings) {
-          setReceiptSettings(prev => ({
-            ...prev,
-            ...settingsData.settings,
-            isLocked: true
-          }));
-        }
-        
-        if (dData && dData.length > 0) {
-          const remoteDispatches = dData.map(fromDBDispatch);
-          setDispatches(prev => {
-            const merged = [...prev];
-            remoteDispatches.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-        
-        if (sData && sData.length > 0) {
-          const remoteSales = sData.map(fromDBSale);
-          setSales(prev => {
-            const merged = [...prev];
-            remoteSales.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-
-        if (eData && eData.length > 0) {
-          const remoteExpenses = eData.map(fromDBExpense);
-          setExpenses(prev => {
-            const merged = [...prev];
-            remoteExpenses.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-        
-        if (lData && lData.length > 0) setAuditLogs(lData.map(fromDBLog));
-        
-        if (bsaData && bsaData.length > 0) {
-          const remoteBsa = bsaData.map(fromDBBranchAdjustment);
-          setBranchStockAdjustments(prev => {
-            const offline = prev.filter(local => !remoteBsa.find(r => r.id === local.id));
-            return [...remoteBsa, ...offline];
-          });
-        }
-
-        if (stData && stData.length > 0) {
-          const remoteStaff = stData.map(fromDBStaff);
-          setStaff(prev => {
-            const offline = prev.filter(local => !remoteStaff.find(r => r.id === local.id));
-            return [...remoteStaff, ...offline];
-          });
-        }
-
-        if (sdData && sdData.length > 0) {
-          const remoteDeductions = sdData.map(fromDBDeduction);
-          setStaffDeductions(prev => {
-            const merged = [...prev];
-            remoteDeductions.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-
-        if (svData && svData.length > 0) {
-          const remoteVouchers = svData.map(fromDBVoucher);
-          setSalaryVouchers(prev => {
-            const merged = [...prev];
-            remoteVouchers.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-
-        if (purchasesData && purchasesData.length > 0) {
-          const remotePurchases = purchasesData.map(fromDBPurchase);
-          setPurchases(prev => {
-            const merged = [...prev];
-            remotePurchases.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-
-        if (recipesData && recipesData.length > 0) {
-          const remoteRecipes = recipesData.map(fromDBRecipe);
-          setRecipes(prev => {
-            const merged = [...prev];
-            remoteRecipes.forEach(r => {
-              const idx = merged.findIndex(l => l.id === r.id);
-              if (idx !== -1) merged[idx] = r; else merged.push(r);
-            });
-            return merged;
-          });
-        }
-        
-        setLastSyncTime(new Date().toISOString());
-        
-        // After fetching, immediately push any local-only data that might exist
-        setTimeout(() => {
-          forceSync();
-        }, 1000);
-      } catch (error: any) {
-        console.error('Supabase fetch error:', error);
-        if (hasSupabaseConfig) {
-          toast.error(`Database connection failed: ${error.message || 'Check your internet connection'}`);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [currentUser]);
-
-  // Background Heartbeat Sync: Ensure all terminals push data every 30 seconds
-  useEffect(() => {
-    if (isOnline && hasSupabaseConfig) {
-      const interval = setInterval(() => {
-        forceSync();
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isOnline, hasSupabaseConfig, forceSync]);
-
-  // Real-time subscriptions
   useEffect(() => {
     if (!navigator.onLine || !hasSupabaseConfig) return;
-
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const newSale = fromDBSale(payload.new as DBSale);
+    const channel = supabase.channel('realtime-erp')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, (p) => {
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const s = fromDBSale(p.new as DBSale);
           setSales(prev => {
-            const index = prev.findIndex(s => s.id === newSale.id);
-            if (index === -1) return [...prev, newSale];
-            const next = [...prev];
-            next[index] = newSale;
-            return next;
+            const idx = prev.findIndex(x => x.id === s.id);
+            if (idx === -1) return [...prev, s];
+            const next = [...prev]; next[idx] = s; return next;
           });
-        } else if (payload.eventType === 'DELETE') {
-          const oldId = (payload.old as { id: string }).id;
-          setSales(prev => prev.filter(s => s.id !== oldId));
+        } else if (p.eventType === 'DELETE') {
+          setSales(prev => prev.filter(s => s.id !== (p.old as any).id));
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newBatch = fromDBBatch(payload.new as DBProductionBatch);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (p) => {
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const b = fromDBBatch(p.new as DBProductionBatch);
           setBatches(prev => {
-            if (prev.find(b => b.id === newBatch.id)) return prev;
-            return [...prev, newBatch];
+            const idx = prev.findIndex(x => x.id === b.id);
+            if (idx === -1) return [...prev, b];
+            const next = [...prev]; next[idx] = b; return next;
           });
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newExpense = fromDBExpense(payload.new as DBExpense);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (p) => {
+        if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+          const e = fromDBExpense(p.new as DBExpense);
           setExpenses(prev => {
-            if (prev.find(e => e.id === newExpense.id)) return prev;
-            return [...prev, newExpense];
+            const idx = prev.findIndex(x => x.id === e.id);
+            if (idx === -1) return [...prev, e];
+            const next = [...prev]; next[idx] = e; return next;
           });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dispatches' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newDispatch = fromDBDispatch(payload.new as DBDispatch);
-          setDispatches(prev => {
-            if (prev.find(d => d.id === newDispatch.id)) return prev;
-            return [...prev, newDispatch];
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'raw_materials' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const newRM = fromDBRawMaterial(payload.new as DBRawMaterial);
-          setRawMaterials(prev => {
-            const index = prev.findIndex(r => r.id === newRM.id);
-            if (index === -1) return [...prev, newRM];
-            const next = [...prev];
-            next[index] = newRM;
-            return next;
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'raw_material_adjustments' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newAdj = fromDBRawAdjustment(payload.new as DBRawMaterialAdjustment);
-          setRawMaterialAdjustments(prev => {
-            if (prev.find(a => a.id === newAdj.id)) return prev;
-            return [...prev, newAdj];
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const newStaff = fromDBStaff(payload.new as DBStaffMember);
-          setStaff(prev => {
-            const index = prev.findIndex(r => r.id === newStaff.id);
-            if (index === -1) return [...prev, newStaff];
-            const next = [...prev];
-            next[index] = newStaff;
-            return next;
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_deductions' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newAdj = fromDBDeduction(payload.new as DBStaffDeduction);
-          setStaffDeductions(prev => {
-            if (prev.find(a => a.id === newAdj.id)) return prev;
-            return [...prev, newAdj];
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'salary_vouchers' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newVoucher = fromDBVoucher(payload.new as DBSalaryVoucher);
-          setSalaryVouchers(prev => {
-            if (prev.find(a => a.id === newVoucher.id)) return prev;
-            return [...prev, newVoucher];
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const newRecipe = fromDBRecipe(payload.new as DBRecipe);
-          setRecipes(prev => {
-            const index = prev.findIndex(r => r.id === newRecipe.id);
-            if (index === -1) return [...prev, newRecipe];
-            const next = [...prev];
-            next[index] = newRecipe;
-            return next;
-          });
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          fetchAllProfiles(); // Refresh the full user list to ensure roles/passcodes stay synced
-        }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const newSettings = (payload.new as any).settings;
-          if (newSettings) {
-            setReceiptSettings(prev => ({
-              ...prev,
-              ...newSettings,
-              isLocked: true
-            }));
-          }
         }
       })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // Persist BUSINESS data to local storage (separate from auth)
-  useEffect(() => {
-    if (!hasLoaded.current) return;
-    
-    // Business data — persists across login/logout/profile switches
-    const businessData = {
-      products, 
-      rawMaterials, 
-      rawMaterialAdjustments, 
-      branchStockAdjustments,
-      batches, 
-      dispatches, 
-      sales, 
-      expenses, 
-      auditLogs, 
-      stock, 
-      lastSyncTime,
-      receiptSettings,
-      staff,
-      staffDeductions,
-      salaryVouchers,
-      recipes
-    };
-    
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(businessData));
-    } catch (e) {
-      console.error('Failed to save business data to localStorage:', e);
-    }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes]);
-
-  // Persist AUTH data separately
-  useEffect(() => {
-    if (!hasLoaded.current) return;
-    try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ currentUser, selectedProfile }));
-    } catch (e) {
-      console.error('Failed to save auth data to localStorage:', e);
-    }
-  }, [currentUser, selectedProfile]);
-
-  // Sync offline data on mount if online
-  useEffect(() => {
-    if (isOnline && !isLoading) {
-      const timer = setTimeout(() => {
-        syncOfflineData();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isOnline, isLoading]);
-
-  // Online/Offline handling
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      toast.success('System is online. Syncing data...');
-      syncOfflineData();
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      toast.error('System is offline. Data will be saved locally.');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  const syncOfflineData = useCallback(async () => {
-    if (!hasSupabaseConfig || !navigator.onLine) return;
-    
-    let syncCount = 0;
-
-    // 1. Sync Sales
-    const pendingSales = sales.filter(s => s.syncStatus === 'pending');
-    if (pendingSales.length > 0) {
-      try {
-        const { error } = await supabase.from('sales').upsert(
-          pendingSales.map(s => toDBSale({ ...s, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setSales(prev => prev.map(s => s.syncStatus === 'pending' ? { ...s, syncStatus: 'synced' } : s));
-          syncCount += pendingSales.length;
-        }
-      } catch (err) { console.error('Sales sync error:', err); }
-    }
-
-    // 2. Sync Production Batches
-    const pendingBatches = batches.filter(b => b.syncStatus === 'pending');
-    if (pendingBatches.length > 0) {
-      try {
-        const { error } = await supabase.from('production_batches').upsert(
-          pendingBatches.map(b => toDBBatch({ ...b, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setBatches(prev => prev.map(b => b.syncStatus === 'pending' ? { ...b, syncStatus: 'synced' } : b));
-          syncCount += pendingBatches.length;
-        }
-      } catch (err) { console.error('Production sync error:', err); }
-    }
-
-    // 3. Sync Dispatches
-    const pendingDispatches = dispatches.filter(d => d.syncStatus === 'pending');
-    if (pendingDispatches.length > 0) {
-      try {
-        const { error } = await supabase.from('dispatches').upsert(
-          pendingDispatches.map(d => toDBDispatch({ ...d, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setDispatches(prev => prev.map(d => d.syncStatus === 'pending' ? { ...d, syncStatus: 'synced' } : d));
-          syncCount += pendingDispatches.length;
-        }
-      } catch (err) { console.error('Dispatch sync error:', err); }
-    }
-
-    // 4. Sync Expenses
-    const pendingExpenses = expenses.filter(e => e.syncStatus === 'pending');
-    if (pendingExpenses.length > 0) {
-      try {
-        const { error } = await supabase.from('expenses').upsert(
-          pendingExpenses.map(e => toDBExpense({ ...e, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setExpenses(prev => prev.map(e => e.syncStatus === 'pending' ? { ...e, syncStatus: 'synced' } : e));
-          syncCount += pendingExpenses.length;
-        }
-      } catch (err) { console.error('Expense sync error:', err); }
-    }
-
-    // 5. Sync Staff Deductions
-    const pendingDeductions = staffDeductions.filter(d => d.syncStatus === 'pending');
-    if (pendingDeductions.length > 0) {
-      try {
-        const { error } = await supabase.from('staff_deductions').upsert(
-          pendingDeductions.map(d => toDBDeduction({ ...d, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setStaffDeductions(prev => prev.map(d => d.syncStatus === 'pending' ? { ...d, syncStatus: 'synced' } : d));
-          syncCount += pendingDeductions.length;
-        }
-      } catch (err) { console.error('Staff deductions sync error:', err); }
-    }
-
-    // 6. Sync Salary Vouchers
-    const pendingVouchers = salaryVouchers.filter(v => v.syncStatus === 'pending');
-    if (pendingVouchers.length > 0) {
-      try {
-        const { error } = await supabase.from('salary_vouchers').upsert(
-          pendingVouchers.map(v => toDBVoucher({ ...v, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setSalaryVouchers(prev => prev.map(v => v.syncStatus === 'pending' ? { ...v, syncStatus: 'synced' } : v));
-          syncCount += pendingVouchers.length;
-        }
-      } catch (err) { console.error('Salary vouchers sync error:', err); }
-    }
-
-    // 7. Sync Purchases
-    const pendingPurchases = purchases.filter(p => p.syncStatus === 'pending');
-    if (pendingPurchases.length > 0) {
-      try {
-        const { error } = await supabase.from('purchases').upsert(
-          pendingPurchases.map(p => toDBPurchase({ ...p, syncStatus: 'synced' }))
-        );
-        if (!error) {
-          setPurchases(prev => prev.map(p => p.syncStatus === 'pending' ? { ...p, syncStatus: 'synced' } : p));
-          syncCount += pendingPurchases.length;
-        }
-      } catch (err) { console.error('Purchase sync error:', err); }
-    }
-
-    if (syncCount > 0) {
-      toast.success(`Successfully synced ${syncCount} offline records to cloud`);
-      setLastSyncTime(new Date().toISOString());
-    }
-  }, [sales, batches, dispatches, expenses, staffDeductions, salaryVouchers]);
-
-
-  const seedDatabase = useCallback(async () => {
-    if (!navigator.onLine || !hasSupabaseConfig) {
-      toast.error('Connect to internet and configure Supabase first');
-      return;
-    }
-
-    toast.loading('Seeding initial data...');
-    try {
-      // 1. Seed Products
-      const { error: pError } = await supabase.from('products').upsert(sampleProducts.map(toDBProduct));
-      if (pError) throw pError;
-
-      // 2. Seed Batches
-      const { error: bError } = await supabase.from('production_batches').upsert(sampleBatches.map(toDBBatch));
-      if (bError) throw bError;
-
-      // 3. Seed Sample Sales
-      const today = new Date().toISOString().slice(0, 10);
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      
-      const sampleSales: Sale[] = [
-        {
-          id: 's-seed-1',
-          type: 'branch',
-          branch: 'branch_1',
-          items: [{ productId: 'p1', quantity: 10, unitPrice: 350 }],
-          total: 3500,
-          paymentMethod: 'cash',
-          date: today,
-          syncStatus: 'synced'
-        },
-        {
-          id: 's-seed-2',
-          type: 'branch',
-          branch: 'branch_2',
-          items: [{ productId: 'p2', quantity: 5, unitPrice: 400 }],
-          total: 2000,
-          paymentMethod: 'card',
-          date: today,
-          syncStatus: 'synced'
-        },
-        {
-          id: 's-seed-3',
-          type: 'factory_walkin',
-          items: [{ productId: 'p3', quantity: 20, unitPrice: 250 }],
-          total: 5000,
-          paymentMethod: 'cash',
-          date: yesterday,
-          syncStatus: 'synced'
-        }
-      ];
-
-      const { error: sError } = await supabase.from('sales').upsert(sampleSales.map(toDBSale));
-      if (sError) throw sError;
-
-      toast.dismiss();
-      toast.success('Initial data and sample sales seeded successfully. Refreshing...');
-      window.location.reload();
-    } catch (error: any) {
-      toast.dismiss();
-      toast.error(`Seeding failed: ${error.message}`);
-    }
-  }, []);
-
-  const addLog = useCallback(async (action: string, entity: string, entityId: string, details: string) => {
-    if (!currentUser) {
-      console.warn('Cannot add log: No current user');
-      return;
-    }
-
-    const log: AuditLog = {
-      id: `log-${Date.now()}`, 
-      action, 
-      entity, 
-      entityId, 
-      details,
-      userId: currentUser?.id || 'unknown', 
-      timestamp: new Date().toISOString()
-    };
-    
-    setAuditLogs(prev => [...prev, log]);
-    
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('audit_logs').insert([toDBLog(log)]);
-    }
-  }, [currentUser]);
-
-  const switchUser = useCallback((role: UserRole, branchId?: 'branch_1' | 'branch_2') => {
-    setCurrentUser(prev => prev ? { ...prev, role, branchId } : null);
-    toast.info(`Switched perspective to ${role.replace('_', ' ')}`);
-  }, []);
-
-  const updateUserRole = useCallback(async (userId: string, role: UserRole, branchId?: 'branch_1' | 'branch_2') => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role, branch_id: branchId })
-        .eq('id', userId);
-      
-      if (error) throw error;
-      
-      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role, branchId } : u));
-      toast.success('User role updated successfully');
-      
-      // If we updated our own role, update current user too
-      if (currentUser && currentUser.id === userId) {
-        setCurrentUser(prev => prev ? { ...prev, role, branchId } : null);
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update user role');
-    }
-  }, [currentUser]);
-
-  const selectProfile = useCallback((profile: User) => {
-    setSelectedProfile(profile);
-    localStorage.setItem('bakewise_selected_profile', JSON.stringify(profile));
-    setIsProfileLocked(true);
-  }, []);
-
-  const verifyPin = useCallback((pin: string): boolean => {
-    if (selectedProfile && selectedProfile.pinCode === pin) {
-      setIsProfileLocked(false);
-      return true;
-    }
-    return false;
-  }, [selectedProfile]);
-
-  const lockProfile = useCallback(() => {
-    setIsProfileLocked(true);
-  }, []);
-
-  const updateUserPin = useCallback(async (userId: string, pin: string) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ pin_code: pin })
-        .eq('id', userId);
-      
-      if (error) throw error;
-      
-      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, pinCode: pin } : u));
-      toast.success('User PIN updated successfully');
-      
-      if (selectedProfile?.id === userId) {
-        setSelectedProfile(prev => prev ? { ...prev, pinCode: pin } : null);
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update PIN');
-    }
-  }, [selectedProfile]);
-
-  const createStaffMember = async (name: string, email: string, password: string, role: UserRole, branchId?: string, pin?: string) => {
-    try {
-      if (!currentUser) throw new Error('Must be logged in to create profiles');
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert([{
-          account_id: currentUser.id,
-          name,
-          email,
-          role,
-          branch_id: branchId,
-          pin_code: pin || '0000'
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      if (data) {
-        toast.success(`Profile ${name} created successfully!`);
-        fetchAllUsers(); // Refresh the list
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create profile');
-    }
-  };
-
-  const clearSales = useCallback(async (range: 'today' | 'weekly' | 'monthly' | 'all') => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    
-    setSales(prev => {
-      if (range === 'all') return [];
-      return prev.filter(sale => {
-        const saleDate = new Date(sale.date);
-        if (range === 'today') return sale.date !== today;
-        if (range === 'weekly') {
-          const oneWeekAgo = new Date();
-          oneWeekAgo.setDate(now.getDate() - 7);
-          return saleDate < oneWeekAgo;
-        }
-        if (range === 'monthly') {
-          const oneMonthAgo = new Date();
-          oneMonthAgo.setMonth(now.getMonth() - 1);
-          return saleDate < oneMonthAgo;
-        }
-        return true;
-      });
-    });
-    
-    addLog('clear', 'sales', range, `Cleared ${range} sales records`);
-    toast.success(`Cleared ${range} sales records`);
-  }, [addLog]);
-
-  const clearAllReportData = useCallback(() => {
-    setSales([]);
-    setBatches([]);
-    setExpenses([]);
-    addLog('clear', 'reports', 'all', 'Cleared all sales, production, and expense records');
-    toast.success('All report data cleared');
-  }, [addLog]);
-
-  const addProduct = useCallback(async (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => {
-    const id = `p${Date.now()}`;
-    const newProduct = { ...p, id, isActive: true, createdAt: new Date().toISOString().slice(0, 10) };
-    
-    setProducts(prev => [...prev, newProduct]);
-    
-    if (navigator.onLine && hasSupabaseConfig) {
-      const { error } = await supabase.from('products').upsert([toDBProduct(newProduct)]);
-      if (error) console.error('Product sync error:', error);
-    }
-    
-    addLog('create', 'product', id, `Created product: ${p.name}`);
-    toast.success(`Product "${p.name}" created`);
-  }, [addLog, hasSupabaseConfig]);
-
-  const updateProduct = useCallback(async (id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        await supabase.from('products').upsert(toDBProduct({ ...product, ...updates })).eq('id', id);
-      }
-    }
-    addLog('update', 'product', id, `Updated product: ${updates.name || id}`);
-    toast.success(`Product updated successfully`);
-  }, [products, addLog, hasSupabaseConfig]);
-
-  const deleteProduct = useCallback(async (id: string, soft = true) => {
-    if (soft) {
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: false } : p));
-      if (navigator.onLine && hasSupabaseConfig) {
-        await supabase.from('products').upsert({ id, is_active: false }).eq('id', id);
-      }
-    } else {
-      setProducts(prev => prev.filter(p => p.id !== id));
-      if (navigator.onLine && hasSupabaseConfig) {
-        await supabase.from('products').delete().eq('id', id);
-      }
-    }
-    addLog('delete', 'product', id, `${soft ? 'Soft deleted' : 'Deleted'} product: ${id}`);
-    toast.success(`Product deleted successfully`);
-  }, [addLog, hasSupabaseConfig]);
-
-
-  const createDispatch = useCallback(async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
-    for (const item of items) {
-      const available = stock[item.productId]?.production || 0;
-      if (item.quantity > available) {
-        toast.error(`Insufficient stock for dispatch`);
-        return false;
-      }
-    }
-    const id = `d${Date.now()}`;
-    const today = new Date().toISOString().slice(0, 10);
-    const todayDispatches = dispatches.filter(d => d.date === today);
-    const tokenNumber = todayDispatches.length + 1;
-
-    const dispatch: Dispatch = { 
-      id, destination, date: today, 
-      status: 'confirmed', items,
-      tokenNumber,
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    
-    setDispatches(prev => [...prev, dispatch]);
-
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
-      if (error) {
-        console.error('Dispatch sync error:', error);
-        setDispatches(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
-      }
-    }
-
-    if (destination === 'walkin') {
-      const saleItems: SaleItem[] = items.map(i => {
-        const product = products.find(p => p.id === i.productId);
-        return { productId: i.productId, quantity: i.quantity, unitPrice: product?.price || 0 };
-      });
-      const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
-      const walkinSale: Sale = {
-        id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems,
-        total, paymentMethod: paymentMethod, 
-        customerName, customerPhone, isCreditPaid: paymentMethod === 'cash' || paymentMethod === 'card',
-        date: new Date().toISOString().slice(0, 10),
-        syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-      };
-      
-      setSales(prev => [...prev, walkinSale]);
-      if (isOnline && hasSupabaseConfig) {
-        const { error } = await supabase.from('sales').upsert([toDBSale(walkinSale)]);
-        if (error) {
-          console.error('Walk-in sale sync error:', error);
-          setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
-        }
-      }
-      return walkinSale.id;
-    }
-
-    addLog('create', 'dispatch', id, `Created dispatch to ${destination} (Token #${tokenNumber})`);
-    toast.success(`Dispatch recorded (Token #${tokenNumber})`);
-    return true;
-  }, [stock, products, dispatches, isOnline, addLog, hasSupabaseConfig]);
-
-  const payCreditSale = useCallback(async (id: string) => {
-    setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : s));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const sale = sales.find(s => s.id === id);
-      if (sale) {
-        await supabase.from('sales').upsert(toDBSale({ ...sale, isCreditPaid: true, syncStatus: 'synced' })).eq('id', id);
-      }
-    }
-    toast.success('Credit payment recorded');
-  }, [isOnline, sales, hasSupabaseConfig]);
-
-  const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
-    if (type === 'branch' && branch) {
-      for (const item of items) {
-        const available = stock[item.productId]?.[branch] || 0;
-        // Removed strict stock validation to allow "always available for selling"
-        // if (item.quantity > available) {
-        //   toast.error(`Insufficient stock at ${branch.replace('_', ' ')}`);
-        //   return false;
-        // }
-      }
-    }
-
-    const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
-    const id = `s${Date.now()}`;
-    const newSale: Sale = { 
-      id, type, branch, items, total, paymentMethod, 
-      date: new Date().toISOString().slice(0, 10),
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    
-    setSales(prev => [...prev, newSale]);
-
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
-      if (error) {
-        console.error('Sale sync error:', error);
-        setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
-      }
-    }
-
-    addLog('create', 'sale', id, `Sale of Rs. ${total.toFixed(2)} at ${branch || 'factory'}`);
-    toast.success(isOnline ? `Sale recorded: Rs. ${total.toFixed(2)}` : `Sale saved offline: Rs. ${total.toFixed(2)}`);
-    return id;
-  }, [stock, addLog, isOnline, hasSupabaseConfig]);
-
-  const refundSale = useCallback(async (id: string) => {
-    const sale = sales.find(s => s.id === id);
-    if (!sale) return false;
-    
-    setSales(prev => prev.filter(s => s.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('sales').delete().eq('id', id);
-    }
-    addLog('delete', 'sale', id, `Refunded/Deleted sale: ${id} at ${sale.branch || 'factory'}`);
-    toast.success(`Sale refunded successfully`);
-    return true;
-  }, [sales, addLog, isOnline, hasSupabaseConfig]);
-
-  const addExpense = useCallback(async (e: Omit<Expense, 'id'>) => {
-    const id = `e${Date.now()}`;
-    const newExpense: Expense = { 
-      ...e, 
-      id, 
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    setExpenses(prev => [...prev, newExpense]);
-    
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('expenses').upsert([toDBExpense(newExpense)]);
-      if (error) {
-        console.error('Expense sync error:', error);
-        setExpenses(prev => prev.map(exp => exp.id === id ? { ...exp, syncStatus: 'pending' } : exp));
-      }
-    }
-    
-    addLog('create', 'expense', id, `Expense: ${e.title} - Rs. ${e.amount}`);
-    toast.success(isOnline ? `Expense recorded: ${e.amount}` : `Expense saved offline: ${e.amount}`);
-  }, [addLog, isOnline, hasSupabaseConfig]);
-
-  const updateExpense = useCallback(async (id: string, updates: Partial<Expense>) => {
-    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : e));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const expense = expenses.find(e => e.id === id);
-      if (expense) {
-        await supabase.from('expenses').upsert(toDBExpense({ ...expense, ...updates, syncStatus: 'synced' })).eq('id', id);
-      }
-    }
-    addLog('update', 'expense', id, `Updated expense: ${id}`);
-    toast.success(`Expense updated successfully`);
-  }, [expenses, addLog, isOnline, hasSupabaseConfig]);
-
-  const deleteExpense = useCallback(async (id: string) => {
-    setExpenses(prev => prev.filter(e => e.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('expenses').delete().eq('id', id);
-    }
-    addLog('delete', 'expense', id, `Deleted expense: ${id}`);
-    toast.success(`Expense deleted successfully`);
-  }, [addLog, isOnline, hasSupabaseConfig]);
-
-  const addPurchase = useCallback(async (p: Omit<Purchase, 'id' | 'syncStatus'>) => {
-    const id = `pur${Date.now()}`;
-    const newPurchase: Purchase = {
-      ...p,
-      id,
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-
-    // 1. Add to purchases state
-    setPurchases(prev => [...prev, newPurchase]);
-
-    // 2. Update material stock automatically
-    setRawMaterials(prev => prev.map(m => 
-      m.id === p.materialId 
-        ? { ...m, currentStock: m.currentStock + p.quantity, lastUpdated: new Date().toISOString() } 
-        : m
-    ));
-
-    // 3. Sync to DB if online
-    if (isOnline && hasSupabaseConfig) {
-      try {
-        const { error } = await supabase.from('purchases').upsert([toDBPurchase(newPurchase)]);
-        if (error) throw error;
-
-        // Also update material stock in DB
-        const currentMaterial = rawMaterials.find(m => m.id === p.materialId);
-        if (currentMaterial) {
-          await supabase.from('raw_materials')
-            .upsert(toDBRawMaterial({ ...currentMaterial, currentStock: currentMaterial.currentStock + p.quantity, lastUpdated: new Date().toISOString() }))
-            .eq('id', p.materialId);
-        }
-      } catch (err) {
-        console.error('Purchase sync error:', err);
-        setPurchases(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
-      }
-    }
-
-    addLog('create', 'purchase', id, `Purchased ${p.quantity} from ${p.vendorName}`);
-    toast.success(`Purchase recorded and stock updated!`);
-  }, [addLog, isOnline, hasSupabaseConfig, rawMaterials]);
-
-  // RECIPES
-  const addRecipe = useCallback(async (r: Omit<Recipe, 'id' | 'syncStatus'>) => {
-    const id = `rec${Date.now()}`;
-    const newRecipe: Recipe = {
-      ...r,
-      id,
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    setRecipes(prev => [...prev, newRecipe]);
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('recipes').upsert([toDBRecipe(newRecipe)]);
-      if (error) {
-        console.error('Recipe sync error:', error);
-        setRecipes(prev => prev.map(rec => rec.id === id ? { ...rec, syncStatus: 'pending' } : rec));
-      }
-    }
-    toast.success(`Recipe saved!`);
-  }, [isOnline, hasSupabaseConfig]);
-
-  const updateRecipe = useCallback(async (id: string, updates: Partial<Recipe>) => {
-    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : r));
-    if (isOnline && hasSupabaseConfig) {
-      const recipe = recipes.find(r => r.id === id);
-      if (recipe) {
-        await supabase.from('recipes').upsert(toDBRecipe({ ...recipe, ...updates, syncStatus: 'synced' })).eq('id', id);
-      }
-    }
-    toast.success(`Recipe updated!`);
-  }, [recipes, isOnline, hasSupabaseConfig]);
-
-  const deleteRecipe = useCallback(async (id: string) => {
-    setRecipes(prev => prev.filter(r => r.id !== id));
-    if (isOnline && hasSupabaseConfig) {
-      await supabase.from('recipes').delete().eq('id', id);
-    }
-    toast.success(`Recipe deleted!`);
-  }, [isOnline, hasSupabaseConfig]);
-
-  const addRawMaterial = useCallback(async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
-    const id = `rm${Date.now()}`;
-    const newRM: RawMaterial = {
-      ...m,
-      id,
-      currentStock: 0,
-      isActive: true,
-      lastUpdated: new Date().toISOString()
-    };
-    setRawMaterials(prev => [...prev, newRM]);
-    if (navigator.onLine && hasSupabaseConfig) {
-      const { error } = await supabase.from('raw_materials').upsert([toDBRawMaterial(newRM)]);
-      if (error) console.error('Raw material sync error:', error);
-    }
-    addLog('create', 'raw_material', id, `Added raw material: ${m.name}`);
-    toast.success(`Raw material "${m.name}" added`);
-  }, [addLog, hasSupabaseConfig]);
-
-  const updateRawMaterial = useCallback(async (id: string, updates: Partial<RawMaterial>) => {
-    setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, ...updates, lastUpdated: new Date().toISOString() } : m));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const material = rawMaterials.find(m => m.id === id);
-      if (material) {
-        await supabase.from('raw_materials').upsert(toDBRawMaterial({ ...material, ...updates, lastUpdated: new Date().toISOString() })).eq('id', id);
-      }
-    }
-    addLog('update', 'raw_material', id, `Updated raw material: ${id}`);
-    toast.success(`Raw material updated`);
-  }, [rawMaterials, addLog, hasSupabaseConfig]);
-
-  const deleteRawMaterial = useCallback(async (id: string) => {
-    setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, isActive: false } : m));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('raw_materials').upsert({ id, is_active: false }).eq('id', id);
-    }
-    addLog('delete', 'raw_material', id, `Soft deleted raw material: ${id}`);
-    toast.success(`Raw material deleted`);
-  }, [addLog, hasSupabaseConfig]);
-
-  const adjustRawMaterialStock = useCallback(async (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => {
-    const material = rawMaterials.find(m => m.id === materialId);
-    if (!material) return false;
-
-    if (type === 'out' && material.currentStock < quantity) {
-      toast.error(`Insufficient stock for ${material.name}`);
-      return false;
-    }
-
-    const newStock = type === 'in' ? material.currentStock + quantity : material.currentStock - quantity;
-    const adjId = `rma${Date.now()}`;
-    const newAdj: RawMaterialAdjustment = {
-      id: adjId,
-      materialId,
-      type,
-      quantity,
-      reason,
-      date: new Date().toISOString().slice(0, 10),
-      userId: currentUser?.id || 'unknown',
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-
-    setRawMaterials(prev => prev.map(m => m.id === materialId ? { ...m, currentStock: newStock, lastUpdated: new Date().toISOString() } : m));
-    setRawMaterialAdjustments(prev => [...prev, newAdj]);
-
-    if (isOnline && hasSupabaseConfig) {
-      const { error: mError } = await supabase.from('raw_materials').upsert(toDBRawMaterial({ ...material, currentStock: newStock, lastUpdated: new Date().toISOString() })).eq('id', materialId);
-      const { error: aError } = await supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(newAdj)]);
-      
-      if (mError || aError) {
-        console.error('Adjustment sync error:', mError || aError);
-        setRawMaterialAdjustments(prev => prev.map(adj => adj.id === adjId ? { ...adj, syncStatus: 'pending' } : adj));
-      }
-    }
-
-    toast.success(`Stock adjusted for ${material.name}`);
-    return true;
-  }, [rawMaterials, currentUser, isOnline, hasSupabaseConfig]);
-
-  const adjustBranchStock = useCallback(async (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => {
-    const id = `bsa${Date.now()}`;
-    const newAdj: BranchStockAdjustment = {
-      id,
-      productId,
-      branch,
-      quantity, // this is the amount to SUBTRACT from the branch stock
-      reason,
-      date: new Date().toISOString().slice(0, 10),
-      userId: currentUser?.id || 'unknown'
-    };
-
-    setBranchStockAdjustments(prev => [...prev, newAdj]);
-    
-    if (isOnline && hasSupabaseConfig) {
-      await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(newAdj)]);
-    }
-    
-    addLog('adjust', 'branch_stock', productId, `Adjusted ${branch} stock by -${quantity}. Reason: ${reason}`);
-    toast.success(`Stock adjusted by -${quantity}`);
-  }, [currentUser, addLog, isOnline, hasSupabaseConfig]);
-
-  const addProduction = useCallback(async (productId: string, quantity: number, notes?: string) => {
-    const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
-    
-    // Check Recipe and calculate deductions
-    const recipe = recipes.find(r => r.productId === productId && r.isActive);
-    if (recipe) {
-      // PRE-CHECK: Ensure we have enough stock before starting deductions
-      for (const ing of recipe.ingredients) {
-        const material = rawMaterials.find(m => m.id === ing.materialId);
-        const needed = ing.quantity * quantity;
-        if (!material || material.currentStock < needed) {
-          toast.error(`Insufficient ${material?.name || 'Raw Material'}! Need ${needed}${material?.unit || ''}.`);
-          return false; // Prevent production
-        }
-      }
-
-      // EXECUTE DEDUCTIONS
-      for (const ing of recipe.ingredients) {
-        const needed = ing.quantity * quantity;
-        await adjustRawMaterialStock(ing.materialId, 'out', needed, `Auto-deducted for Production: ${batchId}`);
-      }
-    }
-
-    const id = `b${Date.now()}`;
-    const newBatch: ProductionBatch = { 
-      id, batchId, productId, quantity, 
-      date: new Date().toISOString().slice(0, 10), 
-      notes,
-      syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending'
-    };
-    
-    setBatches(prev => [...prev, newBatch]);
-
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
-      if (error) {
-        console.error('Production sync error:', error);
-        setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
-      }
-    }
-
-    addLog('create', 'production', id, `Produced ${quantity} units (Batch: ${batchId})`);
-    toast.success(isOnline ? `Production recorded: ${quantity} units` : `Production saved offline: ${quantity} units`);
-    return true;
-  }, [batches.length, addLog, isOnline, hasSupabaseConfig, recipes, rawMaterials, adjustRawMaterialStock]);
-
-  const updateProduction = useCallback(async (id: string, updates: Partial<ProductionBatch>) => {
-    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : b));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const batch = batches.find(b => b.id === id);
-      if (batch) {
-        await supabase.from('production_batches').upsert(toDBBatch({ ...batch, ...updates, syncStatus: 'synced' })).eq('id', id);
-      }
-    }
-    addLog('update', 'production', id, `Updated production batch: ${id}`);
-    toast.success(`Production batch updated successfully`);
-  }, [batches, addLog, isOnline, hasSupabaseConfig]);
-
-  const deleteProduction = useCallback(async (id: string) => {
-    setBatches(prev => prev.filter(b => b.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('production_batches').delete().eq('id', id);
-    }
-    addLog('delete', 'production', id, `Deleted production batch: ${id}`);
-    toast.success(`Production batch deleted successfully`);
-  }, [addLog, isOnline, hasSupabaseConfig]);
-
-  const getProductById = useCallback((id: string) => products.find(p => p.id === id), [products]);
-
-  const getInventorySnapshots = useCallback((): InventorySnapshot[] => {
-    return products.map(p => {
-      const s = stock[p.id] || { production: 0, branch_1: 0, branch_2: 0 };
-      const totalProduced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
-      const totalDispatched = dispatches.flatMap(d => d.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
-      const totalSold = sales.flatMap(sl => sl.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
-      return {
-        productId: p.id, totalProduced, totalDispatched, totalSold,
-        productionStock: s.production, branch1Stock: s.branch_1, branch2Stock: s.branch_2
-      };
-    });
-  }, [products, stock, batches, dispatches, sales]);
-
-  const getTodaySales = useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return sales.filter(s => s.date === today);
-  }, [sales]);
-
-  const getBranchStock = useCallback((branch: 'branch_1' | 'branch_2') => {
-    const dispatchedProductIds = new Set<string>();
-    dispatches.forEach(d => {
-      if (d.destination === branch) {
-        d.items.forEach(i => dispatchedProductIds.add(i.productId));
-      }
-    });
-    return products
-      .filter(p => dispatchedProductIds.has(p.id) || (stock[p.id]?.[branch] || 0) !== 0)
-      .map(p => ({ productId: p.id, stock: stock[p.id]?.[branch] || 0 }));
-  }, [products, stock, dispatches]);
-
-  const getProductionStock = useCallback(() => {
-    return products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })).filter(s => s.stock > 0);
-  }, [products, stock]);
-
-  const addStaffMember = useCallback(async (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => {
-    const id = `st-${Date.now()}`;
-    const newStaff: StaffMember = { ...s, id, isActive: true, createdAt: new Date().toISOString().slice(0, 10) };
-    setStaff(prev => [...prev, newStaff]);
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('staff_members').insert([toDBStaff(newStaff)]);
-    }
-    addLog('create', 'staff', id, `Added staff member: ${s.name}`);
-    toast.success(`Staff member "${s.name}" added`);
-  }, [addLog]);
-
-  const updateStaffMember = useCallback(async (id: string, updates: Partial<StaffMember>) => {
-    setStaff(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-    if (navigator.onLine && hasSupabaseConfig) {
-      const staffMember = staff.find(s => s.id === id);
-      if (staffMember) {
-        await supabase.from('staff_members').upsert(toDBStaff({ ...staffMember, ...updates })).eq('id', id);
-      }
-    }
-    addLog('update', 'staff', id, `Updated staff member: ${id}`);
-    toast.success(`Staff updated`);
-  }, [staff, addLog, hasSupabaseConfig]);
-
-  const deleteStaffMember = useCallback(async (id: string) => {
-    setStaff(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('staff_members').upsert({ id, is_active: false }).eq('id', id);
-    }
-    addLog('delete', 'staff', id, `Soft deleted staff member: ${id}`);
-    toast.success(`Staff member deleted`);
-  }, [addLog, hasSupabaseConfig]);
-
-  const addStaffDeduction = useCallback(async (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => {
-    const id = `sd-${Date.now()}`;
-    const newDeduction: StaffDeduction = { ...d, id, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
-    setStaffDeductions(prev => [...prev, newDeduction]);
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('staff_deductions').upsert([toDBDeduction(newDeduction)]);
-      if (error) {
-        console.error('Staff deduction sync error:', error);
-        setStaffDeductions(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
-      }
-    }
-    addLog('create', 'staff_deduction', id, `Deduction for staff ${d.staffId}: Rs. ${d.amount}`);
-    toast.success(`Deduction/Advance recorded`);
-  }, [addLog, isOnline, hasSupabaseConfig]);
-
-  const updateStaffDeduction = useCallback(async (id: string, updates: Partial<StaffDeduction>) => {
-    setStaffDeductions(prev => prev.map(d => d.id === id ? { ...d, ...updates, syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' } : d));
-    if (navigator.onLine && hasSupabaseConfig) {
-       const deduction = staffDeductions.find(d => d.id === id);
-       if (deduction) {
-         await supabase.from('staff_deductions').upsert(toDBDeduction({ ...deduction, ...updates, syncStatus: 'synced' })).eq('id', id);
-       }
-    }
-    toast.success(`Deduction updated`);
-  }, [staffDeductions, isOnline, hasSupabaseConfig]);
-
-  const deleteStaffDeduction = useCallback(async (id: string) => {
-    setStaffDeductions(prev => prev.filter(d => d.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('staff_deductions').delete().eq('id', id);
-    }
-    toast.success(`Deduction deleted`);
+    return () => { supabase.removeChannel(channel); };
   }, [hasSupabaseConfig]);
 
-  const createSalaryVoucher = useCallback(async (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => {
-    const id = `sv-${Date.now()}`;
-    const newVoucher: SalaryVoucher = { ...v, id, status: 'paid', syncStatus: isOnline && hasSupabaseConfig ? 'synced' : 'pending' };
-    setSalaryVouchers(prev => [...prev, newVoucher]);
-    if (isOnline && hasSupabaseConfig) {
-      const { error } = await supabase.from('salary_vouchers').upsert([toDBVoucher(newVoucher)]);
-      if (error) {
-        console.error('Salary voucher sync error:', error);
-        setSalaryVouchers(prev => prev.map(item => item.id === id ? { ...item, syncStatus: 'pending' } : item));
-      }
-    }
-    addLog('create', 'salary_voucher', id, `Salary paid to staff ${v.staffId}: Rs. ${v.amount}`);
-    toast.success(`Salary payment recorded`);
-  }, [addLog, isOnline, hasSupabaseConfig]);
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases]);
 
-  const deleteSalaryVoucher = useCallback(async (id: string) => {
-    setSalaryVouchers(prev => prev.filter(v => v.id !== id));
-    if (navigator.onLine && hasSupabaseConfig) {
-      await supabase.from('salary_vouchers').delete().eq('id', id);
-    }
-    toast.success(`Salary voucher deleted`);
-  }, []);
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ currentUser, selectedProfile }));
+  }, [currentUser, selectedProfile]);
 
-  const logout = async () => {
-    // Only clear auth state — NEVER touch business data (sales, expenses, etc.)
-    await supabase.auth.signOut();
-    setCurrentUser(null);
-    setSelectedProfile(null);
-    setIsProfileLocked(true);
-    localStorage.removeItem('bakewise_selected_profile');
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    // Business data in STORAGE_KEY is intentionally preserved
-    toast.success('Logged out successfully');
+  useEffect(() => {
+    const on = () => { setIsOnline(true); syncOfflineData(); fetchData(); };
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [syncOfflineData, fetchData]);
+
+  const addLog = useCallback(async (action: string, entity: string, entityId: string, details: string) => {
+    if (!currentUser) return;
+    const log: AuditLog = { id: `log-${Date.now()}`, action, entity, entityId, details, userId: currentUser.id, timestamp: new Date().toISOString() };
+    setAuditLogs(prev => [...prev, log]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('audit_logs').insert([toDBLog(log)]);
+  }, [currentUser, isOnline]);
+
+  const addProduct = async (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => {
+    const newP: Product = { ...p, id: `p${Date.now()}`, createdAt: new Date().toISOString(), isActive: true };
+    setProducts(prev => [...prev, newP]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('products').upsert([toDBProduct(newP)]);
+    addLog('create', 'product', newP.id, `Added product ${newP.name}`);
   };
 
+  const updateProduct = async (id: string, u: Partial<Product>) => {
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...u } : p));
+    const updated = products.find(p => p.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('products').upsert([toDBProduct({ ...updated, ...u })]);
+    addLog('update', 'product', id, `Updated product`);
+  };
 
-  const updateReceiptSettings = useCallback(async (settings: Partial<ReceiptSettings>) => {
-    const updatedSettings = { ...receiptSettings, ...settings, isLocked: true };
-    setReceiptSettings(updatedSettings);
-    
+  const deleteProduct = async (id: string) => {
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: false } : p));
+    if (isOnline && hasSupabaseConfig) await supabase.from('products').update({ is_active: false }).eq('id', id);
+    addLog('delete', 'product', id, `Soft deleted product`);
+  };
+
+  const addRawMaterial = async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
+    const newM: RawMaterial = { ...m, id: `rm${Date.now()}`, lastUpdated: new Date().toISOString(), isActive: true, currentStock: 0 };
+    setRawMaterials(prev => [...prev, newM]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('raw_materials').upsert([toDBRawMaterial(newM)]);
+    addLog('create', 'raw_material', newM.id, `Added material ${newM.name}`);
+  };
+
+  const updateRawMaterial = async (id: string, u: Partial<RawMaterial>) => {
+    setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, ...u, lastUpdated: new Date().toISOString() } : m));
+    const updated = rawMaterials.find(m => m.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('raw_materials').upsert([toDBRawMaterial({ ...updated, ...u, lastUpdated: new Date().toISOString() })]);
+  };
+
+  const deleteRawMaterial = async (id: string) => {
+    setRawMaterials(prev => prev.map(m => m.id === id ? { ...m, isActive: false } : m));
+    if (isOnline && hasSupabaseConfig) await supabase.from('raw_materials').update({ is_active: false }).eq('id', id);
+  };
+
+  const adjustRawMaterialStock = async (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => {
+    const id = `rma${Date.now()}`;
+    const adj: RawMaterialAdjustment = { id, materialId, type, quantity, reason, date: new Date().toISOString(), userId: currentUser?.id || 'system', syncStatus: isOnline ? 'synced' : 'pending' };
+    setRawMaterialAdjustments(prev => [...prev, adj]);
+    setRawMaterials(prev => prev.map(m => {
+      if (m.id === materialId) {
+        const newStock = type === 'in' ? m.currentStock + quantity : m.currentStock - quantity;
+        return { ...m, currentStock: newStock, lastUpdated: new Date().toISOString() };
+      }
+      return m;
+    }));
     if (isOnline && hasSupabaseConfig) {
-      try {
-        await supabase
-          .from('app_settings')
-          .upsert({ id: 'receipt_config', settings: updatedSettings, updated_at: new Date().toISOString() });
-      } catch (error) {
-        console.error('Failed to sync settings to cloud:', error);
+      const mat = rawMaterials.find(m => m.id === materialId);
+      if (mat) {
+        const newStock = type === 'in' ? mat.currentStock + quantity : mat.currentStock - quantity;
+        await Promise.all([
+          supabase.from('raw_material_adjustments').upsert([toDBRawAdjustment(adj)]),
+          supabase.from('raw_materials').update({ current_stock: newStock, last_updated: new Date().toISOString() }).eq('id', materialId)
+        ]);
       }
     }
-    
-    toast.success('Receipt information saved permanently to cloud');
-    addLog('update', 'receipt_settings', 'system', 'Locked and synced receipt information');
-  }, [addLog, isOnline, receiptSettings]);
+    return true;
+  };
+
+  const addRecipe = async (r: Omit<Recipe, 'id' | 'syncStatus'>) => {
+    const newR: Recipe = { ...r, id: `rcp${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    setRecipes(prev => [...prev, newR]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('recipes').upsert([toDBRecipe(newR)]);
+  };
+
+  const updateRecipe = async (id: string, u: Partial<Recipe>) => {
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
+    const updated = recipes.find(r => r.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('recipes').upsert([toDBRecipe({ ...updated, ...u })]);
+  };
+
+  const deleteRecipe = async (id: string) => {
+    setRecipes(prev => prev.filter(r => r.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('recipes').delete().eq('id', id);
+  };
+
+  const adjustBranchStock = async (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => {
+    const adj: BranchStockAdjustment = { id: `bsa${Date.now()}`, productId, branch, quantity, reason, date: new Date().toISOString(), userId: currentUser?.id || 'system' };
+    setBranchStockAdjustments(prev => [...prev, adj]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(adj)]);
+  };
+
+  const updateProduction = async (id: string, u: Partial<ProductionBatch>) => {
+    setBatches(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
+    const updated = batches.find(b => b.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('production_batches').upsert([toDBBatch({ ...updated, ...u })]);
+  };
+
+  const deleteProduction = async (id: string) => {
+    setBatches(prev => prev.filter(b => b.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('production_batches').delete().eq('id', id);
+  };
+
+  const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
+    const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+    const id = `s${Date.now()}`;
+    const newSale: Sale = { id, type, branch, items, total, paymentMethod, date: new Date().toISOString().slice(0, 10), syncStatus: isOnline ? 'synced' : 'pending' };
+    setSales(prev => [...prev, newSale]);
+    if (isOnline && hasSupabaseConfig) {
+      const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
+      if (error) setSales(prev => prev.map(s => s.id === id ? { ...s, syncStatus: 'pending' } : s));
+    }
+    addLog('create', 'sale', id, `Sale Rs. ${total}`);
+    return id;
+  }, [addLog, isOnline]);
+
+  const refundSale = async (id: string) => {
+    setSales(prev => prev.filter(s => s.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('sales').delete().eq('id', id);
+    addLog('refund', 'sale', id, `Refunded sale`);
+    return true;
+  };
+
+  const addExpense = async (e: Omit<Expense, 'id'>) => {
+    const newE: Expense = { ...e, id: `e${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    setExpenses(prev => [...prev, newE]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('expenses').upsert([toDBExpense(newE)]);
+  };
+
+  const updateExpense = async (id: string, u: Partial<Expense>) => {
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...u } : e));
+    const updated = expenses.find(e => e.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('expenses').upsert([toDBExpense({ ...updated, ...u })]);
+  };
+
+  const deleteExpense = async (id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('expenses').delete().eq('id', id);
+  };
+
+  const updateReceiptSettings = async (s: Partial<ReceiptSettings>) => {
+    const newS = { ...receiptSettings, ...s };
+    setReceiptSettings(newS);
+    if (isOnline && hasSupabaseConfig) await supabase.from('app_settings').upsert([{ id: 'receipt_config', settings: newS }]);
+  };
+
+  const addStaffMember = async (s: Omit<StaffMember, 'id' | 'isActive' | 'createdAt'>) => {
+    const newS: StaffMember = { ...s, id: `st${Date.now()}`, isActive: true, createdAt: new Date().toISOString() };
+    setStaff(prev => [...prev, newS]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('staff_members').upsert([toDBStaff(newS)]);
+  };
+
+  const updateStaffMember = async (id: string, u: Partial<StaffMember>) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
+    const updated = staff.find(s => s.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('staff_members').upsert([toDBStaff({ ...updated, ...u })]);
+  };
+
+  const deleteStaffMember = async (id: string) => {
+    setStaff(prev => prev.map(s => s.id === id ? { ...s, isActive: false } : s));
+    if (isOnline && hasSupabaseConfig) await supabase.from('staff_members').update({ is_active: false }).eq('id', id);
+  };
+
+  const addStaffDeduction = async (d: Omit<StaffDeduction, 'id' | 'syncStatus'>) => {
+    const newD: StaffDeduction = { ...d, id: `sd${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    setStaffDeductions(prev => [...prev, newD]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').upsert([toDBDeduction(newD)]);
+  };
+
+  const updateStaffDeduction = async (id: string, u: Partial<StaffDeduction>) => {
+    setStaffDeductions(prev => prev.map(d => d.id === id ? { ...d, ...u } : d));
+    const updated = staffDeductions.find(d => d.id === id);
+    if (updated && isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').upsert([toDBDeduction({ ...updated, ...u })]);
+  };
+
+  const deleteStaffDeduction = async (id: string) => {
+    setStaffDeductions(prev => prev.filter(d => d.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('staff_deductions').delete().eq('id', id);
+  };
+
+  const createSalaryVoucher = async (v: Omit<SalaryVoucher, 'id' | 'syncStatus' | 'status'>) => {
+    const newV: SalaryVoucher = { ...v, id: `sv${Date.now()}`, status: 'paid', syncStatus: isOnline ? 'synced' : 'pending' };
+    setSalaryVouchers(prev => [...prev, newV]);
+    if (isOnline && hasSupabaseConfig) await supabase.from('salary_vouchers').upsert([toDBVoucher(newV)]);
+  };
+
+  const deleteSalaryVoucher = async (id: string) => {
+    setSalaryVouchers(prev => prev.filter(v => v.id !== id));
+    if (isOnline && hasSupabaseConfig) await supabase.from('salary_vouchers').delete().eq('id', id);
+  };
+
+  const payCreditSale = async (id: string) => {
+    setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true } : s));
+    if (isOnline && hasSupabaseConfig) await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id);
+  };
+
+  const addPurchase = async (p: Omit<Purchase, 'id' | 'syncStatus'>) => {
+    const newP: Purchase = { ...p, id: `pur${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    setPurchases(prev => [...prev, newP]);
+    setRawMaterials(prev => prev.map(m => m.id === p.materialId ? { ...m, currentStock: m.currentStock + p.quantity } : m));
+    if (isOnline && hasSupabaseConfig) {
+      const mat = rawMaterials.find(m => m.id === p.materialId);
+      await Promise.all([
+        supabase.from('purchases').upsert([toDBPurchase(newP)]),
+        supabase.from('raw_materials').update({ current_stock: (mat?.currentStock || 0) + p.quantity }).eq('id', p.materialId)
+      ]);
+    }
+  };
 
   return (
     <AppContext.Provider value={{
-      currentUser,
-      selectedProfile,
-      isProfileLocked,
-      products,
-      rawMaterials,
-      rawMaterialAdjustments,
-      batches,
-      dispatches,
-      sales,
-      expenses,
-      auditLogs,
-      stock,
-      allUsers,
-      isOnline,
-      lastSyncTime,
-      isLoading,
-      addProduct,
-      updateProduct,
-      deleteProduct,
-      addRawMaterial,
-      updateRawMaterial,
-      deleteRawMaterial,
-      adjustRawMaterialStock,
-      branchStockAdjustments,
-      adjustBranchStock,
-      addProduction,
-      updateProduction,
-      deleteProduction,
-      createDispatch,
-      createSale,
-      refundSale,
-      addExpense,
-      updateExpense,
-      deleteExpense,
-      getProductById,
-      getInventorySnapshots,
-      getTodaySales,
-      getBranchStock,
-      getProductionStock,
-      clearSales,
-      clearAllReportData,
-      selectProfile,
-      verifyPin,
-      lockProfile,
-      switchUser,
-      updateUserRole,
-      updateUserPin,
-      createStaffMember,
-      forceSync,
-      seedDatabase,
-      logout,
-      receiptSettings,
-      updateReceiptSettings,
-      staff,
-      staffDeductions,
-      salaryVouchers,
-      addStaffMember,
-      updateStaffMember,
-      deleteStaffMember,
-      addStaffDeduction,
-      updateStaffDeduction,
-      deleteStaffDeduction,
-      createSalaryVoucher,
-      deleteSalaryVoucher,
+      currentUser, selectedProfile, isProfileLocked, products, rawMaterials, rawMaterialAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, allUsers, isOnline, lastSyncTime, isLoading,
+      addProduct, updateProduct, deleteProduct,
+      addRawMaterial, updateRawMaterial, deleteRawMaterial, adjustRawMaterialStock,
+      addRecipe, updateRecipe, deleteRecipe,
+      adjustBranchStock, branchStockAdjustments,
+      addProduction, updateProduction, deleteProduction,
+      createDispatch, createSale, refundSale,
+      addExpense, updateExpense, deleteExpense,
+      getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => s.date === new Date().toISOString().slice(0, 10)),
+      getBranchStock: (b) => products.map(p => ({ productId: p.id, stock: stock[p.id]?.[b] || 0 })),
+      getProductionStock: () => products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })),
+      clearSales: (r) => {
+        const today = new Date().toISOString().slice(0, 10);
+        if (r === 'today') setSales(prev => prev.filter(s => s.date !== today));
+        else if (r === 'all') setSales([]);
+      },
+      clearAllReportData: () => { setSales([]); setExpenses([]); setBatches([]); setDispatches([]); },
+      selectProfile, verifyPin, lockProfile, switchUser,
+      updateUserRole: async (id, r, b) => { if (isOnline) await supabase.from('profiles').update({ role: r, branch_id: b }).eq('id', id); fetchAllUsers(); },
+      updateUserPin: async (id, p) => { if (isOnline) await supabase.from('profiles').update({ pin_code: p }).eq('id', id); fetchAllUsers(); },
+      createStaffMember: async (n, e, p, r, b, pi) => { if (isOnline) await supabase.from('profiles').insert([{ name: n, email: e, role: r, branch_id: b, pin_code: pi }]); fetchAllUsers(); },
+      logout: async () => { await supabase.auth.signOut(); setCurrentUser(null); setSelectedProfile(null); },
+      forceSync, seedDatabase: async () => { fetchData(); },
+      receiptSettings, updateReceiptSettings,
+      staff, staffDeductions, salaryVouchers,
+      addStaffMember, updateStaffMember, deleteStaffMember,
+      addStaffDeduction, updateStaffDeduction, deleteStaffDeduction,
+      createSalaryVoucher, deleteSalaryVoucher,
       payCreditSale,
-      purchases,
-      addPurchase,
-      addRecipe,
-      updateRecipe,
-      deleteRecipe,
+      purchases, addPurchase,
       hasSupabaseConfig
     }}>
       {children}
