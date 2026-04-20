@@ -400,6 +400,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const purchasesRef = React.useRef(purchases);
   const recipesRef = React.useRef(recipes);
   const rawMaterialAdjustmentsRef = React.useRef(rawMaterialAdjustments);
+  const receiptSettingsRef = React.useRef(receiptSettings);
 
   useEffect(() => { salesRef.current = sales; }, [sales]);
   useEffect(() => { batchesRef.current = batches; }, [batches]);
@@ -410,6 +411,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { purchasesRef.current = purchases; }, [purchases]);
   useEffect(() => { recipesRef.current = recipes; }, [recipes]);
   useEffect(() => { rawMaterialAdjustmentsRef.current = rawMaterialAdjustments; }, [rawMaterialAdjustments]);
+  useEffect(() => { receiptSettingsRef.current = receiptSettings; }, [receiptSettings]);
 
   const syncOfflineData = useCallback(async () => {
     if (!hasSupabaseConfig || !navigator.onLine) return;
@@ -523,7 +525,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
     if (settingsData?.settings) {
       const remote = settingsData.settings;
-      const localSavedAt = receiptSettings._savedAt || 0;
+      const localSavedAt = (receiptSettingsRef.current as any)._savedAt || 0;
       const remoteSavedAt = remote._savedAt || 0;
       // Only overwrite if remote is newer than local
       if (remoteSavedAt >= localSavedAt) {
