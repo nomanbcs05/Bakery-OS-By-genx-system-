@@ -323,8 +323,18 @@ BEGIN
   END IF;
 END $$;
 
+-- 16b. Recipes Table (Missing — referenced in realtime publication)
+CREATE TABLE IF NOT EXISTS recipes (
+  id TEXT PRIMARY KEY,
+  product_id TEXT REFERENCES products(id),
+  ingredients JSONB DEFAULT '[]',
+  is_active BOOLEAN DEFAULT true,
+  sync_status TEXT DEFAULT 'synced'
+);
+
 -- Forcefully refresh the PostgREST API schema cache
 NOTIFY pgrst, 'reload schema';
+
 
 -- 16. App Settings Table
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -380,3 +390,6 @@ ALTER TABLE staff_deductions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_vouchers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings DISABLE ROW LEVEL SECURITY;
+
+-- Final schema cache refresh to fix "column not found" errors
+NOTIFY pgrst, 'reload schema';
