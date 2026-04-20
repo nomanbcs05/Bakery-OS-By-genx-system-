@@ -376,8 +376,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     branch2Cashier: '',
     branch1Address: 'Jam sahib road, nawabshah',
     branch1Phone: '03297040402',
-    branch2Address: 'Main chowk jam sahib road nawabshah',
-    branch2Phone: '03093660360',
+    branch2Address: 'MAIN CHOWK JAM SAHIB NAWABSHAH',
+    branch2Phone: '+92 309 3660360',
     dispatchAddress: 'Factory Gate, Nawabshah',
     dispatchPhone: '03297040402',
     isLocked: false
