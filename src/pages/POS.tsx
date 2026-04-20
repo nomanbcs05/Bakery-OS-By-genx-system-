@@ -162,7 +162,7 @@ export default function POS({ branch }: POSProps) {
                   <p className="font-semibold text-sm text-foreground">{p.name}</p>
                   <p className="text-primary font-bold mt-1">Rs. {p.price.toFixed(2)}</p>
                   <Badge variant={avail <= 0 ? "destructive" : "secondary"} className="mt-2 text-xs">
-                    {avail} in stock
+                    {Number.isInteger(avail) ? avail : Number(avail).toFixed(2)} in stock
                   </Badge>
                 </button>
               );
