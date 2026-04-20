@@ -527,8 +527,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const remote = settingsData.settings;
       const localSavedAt = (receiptSettingsRef.current as any)._savedAt || 0;
       const remoteSavedAt = remote._savedAt || 0;
-      // Only overwrite if remote is newer than local
-      if (remoteSavedAt >= localSavedAt) {
+      // Only overwrite if remote is strictly newer than local
+      if (remoteSavedAt > localSavedAt) {
         setReceiptSettings(prev => ({ ...prev, ...remote, isLocked: false }));
       }
     }
@@ -714,8 +714,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               setReceiptSettings(prev => {
                 const localSavedAt = (prev as any)._savedAt || 0;
                 const remoteSavedAt = remote._savedAt || 0;
-                // Only overwrite if remote is newer than local
-                if (remoteSavedAt >= localSavedAt) {
+                // Only overwrite if remote is strictly newer than local
+                if (remoteSavedAt > localSavedAt) {
                   return { ...prev, ...remote, isLocked: false };
                 }
                 return prev;
