@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator } from 'lucide-react';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import ReceiptDialog from '@/components/ReceiptDialog';
 
 interface POSProps {
@@ -36,6 +38,24 @@ export default function POS({ branch }: POSProps) {
     saleId: '',
     date: '',
   });
+
+  const [amountPrompt, setAmountPrompt] = useState<{ open: boolean; productId: string; amount: string }>({
+    open: false,
+    productId: '',
+    amount: ''
+  });
+
+  const handleAmountConfirm = () => {
+    const amountVal = parseFloat(amountPrompt.amount);
+    if (!isNaN(amountVal) && amountVal > 0) {
+      setCart(prev => prev.map(i => {
+        if (i.productId !== amountPrompt.productId) return i;
+        const newQty = amountVal / i.unitPrice;
+        return { ...i, quantity: newQty };
+      }));
+    }
+    setAmountPrompt({ open: false, productId: '', amount: '' });
+  };
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
   
@@ -171,13 +191,26 @@ export default function POS({ branch }: POSProps) {
                 <div key={item.productId} className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{product?.name}</p>
-                    <p className="text-xs text-muted-foreground">${item.unitPrice.toFixed(2)} each</p>
+                    <p className="text-xs text-muted-foreground">Rs. {item.unitPrice.toFixed(2)} each</p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {product?.unit?.toLowerCase() === 'kg' && (
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-7 w-7 text-primary" 
+                        onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
+                        title="Enter exact price amount"
+                      >
+                        <Calculator className="h-3 w-3" />
+                      </Button>
+                    )}
                     <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                    <span className="w-8 text-center text-sm font-medium">
+                      {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(3)}
+                    </span>
                     <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -221,6 +254,32 @@ export default function POS({ branch }: POSProps) {
         date={receiptData.date}
         autoPrint={true}
       />
+
+      <Dialog open={amountPrompt.open} onOpenChange={(open) => !open && setAmountPrompt(prev => ({ ...prev, open: false }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Amount</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="amount">Amount (Rs.)</Label>
+              <Input 
+                id="amount" 
+                type="number" 
+                placeholder="e.g. 100" 
+                value={amountPrompt.amount}
+                onChange={e => setAmountPrompt(prev => ({ ...prev, amount: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleAmountConfirm()}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAmountPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            <Button onClick={handleAmountConfirm}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
