@@ -1160,12 +1160,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => s.date === new Date().toISOString().slice(0, 10)),
       getBranchStock: (b) => products.map(p => ({ productId: p.id, stock: stock[p.id]?.[b] || 0 })),
       getProductionStock: () => products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })),
-      clearSales: (r) => {
-        const today = new Date().toISOString().slice(0, 10);
-        if (r === 'today') setSales(prev => prev.filter(s => s.date !== today));
-        else if (r === 'all') setSales([]);
+      clearSales: async (r) => {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+        let toDelete: string[] = [];
+        if (r === 'today') {
+          toDelete = sales.filter(s => s.date && s.date.split('T')[0] === today).map(s => s.id);
+          setSales(prev => prev.filter(s => !s.date || s.date.split('T')[0] !== today));
+        } else if (r === 'weekly') {
+          const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+          const weekStr = weekAgo.toISOString();
+          toDelete = sales.filter(s => s.date && s.date >= weekStr).map(s => s.id);
+          setSales(prev => prev.filter(s => !s.date || s.date < weekStr));
+        } else if (r === 'monthly') {
+          const monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth() - 1);
+          const monthStr = monthAgo.toISOString();
+          toDelete = sales.filter(s => s.date && s.date >= monthStr).map(s => s.id);
+          setSales(prev => prev.filter(s => !s.date || s.date < monthStr));
+        } else if (r === 'all') {
+          toDelete = sales.map(s => s.id);
+          setSales([]);
+        }
+        // Also delete from Supabase
+        if (toDelete.length > 0 && isOnline && hasSupabaseConfig) {
+          try {
+            for (let i = 0; i < toDelete.length; i += 50) {
+              const batch = toDelete.slice(i, i + 50);
+              await supabase.from('sales').delete().in('id', batch);
+            }
+          } catch (err) { console.error('Failed to delete sales from cloud:', err); }
+        }
       },
-      clearAllReportData: () => { setSales([]); setExpenses([]); setBatches([]); setDispatches([]); },
+      clearAllReportData: async () => {
+        const saleIds = sales.map(s => s.id);
+        const expenseIds = expenses.map(e => e.id);
+        const batchIds = batches.map(b => b.id);
+        const dispatchIds = dispatches.map(d => d.id);
+        setSales([]); setExpenses([]); setBatches([]); setDispatches([]);
+        if (isOnline && hasSupabaseConfig) {
+          try {
+            if (saleIds.length) await supabase.from('sales').delete().in('id', saleIds);
+            if (expenseIds.length) await supabase.from('expenses').delete().in('id', expenseIds);
+            if (batchIds.length) await supabase.from('production_batches').delete().in('id', batchIds);
+            if (dispatchIds.length) await supabase.from('dispatches').delete().in('id', dispatchIds);
+          } catch (err) { console.error('Failed to clear cloud data:', err); }
+        }
+      },
       selectProfile, verifyPin, lockProfile, switchUser,
       updateUserRole: async (id, r, b) => { if (isOnline) await supabase.from('profiles').update({ role: r, branch_id: b }).eq('id', id); fetchAllUsers(); },
       updateUserPin: async (id, p) => { if (isOnline) await supabase.from('profiles').update({ pin_code: p }).eq('id', id); fetchAllUsers(); },
