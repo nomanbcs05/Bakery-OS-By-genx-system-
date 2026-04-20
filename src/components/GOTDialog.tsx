@@ -171,7 +171,7 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
         <div className="text-center mb-4">
           <div className="text-[10pt]">{dateStr} | {timeStr}</div>
           {tokenNumber && (
-            <div className="text-[20pt] font-black underline my-1">
+            <div className="text-[28pt] font-black underline my-1">
               TOKEN #: {tokenNumber}
             </div>
           )}
