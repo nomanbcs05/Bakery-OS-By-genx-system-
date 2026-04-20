@@ -521,7 +521,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
 
     const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
-    if (settingsData?.settings) setReceiptSettings(prev => ({ ...prev, ...settingsData.settings, isLocked: true }));
+    if (settingsData?.settings) {
+      const remote = settingsData.settings;
+      const localSavedAt = receiptSettings._savedAt || 0;
+      const remoteSavedAt = remote._savedAt || 0;
+      // Only overwrite if remote is newer than local
+      if (remoteSavedAt >= localSavedAt) {
+        setReceiptSettings(prev => ({ ...prev, ...remote, isLocked: false }));
+      }
+    }
 
     setLastSyncTime(new Date().toISOString());
     setIsLoading(false);
@@ -700,7 +708,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
             const data = p.new as any;
             if (data.id === 'receipt_config' && data.settings) {
-              setReceiptSettings(prev => ({ ...prev, ...data.settings, isLocked: true }));
+              const remote = data.settings;
+              setReceiptSettings(prev => {
+                const localSavedAt = (prev as any)._savedAt || 0;
+                const remoteSavedAt = remote._savedAt || 0;
+                // Only overwrite if remote is newer than local
+                if (remoteSavedAt >= localSavedAt) {
+                  return { ...prev, ...remote, isLocked: false };
+                }
+                return prev;
+              });
             }
           }
         })
@@ -998,7 +1015,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const updateReceiptSettings = async (s: Partial<ReceiptSettings>) => {
-    const newS = { ...receiptSettings, ...s };
+    const now = Date.now();
+    const newS = { ...receiptSettings, ...s, _savedAt: now };
     setReceiptSettings(newS);
     if (isOnline && hasSupabaseConfig) {
       try { await supabase.from('app_settings').upsert([{ id: 'receipt_config', settings: newS }]); } catch (err) { console.error('Settings sync error'); }
