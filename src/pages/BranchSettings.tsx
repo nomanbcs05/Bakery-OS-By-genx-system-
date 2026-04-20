@@ -64,7 +64,7 @@ export default function BranchSettings() {
     }
   };
 
-  const isLocked = receiptSettings.isLocked;
+  const isLocked = false; // Branch staff can always edit branch settings
 
   return (
     <div className="space-y-6 animate-fade-in">
