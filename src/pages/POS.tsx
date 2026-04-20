@@ -209,7 +209,7 @@ export default function POS({ branch }: POSProps) {
                       <Minus className="h-3 w-3" />
                     </Button>
                     <span className="w-8 text-center text-sm font-medium">
-                      {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(3)}
+                      {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
                     </span>
                     <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
                       <Plus className="h-3 w-3" />
