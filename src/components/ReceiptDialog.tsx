@@ -94,8 +94,8 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       padding: 2pt 0;
       font-size: 10.5pt;
     }
-    .w-qty { width: 12%; text-align: left; }
-    .w-item { width: 45%; text-align: left; padding: 0 2pt; font-weight: bold; overflow-wrap: break-word; }
+    .w-qty { width: 17%; text-align: left; }
+    .w-item { width: 40%; text-align: left; padding: 0 2pt; font-weight: bold; overflow-wrap: break-word; }
     .w-rate { width: 18%; text-align: right; }
     .w-amount { width: 25%; text-align: right; font-weight: bold; }
     .item-row { display: flex; padding: 2pt 0; align-items: flex-start; line-height: 1.1; width: 100%; }
@@ -315,7 +315,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <div className="min-h-[40px] border-b-1.5pt border-black">
             {items.map((item, i) => (
               <div key={i} className="item-row text-[10.5pt]">
-                <div className="w-qty font-bold">{Number.isInteger(item.quantity) ? item.quantity : Number(item.quantity).toFixed(3)}</div>
+                <div className="w-qty font-bold">{Number.isInteger(item.quantity) ? item.quantity : Number(item.quantity).toFixed(2)}</div>
                 <div className="w-item uppercase">{item.name}</div>
                 <div className="w-rate">{item.unitPrice}</div>
                 <div className="w-amount font-bold">{Number(Number(item.quantity * item.unitPrice).toFixed(2))}</div>
