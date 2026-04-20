@@ -315,10 +315,10 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
           <div className="min-h-[40px] border-b-1.5pt border-black">
             {items.map((item, i) => (
               <div key={i} className="item-row text-[10.5pt]">
-                <div className="w-qty font-bold">{item.quantity}</div>
+                <div className="w-qty font-bold">{Number.isInteger(item.quantity) ? item.quantity : Number(item.quantity).toFixed(3)}</div>
                 <div className="w-item uppercase">{item.name}</div>
                 <div className="w-rate">{item.unitPrice}</div>
-                <div className="w-amount font-bold">{item.quantity * item.unitPrice}</div>
+                <div className="w-amount font-bold">{Number(Number(item.quantity * item.unitPrice).toFixed(2))}</div>
               </div>
             ))}
           </div>
