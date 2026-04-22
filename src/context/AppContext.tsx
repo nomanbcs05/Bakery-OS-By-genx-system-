@@ -20,6 +20,7 @@ const sampleProducts: Product[] = [
   { id: 'p5', name: 'Bombay Chocolate', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
   { id: 'p6', name: 'Bombay Coffee', category: 'Cakes', price: 600, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
   { id: 'p7', name: 'Brownie Cake', category: 'Cakes', price: 700, unit: 'pound', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p_c120', name: 'Cake 120', category: 'Cakes', price: 120, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
   
   // M.A FROZEN ITEMS
   { id: 'p8', name: 'Plain Paratha (5 PC)', category: 'M.A Frozen Items', price: 180, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
@@ -45,6 +46,11 @@ const sampleProducts: Product[] = [
   { id: 'p24', name: 'Bakery bread', category: 'Cupcakes & Breads', price: 160, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
   { id: 'p25', name: 'Pita bread', category: 'Cupcakes & Breads', price: 100, unit: 'pkt', isActive: true, createdAt: '2026-04-11' },
   { id: 'p26', name: 'Burger buns', category: 'Cupcakes & Breads', price: 25, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  { id: 'p_b100', name: 'Bread 100', category: 'Cupcakes & Breads', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
+  { id: 'p_b50', name: 'Bread 50', category: 'Cupcakes & Breads', price: 50, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
+  { id: 'p_b80', name: 'Bread 80', category: 'Cupcakes & Breads', price: 80, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
+  { id: 'p_b120', name: 'Bread 120', category: 'Cupcakes & Breads', price: 120, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
+  { id: 'p_cup40', name: 'Cupcake 40', category: 'Cupcakes & Breads', price: 40, unit: 'pc', isActive: true, createdAt: '2026-04-22' },
   
   // PASTERIES
   { id: 'p27', name: 'Bombay Chocolate pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
@@ -57,6 +63,7 @@ const sampleProducts: Product[] = [
   { id: 'p34', name: 'Brownie', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
   { id: 'p35', name: 'Chocolate cream puff', category: 'Pasteries', price: 80, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
 ];
+
 
 const sampleRawMaterials: RawMaterial[] = [
   { id: 'rm1', name: 'Flour', category: 'Dry', unit: 'kg', currentStock: 250, minStockLevel: 50, isActive: true, lastUpdated: '2026-04-01' },

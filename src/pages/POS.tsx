@@ -149,6 +149,28 @@ export default function POS({ branch }: POSProps) {
               ))}
             </div>
           </div>
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              <Plus className="h-4 w-4" /> Quick Items
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+              {['p_b100', 'p_b50', 'p_b80', 'p_b120', 'p_c120', 'p_cup40'].map(id => {
+                const p = getProductById(id);
+                if (!p) return null;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p.id)}
+                    className="bg-white dark:bg-card border-2 border-primary/10 rounded-xl p-3 text-left hover:border-primary hover:shadow-lg transition-all active:scale-95 group"
+                  >
+                    <p className="font-semibold text-[11px] text-muted-foreground group-hover:text-primary transition-colors">{p.name}</p>
+                    <p className="text-primary font-bold text-lg leading-tight">Rs. {p.price}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="pos-grid">
             {availableProducts.map(p => {
               const avail = p.stock;
