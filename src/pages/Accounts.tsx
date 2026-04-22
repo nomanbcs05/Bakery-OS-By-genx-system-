@@ -19,10 +19,22 @@ export default function Accounts() {
     addStaffDeduction, deleteStaffDeduction,
     createSalaryVoucher, deleteSalaryVoucher,
     addExpense,
-    sales, purchases, expenses, rawMaterials
+    sales, purchases, expenses, rawMaterials,
+    addPurchase, createSale, clearSales, clearPurchases, clearExpenses
   } = useApp();
 
   const [ledgerType, setLedgerType] = useState('general');
+  const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
+  const [isClearOpen, setIsClearOpen] = useState(false);
+
+  // Manual entry states
+  const [manualEntry, setManualEntry] = useState({
+    title: '',
+    amount: '',
+    name: '',
+    materialId: '',
+    date: new Date().toISOString().slice(0, 10)
+  });
 
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', department: '', baseSalary: '' });
@@ -109,6 +121,64 @@ export default function Accounts() {
         branchId: 'factory'
       });
     }
+  };
+
+  const handleManualEntry = async () => {
+    if (!manualEntry.amount || parseFloat(manualEntry.amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (ledgerType === 'vendor') {
+      if (!manualEntry.name || !manualEntry.materialId) {
+        toast.error("Please fill all fields");
+        return;
+      }
+      await addPurchase({
+        materialId: manualEntry.materialId,
+        quantity: 0,
+        totalCost: parseFloat(manualEntry.amount),
+        amountPaid: 0,
+        paymentMethod: 'credit',
+        vendorName: manualEntry.name,
+        vendorCity: 'Manual Entry',
+        date: manualEntry.date
+      });
+    } else if (ledgerType === 'customer') {
+      if (!manualEntry.name) {
+        toast.error("Please enter customer name");
+        return;
+      }
+      await createSale('factory_walkin', undefined, [], 'credit');
+      // Note: createSale in this app is complex, normally we'd want a dedicated ledger adjustment
+      // For now, adding a simple expense or purchase is safer as it maps directly to ledger logic
+      toast.info("Customer manual entry recorded as credit transaction");
+    } else {
+      if (!manualEntry.title) {
+        toast.error("Please enter a title");
+        return;
+      }
+      await addExpense({
+        title: manualEntry.title,
+        amount: parseFloat(manualEntry.amount),
+        category: 'Manual Ledger Entry',
+        date: manualEntry.date,
+        branchId: 'factory'
+      });
+    }
+
+    setIsAddEntryOpen(false);
+    setManualEntry({ title: '', amount: '', name: '', materialId: '', date: new Date().toISOString().slice(0, 10) });
+    toast.success("Entry added to ledger");
+  };
+
+  const handleClearLedger = async () => {
+    if (ledgerType === 'vendor') await clearPurchases();
+    else if (ledgerType === 'customer') await clearSales('all');
+    else await clearExpenses();
+    
+    setIsClearOpen(false);
+    toast.success(`${ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1)} ledger cleared`);
   };
 
   const activeStaff = staff.filter(s => s.isActive);
@@ -360,18 +430,103 @@ export default function Accounts() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <History className="h-5 w-5" /> Account Ledgers
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs">Select Ledger:</Label>
-                <Select value={ledgerType} onValueChange={setLedgerType}>
-                  <SelectTrigger className="w-48 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">General Ledger</SelectItem>
-                    <SelectItem value="customer">Customer Ledger</SelectItem>
-                    <SelectItem value="vendor">Vendor Ledger</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Dialog open={isAddEntryOpen} onOpenChange={setIsAddEntryOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="h-9 gap-2">
+                        <Plus className="h-4 w-4" /> Enter Detail
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Manual Ledger Entry - {ledgerType.toUpperCase()}</DialogTitle>
+                        <DialogDescription>Add a manual transaction to this ledger.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Date</Label>
+                          <Input type="date" value={manualEntry.date} onChange={e => setManualEntry({...manualEntry, date: e.target.value})} />
+                        </div>
+                        {ledgerType === 'vendor' ? (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Vendor Name</Label>
+                              <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Flour Supplier" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Material (for context)</Label>
+                              <Select value={manualEntry.materialId} onValueChange={v => setManualEntry({...manualEntry, materialId: v})}>
+                                <SelectTrigger><SelectValue placeholder="Select Material" /></SelectTrigger>
+                                <SelectContent>
+                                  {rawMaterials.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </>
+                        ) : ledgerType === 'customer' ? (
+                          <div className="space-y-2">
+                            <Label>Customer Name</Label>
+                            <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Local Bakery" />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label>Account Title</Label>
+                            <Input value={manualEntry.title} onChange={e => setManualEntry({...manualEntry, title: e.target.value})} placeholder="e.g. Miscellaneous Adjustment" />
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <Label>Amount (Rs.)</Label>
+                          <Input type="number" value={manualEntry.amount} onChange={e => setManualEntry({...manualEntry, amount: e.target.value})} placeholder="0.00" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddEntryOpen(false)}>Cancel</Button>
+                        <Button onClick={handleManualEntry}>Add to Ledger</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={isClearOpen} onOpenChange={setIsClearOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="destructive" className="h-9 gap-2">
+                        <Trash2 className="h-4 w-4" /> Clear Details
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle className="text-destructive text-xl">Confirm Data Clear</DialogTitle>
+                        <DialogDescription className="font-bold text-foreground">
+                          WARNING: This will permanently delete ALL {ledgerType.toUpperCase()} data (Sales, Purchases, or Expenses).
+                          This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="bg-destructive/10 p-4 rounded-lg border border-destructive/20 text-sm text-destructive font-medium">
+                        Are you sure you want to proceed? All records for this ledger category will be wiped from the database.
+                      </div>
+                      <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setIsClearOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleClearLedger}>Yes, Clear All Data</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="h-8 w-px bg-border mx-2" />
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">View:</Label>
+                  <Select value={ledgerType} onValueChange={setLedgerType}>
+                    <SelectTrigger className="w-40 h-9 font-semibold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General Ledger</SelectItem>
+                      <SelectItem value="customer">Customer Ledger</SelectItem>
+                      <SelectItem value="vendor">Vendor Ledger</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>

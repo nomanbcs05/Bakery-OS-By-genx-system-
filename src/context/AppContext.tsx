@@ -169,6 +169,8 @@ interface AppContextType extends AppState {
   deleteSalaryVoucher: (id: string) => Promise<void>;
   payCreditSale: (id: string) => Promise<void>;
   addPurchase: (p: Omit<Purchase, 'id' | 'syncStatus'>) => Promise<void>;
+  clearPurchases: () => Promise<void>;
+  clearExpenses: () => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -1229,6 +1231,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createSalaryVoucher, deleteSalaryVoucher,
       payCreditSale,
       purchases, addPurchase,
+      clearPurchases: async () => {
+        const ids = purchases.map(p => p.id);
+        setPurchases([]);
+        if (ids.length && isOnline && hasSupabaseConfig) {
+          try { await supabase.from('purchases').delete().in('id', ids); } catch (err) { console.error(err); }
+        }
+      },
+      clearExpenses: async () => {
+        const ids = expenses.map(e => e.id);
+        setExpenses([]);
+        if (ids.length && isOnline && hasSupabaseConfig) {
+          try { await supabase.from('expenses').delete().in('id', ids); } catch (err) { console.error(err); }
+        }
+      },
       hasSupabaseConfig
     }}>
       {children}
