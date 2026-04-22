@@ -364,3 +364,28 @@ export interface DBPurchase {
   date: string;
   sync_status: 'synced' | 'pending';
 }
+export interface LedgerEntry {
+  id: string;
+  date: string;
+  accountHead: string;
+  accountType: 'Income' | 'Expense' | 'Asset' | 'Liability';
+  debit: number;
+  credit: number;
+  name?: string;
+  station?: string;
+  category: 'general' | 'customer' | 'vendor';
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface DBLedgerEntry {
+  id: string;
+  date: string;
+  account_head: string;
+  account_type: string;
+  debit: number;
+  credit: number;
+  name?: string;
+  station?: string;
+  category: string;
+  sync_status: 'synced' | 'pending';
+}

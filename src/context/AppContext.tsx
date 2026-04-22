@@ -135,7 +135,7 @@ interface AppContextType extends AppState {
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<string | boolean>;
-  createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => Promise<string | false> | string | false;
+  createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => Promise<string | boolean>;
   refundSale: (id: string) => Promise<boolean>;
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>;
   updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
@@ -172,7 +172,9 @@ interface AppContextType extends AppState {
   clearPurchases: () => Promise<void>;
   clearExpenses: () => Promise<void>;
   clearSalaryVouchers: () => Promise<void>;
-  clearStaffDeductions: () => Promise<void>;
+  ledgerEntries: LedgerEntry[];
+  addLedgerEntry: (entry: Omit<LedgerEntry, 'id' | 'syncStatus'>) => Promise<void>;
+  clearLedgerEntries: (category: 'general' | 'customer' | 'vendor') => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -232,6 +234,18 @@ const fromDBRecipe = (r: DBRecipe): Recipe => ({
   id: r.id, productId: r.product_id, ingredients: r.ingredients || [], isActive: r.is_active, syncStatus: r.sync_status || 'synced'
 });
 
+const fromDBLedgerEntry = (l: DBLedgerEntry): LedgerEntry => ({
+  id: l.id, date: l.date, accountHead: l.account_head, accountType: l.account_type as any, 
+  debit: l.debit, credit: l.credit, name: l.name, station: l.station, 
+  category: l.category as any, syncStatus: l.sync_status || 'synced'
+});
+
+const toDBLedgerEntry = (l: LedgerEntry): DBLedgerEntry => ({
+  id: l.id, date: l.date, account_head: l.accountHead, account_type: l.accountType,
+  debit: l.debit, credit: l.credit, name: l.name, station: l.station,
+  category: l.category, sync_status: l.syncStatus
+});
+
 // Helper to convert frontend objects to DB snake_case
 const toDBProduct = (p: Product): DBProduct => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, is_active: p.isActive, created_at: p.createdAt
@@ -251,7 +265,7 @@ const toDBSale = (s: Sale): any => {
     customer_phone: s.customerPhone || null,
     is_credit_paid: s.isCreditPaid ?? false,
     date: s.date,
-    sync_status: 'synced'
+    sync_status: s.syncStatus
   };
 };
 const toDBExpense = (e: Expense): DBExpense => ({
@@ -427,6 +441,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { rawMaterialAdjustmentsRef.current = rawMaterialAdjustments; }, [rawMaterialAdjustments]);
   useEffect(() => { receiptSettingsRef.current = receiptSettings; }, [receiptSettings]);
 
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const ledgerEntriesRef = React.useRef(ledgerEntries);
+  useEffect(() => { ledgerEntriesRef.current = ledgerEntries; }, [ledgerEntries]);
+
   const syncOfflineData = useCallback(async () => {
     if (!hasSupabaseConfig || !navigator.onLine) return;
     
@@ -460,7 +478,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       syncTable('salary_vouchers', salaryVouchersRef.current, toDBVoucher, setSalaryVouchers),
       syncTable('purchases', purchasesRef.current, toDBPurchase, setPurchases),
       syncTable('recipes', recipesRef.current, toDBRecipe, setRecipes),
-      syncTable('raw_material_adjustments', rawMaterialAdjustmentsRef.current, toDBRawAdjustment, setRawMaterialAdjustments)
+      syncTable('raw_material_adjustments', rawMaterialAdjustmentsRef.current, toDBRawAdjustment, setRawMaterialAdjustments),
+      syncTable('ledger_entries', ledgerEntriesRef.current, toDBLedgerEntry, setLedgerEntries)
     ]);
 
     if (syncCount > 0) {
@@ -535,6 +554,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const recipesData = await fetchTable('recipes', 'id');
     if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
+
+    const leData = await fetchTable('ledger_entries', 'date');
+    if (leData) setLedgerEntries(prev => merge(leData, prev, fromDBLedgerEntry));
 
     const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
     if (settingsData?.settings) {
@@ -974,10 +996,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod) => {
-    const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+  const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => {
+    const total = manualTotal !== undefined ? manualTotal : items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
     const id = `s${Date.now()}`;
-    const newSale: Sale = { id, type, branch, items, total, paymentMethod, date: new Date().toISOString().slice(0, 10), syncStatus: isOnline ? 'synced' : 'pending' };
+    const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: new Date().toISOString().slice(0, 10), syncStatus: isOnline ? 'synced' : 'pending' };
     setSales(prev => [...prev, newSale]);
     if (isOnline && hasSupabaseConfig) {
       try {
@@ -1161,6 +1183,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addLedgerEntry = async (e: Omit<LedgerEntry, 'id' | 'syncStatus'>) => {
+    const newE: LedgerEntry = { ...e, id: `le${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    setLedgerEntries(prev => [...prev, newE]);
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('ledger_entries').upsert([toDBLedgerEntry(newE)]); } catch (err) { console.error(err); }
+    }
+  };
+
+  const clearLedgerEntries = async (category: 'general' | 'customer' | 'vendor') => {
+    const toDelete = ledgerEntriesRef.current.filter(e => e.category === category).map(e => e.id);
+    setLedgerEntries(prev => prev.filter(e => e.category !== category));
+    if (toDelete.length && isOnline && hasSupabaseConfig) {
+      try { await supabase.from('ledger_entries').delete().in('id', toDelete); } catch (err) { console.error(err); }
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, selectedProfile, isProfileLocked, products, rawMaterials, rawMaterialAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, allUsers, isOnline, lastSyncTime, isLoading,
@@ -1261,6 +1299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           try { await supabase.from('staff_deductions').delete().in('id', ids); } catch (err) { console.error(err); }
         }
       },
+      ledgerEntries, addLedgerEntry, clearLedgerEntries,
       hasSupabaseConfig
     }}>
       {children}
