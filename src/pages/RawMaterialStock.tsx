@@ -19,7 +19,8 @@ import {
   Search,
   Filter,
   Trash2,
-  Edit2
+  Edit2,
+  X
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -48,6 +49,8 @@ export default function RawMaterialStock() {
     supplierName: ''
   });
 
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  
   const [adjustment, setAdjustment] = useState({
     materialId: '',
     type: 'in' as 'in' | 'out',
@@ -70,6 +73,7 @@ export default function RawMaterialStock() {
     e.preventDefault();
     if (!newMaterial.name) return toast.error("Material name is required");
     addRawMaterial(newMaterial);
+    setIsCustomCategory(false);
     setNewMaterial({
       name: '',
       category: 'Dry',
@@ -149,18 +153,55 @@ export default function RawMaterialStock() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
-                    <Select value={newMaterial.category} onValueChange={v => setNewMaterial({...newMaterial, category: v})}>
-                      <SelectTrigger id="category">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Dry">Dry Goods</SelectItem>
-                        <SelectItem value="Dairy">Dairy</SelectItem>
-                        <SelectItem value="Liquid">Liquid</SelectItem>
-                        <SelectItem value="Cold">Cold Storage</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {isCustomCategory ? (
+                      <div className="flex gap-2">
+                        <Input 
+                          id="category"
+                          placeholder="Enter category..." 
+                          value={newMaterial.category}
+                          onChange={e => setNewMaterial({...newMaterial, category: e.target.value})}
+                          autoFocus
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon" 
+                          className="shrink-0"
+                          onClick={() => {
+                            setIsCustomCategory(false);
+                            setNewMaterial({...newMaterial, category: 'Dry'});
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select 
+                        value={newMaterial.category} 
+                        onValueChange={v => {
+                          if (v === 'new') {
+                            setIsCustomCategory(true);
+                            setNewMaterial({...newMaterial, category: ''});
+                          } else {
+                            setNewMaterial({...newMaterial, category: v});
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set(['Dry', 'Dairy', 'Liquid', 'Cold', 'Other', ...categories])).map(cat => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat === 'Dry' ? 'Dry Goods' : cat === 'Cold' ? 'Cold Storage' : cat}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="new" className="text-primary font-medium border-t mt-1">
+                            + Add New Category
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="unit">Base Unit</Label>
