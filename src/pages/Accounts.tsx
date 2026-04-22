@@ -18,8 +18,11 @@ export default function Accounts() {
     addStaffMember, deleteStaffMember,
     addStaffDeduction, deleteStaffDeduction,
     createSalaryVoucher, deleteSalaryVoucher,
-    addExpense
+    addExpense,
+    sales, purchases, expenses, rawMaterials
   } = useApp();
+
+  const [ledgerType, setLedgerType] = useState('general');
 
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', department: '', baseSalary: '' });
@@ -198,10 +201,11 @@ export default function Accounts() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="overview">Staff Overview</TabsTrigger>
           <TabsTrigger value="vouchers">Salary Vouchers</TabsTrigger>
           <TabsTrigger value="deductions">Deductions/Advances</TabsTrigger>
+          <TabsTrigger value="ledgers">Account Ledgers</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -347,6 +351,161 @@ export default function Accounts() {
                   })}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="ledgers">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <History className="h-5 w-5" /> Account Ledgers
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs">Select Ledger:</Label>
+                <Select value={ledgerType} onValueChange={setLedgerType}>
+                  <SelectTrigger className="w-48 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General Ledger</SelectItem>
+                    <SelectItem value="customer">Customer Ledger</SelectItem>
+                    <SelectItem value="vendor">Vendor Ledger</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {ledgerType === 'vendor' && (
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Title of Account</TableHead>
+                      <TableHead className="text-right">Debit (Paid)</TableHead>
+                      <TableHead className="text-right">Credit (Purchases)</TableHead>
+                      <TableHead className="text-right">Closing Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const vendors = Array.from(new Set(purchases.map(p => p.vendorName)));
+                      if (vendors.length === 0) return <TableRow><TableCell colSpan={4} className="text-center py-8">No vendor data found</TableCell></TableRow>;
+                      
+                      return vendors.map(vendor => {
+                        const vendorPurchases = purchases.filter(p => p.vendorName === vendor);
+                        const debit = vendorPurchases.reduce((sum, p) => sum + p.amountPaid, 0);
+                        const credit = vendorPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+                        const balance = credit - debit;
+                        
+                        return (
+                          <TableRow key={vendor}>
+                            <TableCell className="font-medium">{vendor}</TableCell>
+                            <TableCell className="text-right font-mono text-success">Rs. {debit.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono text-destructive">Rs. {credit.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono font-bold">Rs. {balance.toLocaleString()}</TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              )}
+
+              {ledgerType === 'customer' && (
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Title of Account</TableHead>
+                      <TableHead>Station</TableHead>
+                      <TableHead className="text-right">Debit (Sales)</TableHead>
+                      <TableHead className="text-right">Credit (Paid)</TableHead>
+                      <TableHead className="text-right">Closing Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const customers = Array.from(new Set(sales.filter(s => s.customerName).map(s => s.customerName)));
+                      if (customers.length === 0) return <TableRow><TableCell colSpan={5} className="text-center py-8">No customer data found</TableCell></TableRow>;
+                      
+                      return customers.map(customer => {
+                        const customerSales = sales.filter(s => s.customerName === customer);
+                        const debit = customerSales.reduce((sum, s) => sum + s.total, 0);
+                        // In this system, we consider credit paid sales as "Credit" in the ledger
+                        const credit = customerSales.filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid).reduce((sum, s) => sum + s.total, 0);
+                        const balance = debit - credit;
+                        
+                        return (
+                          <TableRow key={customer as string}>
+                            <TableCell className="font-medium">{customer}</TableCell>
+                            <TableCell><Badge variant="outline" className="text-[10px]">NWS</Badge></TableCell>
+                            <TableCell className="text-right font-mono text-destructive">Rs. {debit.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono text-success">Rs. {credit.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono font-bold">Rs. {balance.toLocaleString()}</TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              )}
+
+              {ledgerType === 'general' && (
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Account Head</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Debit</TableHead>
+                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">Closing Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
+                      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+                      const totalPurchases = purchases.reduce((sum, p) => sum + p.totalCost, 0);
+                      const totalSalaries = salaryVouchers.reduce((sum, v) => sum + v.amount, 0);
+                      const totalAdvances = staffDeductions.reduce((sum, d) => sum + d.amount, 0);
+                      const totalCustomerCredit = sales.filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid).reduce((sum, s) => sum + s.total, 0);
+                      const totalVendorPayable = purchases.reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
+
+                      const heads = [
+                        { name: 'Sales Income', type: 'Income', debit: 0, credit: totalSales, bal: totalSales, color: 'text-success' },
+                        { name: 'Operating Expenses', type: 'Expense', debit: totalExpenses, credit: 0, bal: totalExpenses, color: 'text-destructive' },
+                        { name: 'Raw Material Purchases', type: 'Expense', debit: totalPurchases, credit: 0, bal: totalPurchases, color: 'text-destructive' },
+                        { name: 'Staff Salaries', type: 'Expense', debit: totalSalaries, credit: 0, bal: totalSalaries, color: 'text-destructive' },
+                        { name: 'Staff Advances', type: 'Asset', debit: totalAdvances, credit: 0, bal: totalAdvances, color: 'text-primary' },
+                        { name: 'Accounts Receivable', type: 'Asset', debit: totalCustomerCredit, credit: 0, bal: totalCustomerCredit, color: 'text-primary' },
+                        { name: 'Accounts Payable', type: 'Liability', debit: 0, credit: totalVendorPayable, bal: totalVendorPayable, color: 'text-destructive' },
+                      ];
+
+                      return heads.map(head => (
+                        <TableRow key={head.name}>
+                          <TableCell className="font-semibold">{head.name}</TableCell>
+                          <TableCell><Badge variant="outline">{head.type}</Badge></TableCell>
+                          <TableCell className="text-right font-mono">Rs. {head.debit.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono">Rs. {head.credit.toLocaleString()}</TableCell>
+                          <TableCell className={`text-right font-mono font-bold ${head.color}`}>Rs. {head.bal.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                  <tfoot className="bg-muted/20 font-bold">
+                    <TableRow>
+                      <TableCell colSpan={2}>Grand Totals</TableCell>
+                      <TableCell className="text-right font-mono">
+                        Rs. {(expenses.reduce((sum, e) => sum + e.amount, 0) + purchases.reduce((sum, p) => sum + p.totalCost, 0) + salaryVouchers.reduce((sum, v) => sum + v.amount, 0) + staffDeductions.reduce((sum, d) => sum + d.amount, 0)).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        Rs. {sales.reduce((sum, s) => sum + s.total, 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-primary">
+                        Rs. {(sales.reduce((sum, s) => sum + s.total, 0) - (expenses.reduce((sum, e) => sum + e.amount, 0) + purchases.reduce((sum, p) => sum + p.totalCost, 0) + salaryVouchers.reduce((sum, v) => sum + v.amount, 0))).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </tfoot>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
