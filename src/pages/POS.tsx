@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator, Tag } from 'lucide-react';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,11 @@ export default function POS({ branch }: POSProps) {
     productId: '',
     amount: ''
   });
+  const [pricePrompt, setPricePrompt] = useState<{ open: boolean; productId: string; price: string }>({
+    open: false,
+    productId: '',
+    price: ''
+  });
 
   const handleAmountConfirm = () => {
     const amountVal = parseFloat(amountPrompt.amount);
@@ -55,6 +60,17 @@ export default function POS({ branch }: POSProps) {
       }));
     }
     setAmountPrompt({ open: false, productId: '', amount: '' });
+  };
+
+  const handlePriceConfirm = () => {
+    const priceVal = parseFloat(pricePrompt.price);
+    if (!isNaN(priceVal) && priceVal > 0) {
+      setCart(prev => prev.map(i => {
+        if (i.productId !== pricePrompt.productId) return i;
+        return { ...i, unitPrice: priceVal };
+      }));
+    }
+    setPricePrompt({ open: false, productId: '', price: '' });
   };
 
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';
@@ -153,8 +169,8 @@ export default function POS({ branch }: POSProps) {
             <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
               <Plus className="h-4 w-4" /> Quick Items
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              {['p_b100', 'p_b50', 'p_b80', 'p_b120', 'p_c120', 'p_cup40'].map(id => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+              {['p_b100', 'p_b50', 'p_b80', 'p_b120', 'p_c120', 'p_cup40', 'p_eggs'].map(id => {
                 const p = getProductById(id);
                 if (!p) return null;
                 return (
@@ -216,7 +232,6 @@ export default function POS({ branch }: POSProps) {
                     <p className="text-xs text-muted-foreground">Rs. {item.unitPrice.toFixed(2)} each</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    {product?.unit?.toLowerCase() === 'kg' && (
                       <Button 
                         variant="outline" 
                         size="icon" 
@@ -225,6 +240,17 @@ export default function POS({ branch }: POSProps) {
                         title="Enter exact price amount"
                       >
                         <Calculator className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {(product?.category === 'Daily Rates' || product?.unit?.toLowerCase() === 'dozen') && (
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-7 w-7 text-amber-600" 
+                        onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
+                        title="Change daily price"
+                      >
+                        <Tag className="h-3 w-3" />
                       </Button>
                     )}
                     <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
@@ -299,6 +325,32 @@ export default function POS({ branch }: POSProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAmountPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
             <Button onClick={handleAmountConfirm}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pricePrompt.open} onOpenChange={(open) => !open && setPricePrompt(prev => ({ ...prev, open: false }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Daily Price</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="price">New Unit Price (Rs.)</Label>
+              <Input 
+                id="price" 
+                type="number" 
+                placeholder="e.g. 350" 
+                value={pricePrompt.price}
+                onChange={e => setPricePrompt(prev => ({ ...prev, price: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handlePriceConfirm()}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPricePrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            <Button onClick={handlePriceConfirm}>Update Price</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

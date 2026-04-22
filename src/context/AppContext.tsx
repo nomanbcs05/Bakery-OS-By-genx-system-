@@ -62,6 +62,9 @@ const sampleProducts: Product[] = [
   { id: 'p33', name: 'Pineapple pastry', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
   { id: 'p34', name: 'Brownie', category: 'Pasteries', price: 100, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
   { id: 'p35', name: 'Chocolate cream puff', category: 'Pasteries', price: 80, unit: 'pc', isActive: true, createdAt: '2026-04-11' },
+  
+  // DAILY RATES
+  { id: 'p_eggs', name: 'Eggs', category: 'Daily Rates', price: 300, unit: 'dozen', isActive: true, createdAt: '2026-04-22' },
 ];
 
 
