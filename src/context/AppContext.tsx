@@ -171,6 +171,8 @@ interface AppContextType extends AppState {
   addPurchase: (p: Omit<Purchase, 'id' | 'syncStatus'>) => Promise<void>;
   clearPurchases: () => Promise<void>;
   clearExpenses: () => Promise<void>;
+  clearSalaryVouchers: () => Promise<void>;
+  clearStaffDeductions: () => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -1243,6 +1245,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setExpenses([]);
         if (ids.length && isOnline && hasSupabaseConfig) {
           try { await supabase.from('expenses').delete().in('id', ids); } catch (err) { console.error(err); }
+        }
+      },
+      clearSalaryVouchers: async () => {
+        const ids = salaryVouchers.map(v => v.id);
+        setSalaryVouchers([]);
+        if (ids.length && isOnline && hasSupabaseConfig) {
+          try { await supabase.from('salary_vouchers').delete().in('id', ids); } catch (err) { console.error(err); }
+        }
+      },
+      clearStaffDeductions: async () => {
+        const ids = staffDeductions.map(d => d.id);
+        setStaffDeductions([]);
+        if (ids.length && isOnline && hasSupabaseConfig) {
+          try { await supabase.from('staff_deductions').delete().in('id', ids); } catch (err) { console.error(err); }
         }
       },
       hasSupabaseConfig

@@ -20,7 +20,7 @@ export default function Accounts() {
     createSalaryVoucher, deleteSalaryVoucher,
     addExpense,
     sales, purchases, expenses, rawMaterials,
-    addPurchase, createSale, clearSales, clearPurchases, clearExpenses
+    addPurchase, createSale, clearSales, clearPurchases, clearExpenses, clearSalaryVouchers, clearStaffDeductions
   } = useApp();
 
   const [ledgerType, setLedgerType] = useState('general');
@@ -173,12 +173,23 @@ export default function Accounts() {
   };
 
   const handleClearLedger = async () => {
-    if (ledgerType === 'vendor') await clearPurchases();
-    else if (ledgerType === 'customer') await clearSales('all');
-    else await clearExpenses();
+    if (ledgerType === 'vendor') {
+      await clearPurchases();
+    } else if (ledgerType === 'customer') {
+      await clearSales('all');
+    } else {
+      // General Ledger - Clear all financial records
+      await Promise.all([
+        clearSales('all'),
+        clearPurchases(),
+        clearExpenses(),
+        clearSalaryVouchers(),
+        clearStaffDeductions()
+      ]);
+    }
     
     setIsClearOpen(false);
-    toast.success(`${ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1)} ledger cleared`);
+    toast.success(`${ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1)} ledger cleared from backend`);
   };
 
   const activeStaff = staff.filter(s => s.isActive);
