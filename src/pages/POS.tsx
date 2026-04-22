@@ -232,6 +232,7 @@ export default function POS({ branch }: POSProps) {
                     <p className="text-xs text-muted-foreground">Rs. {item.unitPrice.toFixed(2)} each</p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {product?.unit?.toLowerCase() === 'kg' && (
                       <Button 
                         variant="outline" 
                         size="icon" 
