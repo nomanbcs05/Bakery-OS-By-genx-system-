@@ -270,16 +270,15 @@ export default function POS({ branch }: POSProps) {
                             <Calculator className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        {(product?.category === 'Daily Rates' || product?.unit?.toLowerCase() === 'dozen') && (
-                          <Button 
-                            variant="secondary" 
-                            size="icon" 
-                            className="h-7 w-7 text-amber-600 shadow-sm" 
-                            onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
-                          >
-                            <Tag className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        <Button 
+                          variant="secondary" 
+                          size="icon" 
+                          className="h-7 w-7 text-amber-600 shadow-sm" 
+                          onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
+                          title="Change custom/wholesale price"
+                        >
+                          <Tag className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
                   </div>
