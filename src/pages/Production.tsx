@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Factory, Save, Search, RefreshCcw } from 'lucide-react';
+import { Plus, Factory, Save, Search, RefreshCcw, X, ListRestart } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -27,13 +27,16 @@ export default function Production() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Bread', price: '', unit: 'pc' });
+  const [hiddenProducts, setHiddenProducts] = useState<string[]>([]);
 
   // Filter active products
   const activeProducts = useMemo(() => {
     return products.filter(p => 
-      p.isActive && p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      p.isActive && 
+      !hiddenProducts.includes(p.id) &&
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => a.category.localeCompare(b.category));
-  }, [products, searchTerm]);
+  }, [products, searchTerm, hiddenProducts]);
 
   const handleQtyChange = (productId: string, value: string) => {
     setQuantities(prev => ({ ...prev, [productId]: value }));
@@ -47,6 +50,16 @@ export default function Production() {
     setQuantities({});
     setMeasures({});
     setNotes('');
+    // Intentionally not resetting hiddenProducts so user's preference stays during the session
+  };
+
+  const handleHideProduct = (productId: string) => {
+    setHiddenProducts(prev => [...prev, productId]);
+    setQuantities(prev => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
   };
 
   const handleSubmitAll = async () => {
@@ -101,6 +114,19 @@ export default function Production() {
               className="pl-9 h-9"
             />
           </div>
+
+          {hiddenProducts.length > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setHiddenProducts([])} 
+              className="text-muted-foreground"
+              title="Restore hidden products"
+            >
+              <ListRestart className="h-4 w-4 md:mr-1" /> 
+              <span className="hidden md:inline">Restore ({hiddenProducts.length})</span>
+            </Button>
+          )}
           
           <Dialog open={showAddProduct} onOpenChange={setShowAddProduct}>
             <DialogTrigger asChild>
@@ -218,14 +244,25 @@ export default function Production() {
                         </Select>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          placeholder="0"
-                          className="h-8 w-24 ml-auto text-right"
-                          value={quantities[product.id] || ''}
-                          onChange={(e) => handleQtyChange(product.id, e.target.value)}
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            placeholder="0"
+                            className="h-8 w-24 text-right"
+                            value={quantities[product.id] || ''}
+                            onChange={(e) => handleQtyChange(product.id, e.target.value)}
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleHideProduct(product.id)}
+                            title="Remove from today's list"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
