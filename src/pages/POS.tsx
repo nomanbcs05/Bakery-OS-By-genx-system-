@@ -76,10 +76,13 @@ export default function POS({ branch }: POSProps) {
     const product = getProductById(eggsPrompt.productId);
     if (!product) return;
     
+    // If unit is dozen, treat the quantity as pieces and convert to dozen
+    const finalQty = product.unit.toLowerCase() === 'dozen' ? qty / 12 : qty;
+    
     setCart(prev => {
       const existing = prev.find(i => i.productId === eggsPrompt.productId);
-      if (existing) return prev.map(i => i.productId === eggsPrompt.productId ? { ...i, quantity: i.quantity + qty } : i);
-      return [...prev, { productId: eggsPrompt.productId, quantity: qty, unitPrice: product.price }];
+      if (existing) return prev.map(i => i.productId === eggsPrompt.productId ? { ...i, quantity: i.quantity + finalQty } : i);
+      return [...prev, { productId: eggsPrompt.productId, quantity: finalQty, unitPrice: product.price }];
     });
     setEggsPrompt({ open: false, productId: '', quantity: '' });
   };
@@ -396,12 +399,21 @@ export default function POS({ branch }: POSProps) {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-3 gap-2">
-              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(3)}>3</Button>
-              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(6)}>6</Button>
-              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(12)}>12</Button>
+              <Button variant="outline" className="h-12 text-sm font-bold flex flex-col" onClick={() => handleEggsConfirm(3)}>
+                <span>3 Pcs</span>
+                <span className="text-[10px] font-normal opacity-70">1/4 Dozen</span>
+              </Button>
+              <Button variant="outline" className="h-12 text-sm font-bold flex flex-col" onClick={() => handleEggsConfirm(6)}>
+                <span>6 Pcs</span>
+                <span className="text-[10px] font-normal opacity-70">1/2 Dozen</span>
+              </Button>
+              <Button variant="outline" className="h-12 text-sm font-bold flex flex-col" onClick={() => handleEggsConfirm(12)}>
+                <span>12 Pcs</span>
+                <span className="text-[10px] font-normal opacity-70">1 Dozen</span>
+              </Button>
             </div>
             <div className="flex flex-col gap-2 mt-2">
-              <Label htmlFor="eggQty">Or enter manually</Label>
+              <Label htmlFor="eggQty">Or enter manually (in Pcs)</Label>
               <Input 
                 id="eggQty" 
                 type="number" 
