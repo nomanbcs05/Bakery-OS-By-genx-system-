@@ -17,7 +17,7 @@ interface POSProps {
 }
 
 export default function POS({ branch }: POSProps) {
-  const { currentUser, products, stock, createSale, getProductById, getBranchStock } = useApp();
+  const { currentUser, products, stock, createSale, getProductById, getBranchStock, sales } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);
@@ -37,6 +37,15 @@ export default function POS({ branch }: POSProps) {
     paymentMethod: 'cash',
     saleId: '',
     date: '',
+    customerName: undefined,
+    customerPhone: undefined,
+    previousBalance: undefined,
+  });
+
+  const [creditPrompt, setCreditPrompt] = useState<{ open: boolean; name: string; phone: string }>({
+    open: false,
+    name: '',
+    phone: ''
   });
 
   const [amountPrompt, setAmountPrompt] = useState<{ open: boolean; productId: string; amount: string }>({
@@ -112,7 +121,7 @@ export default function POS({ branch }: POSProps) {
 
   const total = cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
-  const checkout = async (method: PaymentMethod) => {
+  const checkout = async (method: PaymentMethod, customerName?: string, customerPhone?: string) => {
     if (cart.length === 0) return;
     
     const receiptItems = cart.map(i => ({
@@ -123,7 +132,14 @@ export default function POS({ branch }: POSProps) {
     const receiptTotal = total;
     const date = new Date().toISOString();
 
-    const createdSaleId = await createSale('branch', branch, cart, method);
+    let previousBalance = 0;
+    if (method === 'credit' && customerName) {
+      previousBalance = sales
+        .filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid && (s.customerName === customerName || s.customerPhone === customerPhone))
+        .reduce((sum, s) => sum + s.total, 0);
+    }
+
+    const createdSaleId = await createSale('branch', branch, cart, method, customerName, customerPhone);
     if (createdSaleId) {
       setCart([]);
       setReceiptData({
@@ -133,8 +149,20 @@ export default function POS({ branch }: POSProps) {
         paymentMethod: method,
         saleId: createdSaleId as string,
         date,
+        customerName,
+        customerPhone,
+        previousBalance
       });
     }
+  };
+
+  const handleCreditConfirm = () => {
+    if (!creditPrompt.name) {
+      toast.error('Customer name is required for credit sales');
+      return;
+    }
+    checkout('credit', creditPrompt.name, creditPrompt.phone);
+    setCreditPrompt({ open: false, name: '', phone: '' });
   };
 
   return (
@@ -296,8 +324,8 @@ export default function POS({ branch }: POSProps) {
                   <Button onClick={() => checkout('cash')} className="w-full h-12 shadow-sm font-bold" variant="outline">
                     <Banknote className="h-4 w-4 mr-2" /> Cash
                   </Button>
-                  <Button onClick={() => checkout('card')} className="w-full h-12 shadow-lg font-bold">
-                    <CreditCard className="h-4 w-4 mr-2" /> Card
+                  <Button onClick={() => setCreditPrompt({ open: true, name: '', phone: '' })} className="w-full h-12 shadow-lg font-bold">
+                    <CreditCard className="h-4 w-4 mr-2" /> Credit
                   </Button>
                 </div>
               </div>
@@ -316,6 +344,9 @@ export default function POS({ branch }: POSProps) {
         saleId={receiptData.saleId}
         date={receiptData.date}
         autoPrint={true}
+        customerName={receiptData.customerName}
+        customerPhone={receiptData.customerPhone}
+        previousBalance={receiptData.previousBalance}
       />
 
       <Dialog open={amountPrompt.open} onOpenChange={(open) => !open && setAmountPrompt(prev => ({ ...prev, open: false }))}>
@@ -366,6 +397,40 @@ export default function POS({ branch }: POSProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPricePrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
             <Button onClick={handlePriceConfirm}>Update Price</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={creditPrompt.open} onOpenChange={(open) => !open && setCreditPrompt(prev => ({ ...prev, open: false }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Credit Sale Customer Info</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="customerName">Customer Name *</Label>
+              <Input 
+                id="customerName" 
+                placeholder="e.g. John Doe" 
+                value={creditPrompt.name}
+                onChange={e => setCreditPrompt(prev => ({ ...prev, name: e.target.value }))}
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="customerPhone">Phone Number</Label>
+              <Input 
+                id="customerPhone" 
+                placeholder="e.g. 03001234567" 
+                value={creditPrompt.phone}
+                onChange={e => setCreditPrompt(prev => ({ ...prev, phone: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleCreditConfirm()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            <Button onClick={handleCreditConfirm}>Complete Sale</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

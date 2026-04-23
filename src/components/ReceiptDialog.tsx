@@ -14,9 +14,12 @@ interface ReceiptDialogProps {
   saleId: string;
   date: string;
   autoPrint?: boolean;
+  customerName?: string;
+  customerPhone?: string;
+  previousBalance?: number;
 }
 
-export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date, autoPrint }: ReceiptDialogProps) {
+export default function ReceiptDialog({ open, onClose, items, total, paymentMethod, branch, saleId, date, autoPrint, customerName, customerPhone, previousBalance }: ReceiptDialogProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { receiptSettings, sales } = useApp();
 
@@ -299,6 +302,18 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               <span>Payment:</span>
               <span className="font-bold uppercase tracking-widest bg-stone-200 px-1">{paymentMethod}</span>
             </div>
+            {customerName && (
+              <div className="flex-row">
+                <span>Customer:</span>
+                <span className="font-bold">{customerName}</span>
+              </div>
+            )}
+            {customerPhone && (
+              <div className="flex-row">
+                <span>Phone:</span>
+                <span>{customerPhone}</span>
+              </div>
+            )}
             <div className="flex-row">
               <span>{formattedDate}</span>
               <span>{formattedTime}</span>
@@ -336,6 +351,20 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               <span>Net Bill :</span>
               <span>{total}</span>
             </div>
+
+            {(previousBalance !== undefined && previousBalance > 0) && (
+              <div className="flex-row pt-1">
+                <span>Prev Balance:</span>
+                <span className="font-bold">{previousBalance.toFixed(2)}</span>
+              </div>
+            )}
+            
+            {(paymentMethod.toLowerCase() === 'credit' || (previousBalance !== undefined && previousBalance > 0)) && (
+              <div className="flex-row border-t-2 border-black mt-1 pt-1 font-bold text-[12pt]">
+                <span>Total Balance:</span>
+                <span>{((previousBalance || 0) + (paymentMethod.toLowerCase() === 'credit' ? total : 0)).toFixed(2)}</span>
+              </div>
+            )}
             
           </div>
 
