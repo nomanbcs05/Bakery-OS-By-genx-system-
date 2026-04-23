@@ -42,10 +42,11 @@ export default function POS({ branch }: POSProps) {
     previousBalance: undefined,
   });
 
-  const [creditPrompt, setCreditPrompt] = useState<{ open: boolean; name: string; phone: string }>({
+  const [checkoutPrompt, setCheckoutPrompt] = useState<{ open: boolean; name: string; phone: string; method: PaymentMethod | null }>({
     open: false,
     name: '',
-    phone: ''
+    phone: '',
+    method: null
   });
 
   const [amountPrompt, setAmountPrompt] = useState<{ open: boolean; productId: string; amount: string }>({
@@ -133,7 +134,7 @@ export default function POS({ branch }: POSProps) {
     const date = new Date().toISOString();
 
     let previousBalance = 0;
-    if (method === 'credit' && customerName) {
+    if (customerName) {
       previousBalance = sales
         .filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid && (s.customerName === customerName || s.customerPhone === customerPhone))
         .reduce((sum, s) => sum + s.total, 0);
@@ -156,13 +157,14 @@ export default function POS({ branch }: POSProps) {
     }
   };
 
-  const handleCreditConfirm = () => {
-    if (!creditPrompt.name) {
+  const handleCheckoutConfirm = () => {
+    if (!checkoutPrompt.method) return;
+    if (checkoutPrompt.method === 'credit' && !checkoutPrompt.name) {
       toast.error('Customer name is required for credit sales');
       return;
     }
-    checkout('credit', creditPrompt.name, creditPrompt.phone);
-    setCreditPrompt({ open: false, name: '', phone: '' });
+    checkout(checkoutPrompt.method, checkoutPrompt.name, checkoutPrompt.phone);
+    setCheckoutPrompt({ open: false, name: '', phone: '', method: null });
   };
 
   return (
@@ -321,10 +323,10 @@ export default function POS({ branch }: POSProps) {
                   <span className="text-xl font-black text-primary">Rs. {total.toFixed(2)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button onClick={() => checkout('cash')} className="w-full h-12 shadow-sm font-bold" variant="outline">
+                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'cash' })} className="w-full h-12 shadow-sm font-bold" variant="outline">
                     <Banknote className="h-4 w-4 mr-2" /> Cash
                   </Button>
-                  <Button onClick={() => setCreditPrompt({ open: true, name: '', phone: '' })} className="w-full h-12 shadow-lg font-bold">
+                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'credit' })} className="w-full h-12 shadow-lg font-bold">
                     <CreditCard className="h-4 w-4 mr-2" /> Credit
                   </Button>
                 </div>
@@ -401,19 +403,27 @@ export default function POS({ branch }: POSProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={creditPrompt.open} onOpenChange={(open) => !open && setCreditPrompt(prev => ({ ...prev, open: false }))}>
+      <Dialog open={checkoutPrompt.open} onOpenChange={(open) => !open && setCheckoutPrompt(prev => ({ ...prev, open: false }))}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Credit Sale Customer Info</DialogTitle>
+            <DialogTitle>
+              {checkoutPrompt.method === 'credit' ? 'Credit Sale Customer Info' : 'Cash Sale (Optional Customer Info)'}
+            </DialogTitle>
+            {checkoutPrompt.method === 'cash' && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Enter name to link this cash sale to a customer and print their previous credit balance on the receipt. Leave blank to skip.
+              </p>
+            )}
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="customerName">Customer Name *</Label>
+              <Label htmlFor="customerName">Customer Name {checkoutPrompt.method === 'credit' && '*'}</Label>
               <Input 
                 id="customerName" 
                 placeholder="e.g. John Doe" 
-                value={creditPrompt.name}
-                onChange={e => setCreditPrompt(prev => ({ ...prev, name: e.target.value }))}
+                value={checkoutPrompt.name}
+                onChange={e => setCheckoutPrompt(prev => ({ ...prev, name: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && checkoutPrompt.method === 'cash' && handleCheckoutConfirm()}
                 autoFocus
               />
             </div>
@@ -422,15 +432,21 @@ export default function POS({ branch }: POSProps) {
               <Input 
                 id="customerPhone" 
                 placeholder="e.g. 03001234567" 
-                value={creditPrompt.phone}
-                onChange={e => setCreditPrompt(prev => ({ ...prev, phone: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && handleCreditConfirm()}
+                value={checkoutPrompt.phone}
+                onChange={e => setCheckoutPrompt(prev => ({ ...prev, phone: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleCheckoutConfirm()}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreditPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
-            <Button onClick={handleCreditConfirm}>Complete Sale</Button>
+            {checkoutPrompt.method === 'cash' && !checkoutPrompt.name ? (
+              <Button variant="outline" onClick={handleCheckoutConfirm} className="w-full sm:w-auto">Skip & Print Cash Receipt</Button>
+            ) : (
+              <Button variant="outline" onClick={() => setCheckoutPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            )}
+            <Button onClick={handleCheckoutConfirm}>
+              {checkoutPrompt.method === 'credit' ? 'Complete Credit Sale' : 'Complete Cash Sale'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
