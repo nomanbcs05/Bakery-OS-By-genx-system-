@@ -132,6 +132,7 @@ interface AppContextType extends AppState {
   branchStockAdjustments: BranchStockAdjustment[];
   adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => Promise<void>;
   addProduction: (productId: string, quantity: number, notes?: string) => Promise<boolean | void>;
+  addMultiProduction: (items: { productId: string; quantity: number }[], notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<string | boolean>;
@@ -955,6 +956,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const addMultiProduction = async (items: { productId: string; quantity: number }[], notes?: string) => {
+    if (items.length === 0) return false;
+    const id = `b${Date.now()}`;
+    const newBatch: ProductionBatch = { 
+      id, 
+      items, 
+      date: new Date().toISOString().slice(0, 10), 
+      notes, 
+      syncStatus: isOnline ? 'synced' : 'pending' 
+    };
+    setBatches(prev => [...prev, newBatch]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        const { error } = await supabase.from('production_batches').upsert([toDBBatch(newBatch)]);
+        if (error) throw error;
+      } catch (err) {
+        setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
+      }
+    }
+    return true;
+  };
+
   const updateProduction = async (id: string, u: Partial<ProductionBatch>) => {
     setBatches(prev => prev.map(b => b.id === id ? { ...b, ...u } : b));
     const updated = batches.find(b => b.id === id);
@@ -1217,7 +1240,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addRawMaterial, updateRawMaterial, deleteRawMaterial, adjustRawMaterialStock,
       addRecipe, updateRecipe, deleteRecipe,
       adjustBranchStock, branchStockAdjustments,
-      addProduction, updateProduction, deleteProduction,
+      addProduction, addMultiProduction, updateProduction, deleteProduction,
       createDispatch, createSale, refundSale,
       addExpense, updateExpense, deleteExpense,
       getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => s.date === new Date().toISOString().slice(0, 10)),
