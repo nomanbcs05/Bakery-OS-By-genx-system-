@@ -214,82 +214,97 @@ export default function POS({ branch }: POSProps) {
         </div>
 
         {/* Cart */}
-        <Card className="h-fit sticky top-4">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4" /> Cart
-              {cart.length > 0 && <Badge>{cart.length}</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {cart.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Cart is empty</p>}
-            {cart.map(item => {
-              const product = getProductById(item.productId);
-              return (
-                <div key={item.productId} className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{product?.name}</p>
-                    <p className="text-xs text-muted-foreground">Rs. {item.unitPrice.toFixed(2)} each</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {product?.unit?.toLowerCase() === 'kg' && (
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-7 w-7 text-primary" 
-                        onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
-                        title="Enter exact price amount"
-                      >
-                        <Calculator className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {(product?.category === 'Daily Rates' || product?.unit?.toLowerCase() === 'dozen') && (
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-7 w-7 text-amber-600" 
-                        onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
-                        title="Change daily price"
-                      >
-                        <Tag className="h-3 w-3" />
-                      </Button>
-                    )}
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-8 text-center text-sm font-medium">
-                      {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
-                    </span>
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeFromCart(item.productId)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+        <div className="lg:col-span-1">
+          <Card className="sticky top-24 max-h-[calc(100vh-120px)] flex flex-col shadow-xl border-primary/10">
+            <CardHeader className="pb-3 border-b bg-muted/20">
+              <CardTitle className="text-base flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-primary" /> 
+                  Cart
                 </div>
-              );
-            })}
+                {cart.length > 0 && <Badge variant="secondary" className="font-bold">{cart.length}</Badge>}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+              {cart.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 opacity-50">
+                  <ShoppingCart className="h-12 w-12 mb-2" />
+                  <p className="text-sm font-medium">Cart is empty</p>
+                </div>
+              )}
+              {cart.map(item => {
+                const product = getProductById(item.productId);
+                return (
+                  <div key={item.productId} className="flex flex-col gap-2 p-2 rounded-lg bg-muted/30 border border-transparent hover:border-primary/20 transition-all">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{product?.name}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Rs. {item.unitPrice.toFixed(2)} / {product?.unit}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => removeFromCart(item.productId)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between gap-2 bg-background/50 p-1 rounded-md border">
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-10 text-center text-sm font-bold">
+                          {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
 
+                      <div className="flex items-center gap-1">
+                        {product?.unit?.toLowerCase() === 'kg' && (
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-7 w-7 text-primary shadow-sm" 
+                            onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
+                          >
+                            <Calculator className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {(product?.category === 'Daily Rates' || product?.unit?.toLowerCase() === 'dozen') && (
+                          <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-7 w-7 text-amber-600 shadow-sm" 
+                            onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
+                          >
+                            <Tag className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+            
             {cart.length > 0 && (
-              <>
-                <Separator />
-                <div className="flex justify-between items-center text-lg font-bold mb-4">
-                  <span>Total</span>
-                  <span className="text-primary">Rs. {total.toFixed(2)}</span>
+              <div className="p-4 bg-muted/10 border-t space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Subtotal</span>
+                  <span className="text-xl font-black text-primary">Rs. {total.toFixed(2)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button onClick={() => checkout('cash')} className="w-full" variant="outline">
-                    <Banknote className="h-4 w-4 mr-1" /> Cash
+                  <Button onClick={() => checkout('cash')} className="w-full h-12 shadow-sm font-bold" variant="outline">
+                    <Banknote className="h-4 w-4 mr-2" /> Cash
                   </Button>
-                  <Button onClick={() => checkout('card')} className="w-full">
-                    <CreditCard className="h-4 w-4 mr-1" /> Card
+                  <Button onClick={() => checkout('card')} className="w-full h-12 shadow-lg font-bold">
+                    <CreditCard className="h-4 w-4 mr-2" /> Card
                   </Button>
                 </div>
-              </>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       <ReceiptDialog 
