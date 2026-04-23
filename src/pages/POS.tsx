@@ -159,8 +159,8 @@ export default function POS({ branch }: POSProps) {
 
   const handleCheckoutConfirm = () => {
     if (!checkoutPrompt.method) return;
-    if (checkoutPrompt.method === 'credit' && !checkoutPrompt.name) {
-      toast.error('Customer name is required for credit sales');
+    if (!checkoutPrompt.name) {
+      toast.error('Customer name is required');
       return;
     }
     checkout(checkoutPrompt.method, checkoutPrompt.name, checkoutPrompt.phone);
@@ -438,14 +438,21 @@ export default function POS({ branch }: POSProps) {
               />
             </div>
           </div>
-          <DialogFooter>
-            {checkoutPrompt.method === 'cash' && !checkoutPrompt.name ? (
-              <Button variant="outline" onClick={handleCheckoutConfirm} className="w-full sm:w-auto">Skip & Print Cash Receipt</Button>
-            ) : (
-              <Button variant="outline" onClick={() => setCheckoutPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+          <DialogFooter className="flex gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setCheckoutPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            {checkoutPrompt.method === 'cash' && (
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  checkout('cash');
+                  setCheckoutPrompt({ open: false, name: '', phone: '', method: null });
+                }}
+              >
+                Normal Cash Sale
+              </Button>
             )}
-            <Button onClick={handleCheckoutConfirm}>
-              {checkoutPrompt.method === 'credit' ? 'Complete Credit Sale' : 'Complete Cash Sale'}
+            <Button onClick={handleCheckoutConfirm} className="bg-primary hover:bg-primary/90">
+              {checkoutPrompt.method === 'credit' ? 'Complete Credit Sale' : 'Add Credit Balance'}
             </Button>
           </DialogFooter>
         </DialogContent>
