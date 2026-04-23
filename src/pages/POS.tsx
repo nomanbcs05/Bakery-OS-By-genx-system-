@@ -66,6 +66,24 @@ export default function POS({ branch }: POSProps) {
     items: [],
   });
 
+  const [eggsPrompt, setEggsPrompt] = useState<{ open: boolean; productId: string; quantity: string }>({
+    open: false,
+    productId: '',
+    quantity: ''
+  });
+
+  const handleEggsConfirm = (qty: number) => {
+    const product = getProductById(eggsPrompt.productId);
+    if (!product) return;
+    
+    setCart(prev => {
+      const existing = prev.find(i => i.productId === eggsPrompt.productId);
+      if (existing) return prev.map(i => i.productId === eggsPrompt.productId ? { ...i, quantity: i.quantity + qty } : i);
+      return [...prev, { productId: eggsPrompt.productId, quantity: qty, unitPrice: product.price }];
+    });
+    setEggsPrompt({ open: false, productId: '', quantity: '' });
+  };
+
   const handleAmountConfirm = () => {
     const amountVal = parseFloat(amountPrompt.amount);
     if (!isNaN(amountVal) && amountVal > 0) {
@@ -115,6 +133,11 @@ export default function POS({ branch }: POSProps) {
     const product = getProductById(productId);
     if (!product) return;
     // Removed strict stock check to ensure products are always available for selling
+
+    if (productId === 'p_eggs' || product.name.toLowerCase().includes('egg')) {
+      setEggsPrompt({ open: true, productId, quantity: '' });
+      return;
+    }
 
     setCart(prev => {
       const existing = prev.find(i => i.productId === productId);
@@ -365,6 +388,45 @@ export default function POS({ branch }: POSProps) {
         customerPhone={receiptData.customerPhone}
         previousBalance={receiptData.previousBalance}
       />
+
+      <Dialog open={eggsPrompt.open} onOpenChange={(open) => !open && setEggsPrompt(prev => ({ ...prev, open: false }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Quantity (Eggs)</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-3 gap-2">
+              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(3)}>3</Button>
+              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(6)}>6</Button>
+              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleEggsConfirm(12)}>12</Button>
+            </div>
+            <div className="flex flex-col gap-2 mt-2">
+              <Label htmlFor="eggQty">Or enter manually</Label>
+              <Input 
+                id="eggQty" 
+                type="number" 
+                placeholder="e.g. 5" 
+                value={eggsPrompt.quantity}
+                onChange={e => setEggsPrompt(prev => ({ ...prev, quantity: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const q = parseInt(eggsPrompt.quantity);
+                    if (!isNaN(q) && q > 0) handleEggsConfirm(q);
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEggsPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            <Button onClick={() => {
+              const q = parseInt(eggsPrompt.quantity);
+              if (!isNaN(q) && q > 0) handleEggsConfirm(q);
+            }}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={amountPrompt.open} onOpenChange={(open) => !open && setAmountPrompt(prev => ({ ...prev, open: false }))}>
         <DialogContent>
