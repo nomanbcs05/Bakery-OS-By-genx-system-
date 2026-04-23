@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import ReceiptDialog from '@/components/ReceiptDialog';
+import GOTDialog from '@/components/GOTDialog';
 
 interface POSProps {
   branch: 'branch_1' | 'branch_2';
@@ -60,6 +61,11 @@ export default function POS({ branch }: POSProps) {
     price: ''
   });
 
+  const [gotData, setGotData] = useState<{ open: boolean; items: any[] }>({
+    open: false,
+    items: [],
+  });
+
   const handleAmountConfirm = () => {
     const amountVal = parseFloat(amountPrompt.amount);
     if (!isNaN(amountVal) && amountVal > 0) {
@@ -72,13 +78,22 @@ export default function POS({ branch }: POSProps) {
     setAmountPrompt({ open: false, productId: '', amount: '' });
   };
 
-  const handlePriceConfirm = () => {
+  const handlePriceConfirm = (printGOT = false) => {
     const priceVal = parseFloat(pricePrompt.price);
     if (!isNaN(priceVal) && priceVal > 0) {
       setCart(prev => prev.map(i => {
         if (i.productId !== pricePrompt.productId) return i;
         return { ...i, unitPrice: priceVal };
       }));
+      
+      if (printGOT) {
+        const product = getProductById(pricePrompt.productId);
+        const itemInCart = cart.find(i => i.productId === pricePrompt.productId);
+        setGotData({
+          open: true,
+          items: [{ name: product?.name || 'Unknown Item', quantity: itemInCart?.quantity || 1 }]
+        });
+      }
     }
     setPricePrompt({ open: false, productId: '', price: '' });
   };
@@ -391,14 +406,15 @@ export default function POS({ branch }: POSProps) {
                 placeholder="e.g. 350" 
                 value={pricePrompt.price}
                 onChange={e => setPricePrompt(prev => ({ ...prev, price: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && handlePriceConfirm()}
+                onKeyDown={e => e.key === 'Enter' && handlePriceConfirm(false)}
                 autoFocus
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2 justify-end sm:flex-row flex-col">
             <Button variant="outline" onClick={() => setPricePrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
-            <Button onClick={handlePriceConfirm}>Update Price</Button>
+            <Button variant="secondary" onClick={() => handlePriceConfirm(true)}>Update & Print GOT</Button>
+            <Button onClick={() => handlePriceConfirm(false)}>Update Price</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -457,6 +473,14 @@ export default function POS({ branch }: POSProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <GOTDialog 
+        open={gotData.open}
+        onClose={() => setGotData(prev => ({ ...prev, open: false }))}
+        items={gotData.items}
+        destination={branchLabel}
+        autoPrint={true}
+      />
     </div>
   );
 }
