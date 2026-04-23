@@ -251,7 +251,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     <div style={{ position: 'fixed', left: '-9999px', top: 0, opacity: 0, pointerEvents: 'none' }}>
       <div ref={receiptRef}>
         <div className="print-container bg-white text-black">
-          <div className="receipt-box text-center">
+          <div className="text-center mb-2">
             {receiptSettings?.logoUrl ? (
               <div className="receipt-logo-wrapper">
                 <img src={receiptSettings.logoUrl} alt="Logo" className="receipt-logo" crossOrigin="anonymous" />
@@ -362,7 +362,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             {(paymentMethod.toLowerCase() === 'credit' || (previousBalance !== undefined && previousBalance > 0)) && (
               <div className="flex-row border-t-2 border-black mt-1 pt-1 font-bold text-[12pt]">
                 <span>Total Balance:</span>
-                <span>{((previousBalance || 0) + (paymentMethod.toLowerCase() === 'credit' ? total : 0)).toFixed(2)}</span>
+                <span>{((previousBalance || 0) + total).toFixed(2)}</span>
               </div>
             )}
             
