@@ -116,14 +116,21 @@ export default function Production() {
             </TableHeader>
             <TableBody>
               {[...batches].reverse().map(b => {
-                const product = getProductById(b.productId);
+                const itemDetails = b.items?.map(item => {
+                  const product = getProductById(item.productId);
+                  return `${product?.name || 'Unknown'} (${item.quantity})`;
+                }).join(', ') || '—';
+                
+                const firstProductId = b.items?.[0]?.productId;
+                const totalQty = b.items?.reduce((sum, i) => sum + i.quantity, 0) || 0;
+
                 return (
                   <TableRow key={b.id}>
-                    <TableCell><Badge variant="outline">{b.batchId}</Badge></TableCell>
-                    <TableCell className="font-medium">{product?.name}</TableCell>
-                    <TableCell>{b.quantity}</TableCell>
+                    <TableCell><Badge variant="outline">{b.id.slice(-6).toUpperCase()}</Badge></TableCell>
+                    <TableCell className="font-medium">{itemDetails}</TableCell>
+                    <TableCell>{totalQty}</TableCell>
                     <TableCell>{b.date}</TableCell>
-                    <TableCell>{stock[b.productId]?.production || 0}</TableCell>
+                    <TableCell>{firstProductId ? (stock[firstProductId]?.production || 0) : '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{b.notes || '—'}</TableCell>
                   </TableRow>
                 );

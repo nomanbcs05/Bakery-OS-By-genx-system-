@@ -76,10 +76,10 @@ const sampleRawMaterials: RawMaterial[] = [
 ];
 
 const sampleBatches: ProductionBatch[] = [
-  { id: 'b1', batchId: 'BATCH-001', productId: 'p1', quantity: 500, date: '2026-04-05', syncStatus: 'synced' },
-  { id: 'b2', batchId: 'BATCH-002', productId: 'p3', quantity: 300, date: '2026-04-05', syncStatus: 'synced' },
-  { id: 'b3', batchId: 'BATCH-003', productId: 'p4', quantity: 50, date: '2026-04-05', syncStatus: 'synced' },
-  { id: 'b4', batchId: 'BATCH-004', productId: 'p5', quantity: 200, date: '2026-04-05', syncStatus: 'synced' },
+  { id: 'b1', items: [{ productId: 'p1', quantity: 500 }], date: '2026-04-05', syncStatus: 'synced' },
+  { id: 'b2', items: [{ productId: 'p3', quantity: 300 }], date: '2026-04-05', syncStatus: 'synced' },
+  { id: 'b3', items: [{ productId: 'p4', quantity: 50 }], date: '2026-04-05', syncStatus: 'synced' },
+  { id: 'b4', items: [{ productId: 'p5', quantity: 200 }], date: '2026-04-05', syncStatus: 'synced' },
 ];
 
 interface StockMap {
@@ -191,7 +191,7 @@ const fromDBProduct = (p: DBProduct): Product => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, isActive: p.is_active, createdAt: p.created_at
 });
 const fromDBBatch = (b: DBProductionBatch): ProductionBatch => ({
-  id: b.id, batchId: b.batch_id, productId: b.product_id, quantity: b.quantity, date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
+  id: b.id, items: b.items || [], date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
 });
 const fromDBSale = (s: DBSale): Sale => ({
   id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: s.payment_method, 
@@ -251,7 +251,7 @@ const toDBProduct = (p: Product): DBProduct => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, is_active: p.isActive, created_at: p.createdAt
 });
 const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
-  id: b.id, batch_id: b.batchId, product_id: b.productId, quantity: b.quantity, date: b.date, notes: b.notes, sync_status: b.syncStatus
+  id: b.id, items: b.items, date: b.date, notes: b.notes, sync_status: b.syncStatus
 });
 const toDBSale = (s: Sale): any => {
   return {
@@ -607,7 +607,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const stock = React.useMemo(() => {
     const map: StockMap = {};
     products.forEach(p => { map[p.id] = { production: 0, branch_1: 0, branch_2: 0 }; });
-    batches.forEach(b => { if (map[b.productId]) map[b.productId].production += b.quantity; });
+    batches.forEach(b => { 
+      if (b.items) {
+        b.items.forEach(item => {
+          if (map[item.productId]) map[item.productId].production += item.quantity;
+        });
+      }
+    });
     dispatches.forEach(d => {
       d.items.forEach(item => {
         if (map[item.productId]) {
@@ -808,7 +814,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const getInventorySnapshots = useCallback((): InventorySnapshot[] => {
     return products.map(p => {
       const s = stock[p.id] || { production: 0, branch_1: 0, branch_2: 0 };
-      const totalProduced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
+      const totalProduced = batches.flatMap(b => b.items || []).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
       const totalDispatched = dispatches.flatMap(d => d.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
       const totalSold = sales.flatMap(sl => sl.items).filter(i => i.productId === p.id).reduce((sum, i) => sum + i.quantity, 0);
       return { productId: p.id, totalProduced, totalDispatched, totalSold, productionStock: s.production, branch1Stock: s.branch_1, branch2Stock: s.branch_2 };
@@ -929,9 +935,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addProduction = async (productId: string, quantity: number, notes?: string) => {
-    const batchId = `BATCH-${String(batches.length + 1).padStart(3, '0')}`;
     const id = `b${Date.now()}`;
-    const newBatch: ProductionBatch = { id, batchId, productId, quantity, date: new Date().toISOString().slice(0, 10), notes, syncStatus: isOnline ? 'synced' : 'pending' };
+    const newBatch: ProductionBatch = { 
+      id, 
+      items: [{ productId, quantity }], 
+      date: new Date().toISOString().slice(0, 10), 
+      notes, 
+      syncStatus: isOnline ? 'synced' : 'pending' 
+    };
     setBatches(prev => [...prev, newBatch]);
     if (isOnline && hasSupabaseConfig) {
       try {

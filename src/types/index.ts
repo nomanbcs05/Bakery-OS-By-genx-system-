@@ -61,9 +61,7 @@ export interface RawMaterialAdjustment {
 
 export interface ProductionBatch {
   id: string;
-  batchId: string;
-  productId: string;
-  quantity: number;
+  items: { productId: string; quantity: number }[];
   date: string;
   notes?: string;
   syncStatus: 'synced' | 'pending';
@@ -170,9 +168,7 @@ export interface DBRecipe {
 
 export interface DBProductionBatch {
   id: string;
-  batch_id: string;
-  product_id: string;
-  quantity: number;
+  items: any; // Will be stored as JSON/JSONB
   date: string;
   notes?: string;
   sync_status: 'synced' | 'pending';
