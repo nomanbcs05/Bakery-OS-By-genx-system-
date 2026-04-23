@@ -138,11 +138,11 @@ export default function POS({ branch }: POSProps) {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Product Grid */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="flex flex-col sm:flex-row gap-4">
+    <div className="animate-fade-in h-[calc(100vh-120px)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+        {/* Product Grid — scrolls independently */}
+        <div className="lg:col-span-2 overflow-y-auto pr-2 space-y-6" style={{ scrollbarWidth: 'thin' }}>
+          <div className="flex flex-col sm:flex-row gap-4 sticky top-0 z-10 bg-slate-50 pb-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
@@ -187,7 +187,7 @@ export default function POS({ branch }: POSProps) {
             </div>
           </div>
 
-          <div className="pos-grid">
+          <div className="pos-grid pb-6">
             {availableProducts.map(p => {
               const avail = p.stock;
               const isOutOfStock = false; // Bypass stock ui disabling
@@ -213,9 +213,9 @@ export default function POS({ branch }: POSProps) {
           </div>
         </div>
 
-        {/* Cart */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-24 max-h-[calc(100vh-120px)] flex flex-col shadow-xl border-primary/10">
+        {/* Cart — stays fixed, never scrolls with products */}
+        <div className="lg:col-span-1 h-full">
+          <Card className="h-full max-h-[calc(100vh-120px)] flex flex-col shadow-xl border-primary/10">
             <CardHeader className="pb-3 border-b bg-muted/20">
               <CardTitle className="text-base flex items-center justify-between">
                 <div className="flex items-center gap-2">
