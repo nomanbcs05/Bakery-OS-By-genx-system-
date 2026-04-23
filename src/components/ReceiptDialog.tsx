@@ -80,7 +80,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
     .highlight-bill { 
       border-top: 1pt solid #000; 
       border-bottom: 2pt solid #000; 
-      padding: 6pt 4pt; 
+      padding: 10pt 4pt; 
       font-size: 14pt; 
       font-weight: bold; 
       display: flex; 
@@ -94,14 +94,14 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
       font-weight: bold; 
       display: flex; 
       margin-top: 6pt;
-      padding: 4pt 0;
+      padding: 6pt 0;
       font-size: 10.5pt;
     }
     .w-qty { width: 15%; text-align: left; padding-right: 4pt; }
     .w-item { width: 43%; text-align: left; padding: 0 4pt; font-weight: bold; overflow-wrap: break-word; }
     .w-rate { width: 20%; text-align: right; padding-right: 4pt; }
     .w-amount { width: 22%; text-align: right; font-weight: bold; }
-    .item-row { display: flex; padding: 5pt 0; align-items: flex-start; line-height: 1.2; width: 100%; border-bottom: 1px dashed #eee; }
+    .item-row { display: flex; padding: 8pt 0; align-items: flex-start; line-height: 1.2; width: 100%; border-bottom: 1px dashed #eee; }
     
     .phone-pill {
       background: #000 !important;
@@ -342,7 +342,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
 
           <div className="receipt-line mt-6"></div>
           <div className="text-[11pt] space-y-2">
-            <div className="flex-row py-1">
+            <div className="flex-row py-2">
               <span>SubTotal :</span>
               <span className="font-bold">{total}</span>
             </div>
