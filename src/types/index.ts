@@ -369,6 +369,8 @@ export interface LedgerEntry {
   credit: number;
   name?: string;
   station?: string;
+  accountNo?: string;
+  closingBalance?: number;
   category: 'general' | 'customer' | 'vendor';
   syncStatus: 'synced' | 'pending';
 }
@@ -382,6 +384,8 @@ export interface DBLedgerEntry {
   credit: number;
   name?: string;
   station?: string;
+  account_no?: string;
+  closing_balance?: number;
   category: string;
   sync_status: 'synced' | 'pending';
 }

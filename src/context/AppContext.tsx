@@ -238,12 +238,14 @@ const fromDBRecipe = (r: DBRecipe): Recipe => ({
 const fromDBLedgerEntry = (l: DBLedgerEntry): LedgerEntry => ({
   id: l.id, date: l.date, accountHead: l.account_head, accountType: l.account_type as any, 
   debit: l.debit, credit: l.credit, name: l.name, station: l.station, 
+  accountNo: l.account_no, closingBalance: l.closing_balance,
   category: l.category as any, syncStatus: l.sync_status || 'synced'
 });
 
 const toDBLedgerEntry = (l: LedgerEntry): DBLedgerEntry => ({
   id: l.id, date: l.date, account_head: l.accountHead, account_type: l.accountType,
   debit: l.debit, credit: l.credit, name: l.name, station: l.station,
+  account_no: l.accountNo, closing_balance: l.closingBalance,
   category: l.category, sync_status: l.syncStatus
 });
 

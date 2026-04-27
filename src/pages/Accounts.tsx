@@ -44,8 +44,15 @@ export default function Accounts() {
     credit: '0', 
     name: '', 
     station: '', 
+    accountNo: '',
+    closingBalance: '0',
     date: new Date().toISOString().slice(0, 10) 
   });
+
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState('all');
+  const [filterStation, setFilterStation] = useState('all');
+  const [filterType, setFilterType] = useState('all');
 
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', department: '', baseSalary: '' });
@@ -151,6 +158,8 @@ export default function Accounts() {
       credit,
       name: manualEntry.name,
       station: manualEntry.station,
+      accountNo: manualEntry.accountNo,
+      closingBalance: parseFloat(manualEntry.closingBalance) || 0,
       category: ledgerType as any
     });
 
@@ -162,6 +171,8 @@ export default function Accounts() {
       credit: '0', 
       name: '', 
       station: '',
+      accountNo: '',
+      closingBalance: '0',
       date: new Date().toISOString().slice(0, 10) 
     });
     toast.success("Entry added to ledger from backend");
@@ -639,43 +650,88 @@ export default function Accounts() {
                           <Input type="date" value={manualEntry.date} onChange={e => setManualEntry({...manualEntry, date: e.target.value})} />
                         </div>
                         
-                        <div className="space-y-2 col-span-2">
-                          <Label>Account Head / Title</Label>
-                          <Input value={manualEntry.accountHead} onChange={e => setManualEntry({...manualEntry, accountHead: e.target.value})} placeholder="e.g. Sales, Rent, Electricity" />
-                        </div>
+                        {ledgerType === 'vendor' && (
+                          <>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Title of Account (Vendor Name)</Label>
+                              <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Ali Traders" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-success font-bold">Debit (Paid)</Label>
+                              <Input type="number" value={manualEntry.debit} onChange={e => setManualEntry({...manualEntry, debit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-destructive font-bold">Credit (Purchases)</Label>
+                              <Input type="number" value={manualEntry.credit} onChange={e => setManualEntry({...manualEntry, credit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Closing Balance</Label>
+                              <Input type="number" value={manualEntry.closingBalance} onChange={e => setManualEntry({...manualEntry, closingBalance: e.target.value})} placeholder="0.00" />
+                            </div>
+                          </>
+                        )}
 
-                        <div className="space-y-2">
-                          <Label>Account Type</Label>
-                          <Select value={manualEntry.accountType} onValueChange={v => setManualEntry({...manualEntry, accountType: v as any})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Income">Income</SelectItem>
-                              <SelectItem value="Expense">Expense</SelectItem>
-                              <SelectItem value="Asset">Asset</SelectItem>
-                              <SelectItem value="Liability">Liability</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {ledgerType === 'customer' && (
+                          <>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Title of Account (Customer Name)</Label>
+                              <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Ahmed Ali" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Station / City</Label>
+                              <Input value={manualEntry.station} onChange={e => setManualEntry({...manualEntry, station: e.target.value})} placeholder="e.g. Nawabshah" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-destructive font-bold">Debit (Sales)</Label>
+                              <Input type="number" value={manualEntry.debit} onChange={e => setManualEntry({...manualEntry, debit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-success font-bold">Credit (Paid)</Label>
+                              <Input type="number" value={manualEntry.credit} onChange={e => setManualEntry({...manualEntry, credit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Closing Balance</Label>
+                              <Input type="number" value={manualEntry.closingBalance} onChange={e => setManualEntry({...manualEntry, closingBalance: e.target.value})} placeholder="0.00" />
+                            </div>
+                          </>
+                        )}
 
-                        <div className="space-y-2">
-                          <Label>Station / Location</Label>
-                          <Input value={manualEntry.station} onChange={e => setManualEntry({...manualEntry, station: e.target.value})} placeholder="e.g. NWS" />
-                        </div>
-
-                        <div className="space-y-2 col-span-2 border-t pt-4">
-                          <Label className="text-primary font-bold">Party / Customer / Vendor Name</Label>
-                          <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Ali Traders" />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-destructive font-bold">Debit (Out/Sale)</Label>
-                          <Input type="number" value={manualEntry.debit} onChange={e => setManualEntry({...manualEntry, debit: e.target.value})} placeholder="0.00" />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-success font-bold">Credit (In/Payment)</Label>
-                          <Input type="number" value={manualEntry.credit} onChange={e => setManualEntry({...manualEntry, credit: e.target.value})} placeholder="0.00" />
-                        </div>
+                        {ledgerType === 'general' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Account No</Label>
+                              <Input value={manualEntry.accountNo} onChange={e => setManualEntry({...manualEntry, accountNo: e.target.value})} placeholder="e.g. 1001" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Account Head</Label>
+                              <Input value={manualEntry.accountHead} onChange={e => setManualEntry({...manualEntry, accountHead: e.target.value})} placeholder="e.g. Rent, Electricity" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Type</Label>
+                              <Select value={manualEntry.accountType} onValueChange={v => setManualEntry({...manualEntry, accountType: v as any})}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Income">Income</SelectItem>
+                                  <SelectItem value="Expense">Expense</SelectItem>
+                                  <SelectItem value="Asset">Asset</SelectItem>
+                                  <SelectItem value="Liability">Liability</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-destructive font-bold">Debit</Label>
+                              <Input type="number" value={manualEntry.debit} onChange={e => setManualEntry({...manualEntry, debit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-success font-bold">Credit</Label>
+                              <Input type="number" value={manualEntry.credit} onChange={e => setManualEntry({...manualEntry, credit: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Closing Balance</Label>
+                              <Input type="number" value={manualEntry.closingBalance} onChange={e => setManualEntry({...manualEntry, closingBalance: e.target.value})} placeholder="0.00" />
+                            </div>
+                          </>
+                        )}
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddEntryOpen(false)}>Cancel</Button>
@@ -727,6 +783,55 @@ export default function Accounts() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-muted/30 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">Year:</Label>
+                  <Select value={filterYear} onValueChange={setFilterYear}>
+                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['2023', '2024', '2025', '2026', '2027'].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground">Month:</Label>
+                  <Select value={filterMonth} onValueChange={setFilterMonth}>
+                    <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Months</SelectItem>
+                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {ledgerType === 'customer' && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-bold uppercase text-muted-foreground">City/Station:</Label>
+                    <Select value={filterStation} onValueChange={setFilterStation}>
+                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Cities</SelectItem>
+                        {Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer').map(e => e.station).filter(Boolean))).map(s => <SelectItem key={s} value={s as string}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {ledgerType === 'general' && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs font-bold uppercase text-muted-foreground">Type:</Label>
+                    <Select value={filterType} onValueChange={setFilterType}>
+                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="Income">Income</SelectItem>
+                        <SelectItem value="Expense">Expense</SelectItem>
+                        <SelectItem value="Asset">Asset</SelectItem>
+                        <SelectItem value="Liability">Liability</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
               {ledgerType === 'vendor' && (
                 <Table>
                   <TableHeader className="bg-muted/50">
@@ -743,12 +848,22 @@ export default function Accounts() {
                       if (vendors.length === 0) return <TableRow><TableCell colSpan={4} className="text-center py-8">No vendor data found</TableCell></TableRow>;
                       
                       return vendors.map(vendor => {
-                        const vendorPurchases = purchases.filter(p => p.vendorName === vendor);
-                        const vendorManual = ledgerEntries.filter(e => e.category === 'vendor' && e.name === vendor);
+                        const filterData = <T extends { date: string }>(items: T[]) => {
+                          return items.filter(item => {
+                            const date = new Date(item.date);
+                            const yearMatch = date.getFullYear().toString() === filterYear;
+                            const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                            return yearMatch && monthMatch;
+                          });
+                        };
+
+                        const vendorPurchases = filterData(purchases.filter(p => p.vendorName === vendor));
+                        const vendorManual = filterData(ledgerEntries.filter(e => e.category === 'vendor' && e.name === vendor));
                         
                         const debit = vendorPurchases.reduce((sum, p) => sum + p.amountPaid, 0) + vendorManual.reduce((sum, e) => sum + e.debit, 0);
                         const credit = vendorPurchases.reduce((sum, p) => sum + p.totalCost, 0) + vendorManual.reduce((sum, e) => sum + e.credit, 0);
-                        const balance = credit - debit;
+                        const manualClosing = vendorManual.length > 0 ? vendorManual[vendorManual.length - 1].closingBalance || 0 : 0;
+                        const balance = manualClosing || (credit - debit);
                         
                         return (
                           <TableRow key={vendor}>
@@ -781,26 +896,38 @@ export default function Accounts() {
                       if (customers.length === 0) return <TableRow><TableCell colSpan={5} className="text-center py-8">No customer data found</TableCell></TableRow>;
                       
                       return customers.map(customer => {
-                        const customerSales = sales.filter(s => s.customerName === customer);
-                        const customerManual = ledgerEntries.filter(e => e.category === 'customer' && e.name === customer);
+                        const filterData = <T extends { date: string, station?: string }>(items: T[]) => {
+                          return items.filter(item => {
+                            const date = new Date(item.date);
+                            const yearMatch = date.getFullYear().toString() === filterYear;
+                            const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                            const stationMatch = filterStation === 'all' || item.station === filterStation;
+                            return yearMatch && monthMatch && stationMatch;
+                          });
+                        };
+
+                        const customerSales = filterData(sales.filter(s => s.customerName === customer).map(s => ({...s, station: 'NWS'})));
+                        const customerManual = filterData(ledgerEntries.filter(e => e.category === 'customer' && e.name === customer));
 
                         const debit = customerSales.reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.debit, 0);
-                        // In this system, we consider credit paid sales as "Credit" in the ledger
                         const credit = customerSales.filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid).reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.credit, 0);
-                        const balance = debit - credit;
+                        const manualClosing = customerManual.length > 0 ? customerManual[customerManual.length - 1].closingBalance || 0 : 0;
+                        const balance = manualClosing || (debit - credit);
                         
                         const station = customerManual.length > 0 ? customerManual[0].station : 'NWS';
                         
+                        if (filterStation !== 'all' && station !== filterStation) return null;
+
                         return (
                           <TableRow key={customer as string}>
                             <TableCell className="font-medium">{customer}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-[10px]">NWS</Badge></TableCell>
+                            <TableCell><Badge variant="outline" className="text-[10px]">{station}</Badge></TableCell>
                             <TableCell className="text-right font-mono text-destructive">Rs. {debit.toLocaleString()}</TableCell>
                             <TableCell className="text-right font-mono text-success">Rs. {credit.toLocaleString()}</TableCell>
                             <TableCell className="text-right font-mono font-bold">Rs. {balance.toLocaleString()}</TableCell>
                           </TableRow>
                         );
-                      });
+                      }).filter(Boolean);
                     })()}
                   </TableBody>
                 </Table>
@@ -819,30 +946,53 @@ export default function Accounts() {
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
-                      const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-                      const totalPurchases = purchases.reduce((sum, p) => sum + p.totalCost, 0);
-                      const totalSalaries = salaryVouchers.reduce((sum, v) => sum + v.amount, 0);
-                      const totalAdvances = staffDeductions.reduce((sum, d) => sum + d.amount, 0);
-                      const totalCustomerCredit = sales.filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid).reduce((sum, s) => sum + s.total, 0);
-                      const totalVendorPayable = purchases.reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
+                      const filterData = <T extends { date: string }>(items: T[]) => {
+                        return items.filter(item => {
+                          const date = new Date(item.date);
+                          const yearMatch = date.getFullYear().toString() === filterYear;
+                          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                          return yearMatch && monthMatch;
+                        });
+                      };
+
+                      const fSales = filterData(sales);
+                      const fPurchases = filterData(purchases);
+                      const fExpenses = filterData(expenses);
+                      const fSalaryVouchers = filterData(salaryVouchers);
+                      const fStaffDeductions = filterData(staffDeductions);
+                      const fLedgerEntries = filterData(ledgerEntries);
+
+                      const totalSales = fSales.reduce((sum, s) => sum + s.total, 0);
+                      const totalExpenses = fExpenses.reduce((sum, e) => sum + e.amount, 0);
+                      const totalPurchases = fPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+                      const totalSalaries = fSalaryVouchers.reduce((sum, v) => sum + v.amount, 0);
+                      const totalAdvances = fStaffDeductions.reduce((sum, d) => sum + d.amount, 0);
+                      const totalCustomerCredit = fSales.filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid).reduce((sum, s) => sum + s.total, 0);
+                      const totalVendorPayable = fPurchases.reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
 
                       const heads = [
-                        { name: 'Sales Income', type: 'Income', debit: ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.debit, 0), credit: totalSales + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.credit, 0), bal: totalSales, color: 'text-success' },
-                        { name: 'Operating Expenses', type: 'Expense', debit: totalExpenses + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.debit, 0), credit: ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.credit, 0), bal: totalExpenses, color: 'text-destructive' },
-                        { name: 'Raw Material Purchases', type: 'Expense', debit: totalPurchases + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Raw Material Purchases').reduce((sum, e) => sum + e.debit, 0), credit: 0, bal: totalPurchases, color: 'text-destructive' },
+                        { name: 'Sales Income', type: 'Income', debit: fLedgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.debit, 0), credit: totalSales + fLedgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.credit, 0), bal: totalSales, color: 'text-success' },
+                        { name: 'Operating Expenses', type: 'Expense', debit: totalExpenses + fLedgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.debit, 0), credit: fLedgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.credit, 0), bal: totalExpenses, color: 'text-destructive' },
+                        { name: 'Raw Material Purchases', type: 'Expense', debit: totalPurchases + fLedgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Raw Material Purchases').reduce((sum, e) => sum + e.debit, 0), credit: 0, bal: totalPurchases, color: 'text-destructive' },
                         { name: 'Staff Salaries', type: 'Expense', debit: totalSalaries, credit: 0, bal: totalSalaries, color: 'text-destructive' },
                         { name: 'Staff Advances', type: 'Asset', debit: totalAdvances, credit: 0, bal: totalAdvances, color: 'text-primary' },
                         { name: 'Accounts Receivable', type: 'Asset', debit: totalCustomerCredit, credit: 0, bal: totalCustomerCredit, color: 'text-primary' },
                         { name: 'Accounts Payable', type: 'Liability', debit: 0, credit: totalVendorPayable, bal: totalVendorPayable, color: 'text-destructive' },
-                        ...ledgerEntries.filter(e => e.category === 'general' && !['Sales Income', 'Operating Expenses', 'Raw Material Purchases'].includes(e.accountHead)).map(e => ({
-                          name: e.accountHead, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive'
+                        ...fLedgerEntries.filter(e => e.category === 'general' && !['Sales Income', 'Operating Expenses', 'Raw Material Purchases'].includes(e.accountHead))
+                          .filter(e => filterType === 'all' || e.accountType === filterType)
+                          .map(e => ({
+                          name: e.accountHead, accountNo: e.accountNo, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive'
                         }))
                       ];
 
                       return heads.map((head, idx) => (
                         <TableRow key={`${head.name}-${idx}`}>
-                          <TableCell className="font-semibold">{head.name}</TableCell>
+                          <TableCell className="font-semibold">
+                            <div className="flex flex-col">
+                              <span>{head.name}</span>
+                              {head.accountNo && <span className="text-[10px] text-muted-foreground font-mono">No: {head.accountNo}</span>}
+                            </div>
+                          </TableCell>
                           <TableCell><Badge variant="outline">{head.type}</Badge></TableCell>
                           <TableCell className="text-right font-mono">Rs. {head.debit.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-mono">Rs. {head.credit.toLocaleString()}</TableCell>
@@ -852,18 +1002,42 @@ export default function Accounts() {
                     })()}
                   </TableBody>
                   <tfoot className="bg-muted/20 font-bold">
-                    <TableRow>
-                      <TableCell colSpan={2}>Grand Totals</TableCell>
-                      <TableCell className="text-right font-mono">
-                        Rs. {(expenses.reduce((sum, e) => sum + e.amount, 0) + purchases.reduce((sum, p) => sum + p.totalCost, 0) + salaryVouchers.reduce((sum, v) => sum + v.amount, 0) + staffDeductions.reduce((sum, d) => sum + d.amount, 0)).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        Rs. {sales.reduce((sum, s) => sum + s.total, 0).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-primary">
-                        Rs. {(sales.reduce((sum, s) => sum + s.total, 0) - (expenses.reduce((sum, e) => sum + e.amount, 0) + purchases.reduce((sum, p) => sum + p.totalCost, 0) + salaryVouchers.reduce((sum, v) => sum + v.amount, 0))).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
+                    {(() => {
+                      const filterData = <T extends { date: string }>(items: T[]) => {
+                        return items.filter(item => {
+                          const date = new Date(item.date);
+                          const yearMatch = date.getFullYear().toString() === filterYear;
+                          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                          return yearMatch && monthMatch;
+                        });
+                      };
+                      const fSales = filterData(sales);
+                      const fPurchases = filterData(purchases);
+                      const fExpenses = filterData(expenses);
+                      const fSalaryVouchers = filterData(salaryVouchers);
+                      const fStaffDeductions = filterData(staffDeductions);
+                      
+                      const totExp = fExpenses.reduce((sum, e) => sum + e.amount, 0);
+                      const totPur = fPurchases.reduce((sum, p) => sum + p.totalCost, 0);
+                      const totSal = fSalaryVouchers.reduce((sum, v) => sum + v.amount, 0);
+                      const totAdv = fStaffDeductions.reduce((sum, d) => sum + d.amount, 0);
+                      const totSales = fSales.reduce((sum, s) => sum + s.total, 0);
+
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={2}>Grand Totals</TableCell>
+                          <TableCell className="text-right font-mono">
+                            Rs. {(totExp + totPur + totSal + totAdv).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            Rs. {totSales.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-primary">
+                            Rs. {(totSales - (totExp + totPur + totSal)).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </tfoot>
                 </Table>
               )}
