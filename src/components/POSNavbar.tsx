@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
-  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2
+  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2, ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,12 +19,14 @@ const mainNav = [
   { title: 'Recipes (BOM)', url: '/recipes', icon: TestTube2 },
   { title: 'Production Stock', url: '/production-stock', icon: Package },
   { title: 'Dispatch', url: '/dispatch', icon: Truck },
+  { title: 'Advance Orders', url: '/advance-orders-production', icon: ClipboardList },
 ];
 
 const salesNav = [
   { title: 'POS 1', url: '/pos/branch-1', icon: ShoppingCart },
   { title: 'POS 2', url: '/pos/branch-2', icon: ShoppingCart },
   { title: 'Walk-in', url: '/walkin', icon: Store },
+  { title: 'Advance Orders', url: '/advance-orders', icon: ClipboardList },
 ];
 
 const managementNav = [
@@ -85,14 +87,15 @@ export function POSNavbar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Recipes (BOM)', 'Production Stock', 'Dispatch'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Advance Orders'].includes(item.title);
     if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
     return false;
   });
 
   const filteredSalesNav = salesNav.filter(item => {
-    if (isRole(['admin'])) return false;
+    if (isRole(['admin'])) return item.title === 'Advance Orders';
     if (isRole(['branch_staff'])) {
+      if (item.title === 'Advance Orders') return true;
       if (selectedProfile.branchId === 'branch_1') return item.title === 'POS 1';
       if (selectedProfile.branchId === 'branch_2') return item.title === 'POS 2';
       return false;

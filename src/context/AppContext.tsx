@@ -460,11 +460,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => { rawMaterialAdjustmentsRef.current = rawMaterialAdjustments; }, [rawMaterialAdjustments]);
   useEffect(() => { receiptSettingsRef.current = receiptSettings; }, [receiptSettings]);
 
-  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>(initialState.ledgerEntries || []);
   const ledgerEntriesRef = React.useRef(ledgerEntries);
   useEffect(() => { ledgerEntriesRef.current = ledgerEntries; }, [ledgerEntries]);
 
-  const [advanceOrders, setAdvanceOrders] = useState<AdvanceOrder[]>([]);
+  const [advanceOrders, setAdvanceOrders] = useState<AdvanceOrder[]>(initialState.advanceOrders || []);
   const advanceOrdersRef = React.useRef(advanceOrders);
   useEffect(() => { advanceOrdersRef.current = advanceOrders; }, [advanceOrders]);
 
@@ -792,6 +792,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
             }
           }
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'advance_orders' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const ao = fromDBAdvanceOrder(p.new as DBAdvanceOrder);
+            setAdvanceOrders(prev => {
+              const idx = prev.findIndex(x => x.id === ao.id);
+              if (idx === -1) return [...prev, ao];
+              const next = [...prev]; next[idx] = ao; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setAdvanceOrders(prev => prev.filter(o => o.id !== (p.old as any).id));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_entries' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const le = fromDBLedgerEntry(p.new as DBLedgerEntry);
+            setLedgerEntries(prev => {
+              const idx = prev.findIndex(x => x.id === le.id);
+              if (idx === -1) return [...prev, le];
+              const next = [...prev]; next[idx] = le; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setLedgerEntries(prev => prev.filter(l => l.id !== (p.old as any).id));
+          }
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('Realtime subscribed successfully');
@@ -808,9 +832,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasLoaded.current || DISABLE_OFFLINE_DB) return;
-    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases };
+    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries]);
 
   useEffect(() => {
     if (!hasLoaded.current) return;

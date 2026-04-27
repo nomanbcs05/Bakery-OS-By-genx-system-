@@ -49,7 +49,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { currentUser, selectedProfile, lockProfile, hasSupabaseConfig, isOnline } = useApp();
+  const { currentUser, selectedProfile, lockProfile, hasSupabaseConfig, isOnline, receiptSettings, forceSync } = useApp();
 
   if (!currentUser || !selectedProfile) return null;
 
