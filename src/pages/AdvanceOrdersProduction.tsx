@@ -92,8 +92,9 @@ export default function AdvanceOrdersProduction() {
         </body></html>
       `);
       printWindow.document.close();
+      printWindow.focus();
+      printWindow.onafterprint = () => printWindow.close();
       printWindow.print();
-      printWindow.close();
     }
   };
 

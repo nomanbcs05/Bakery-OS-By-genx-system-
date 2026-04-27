@@ -139,8 +139,9 @@ export default function AdvanceOrders() {
             </head><body>${printContent.innerHTML}</body></html>
           `);
           printWindow.document.close();
+          printWindow.focus();
+          printWindow.onafterprint = () => printWindow.close();
           printWindow.print();
-          printWindow.close();
         }
       }
       setPrintOrderId(null);

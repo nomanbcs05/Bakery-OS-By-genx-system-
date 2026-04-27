@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bakewise-v5'; // Bump version
+const CACHE_NAME = 'bakewise-v6'; // Bump version
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -61,7 +61,7 @@ self.addEventListener('fetch', (event) => {
         });
         return response;
       }).catch(() => {
-        return caches.match(event.request);
+        return caches.match(event.request).then(res => res || caches.match('/index.html'));
       })
     );
     return;
