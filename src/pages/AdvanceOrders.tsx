@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, ClipboardList, Printer, CheckCircle2, Clock, Package, Trash2, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
-import type { SaleItem } from '@/types';
+import ReceiptDialog from '@/components/ReceiptDialog';
+import type { SaleItem, AdvanceOrder } from '@/types';
 
 export default function AdvanceOrders() {
   const { 
     products, advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
-    selectedProfile, getProductById, receiptSettings
+    selectedProfile, getProductById, receiptSettings, createSale
   } = useApp();
 
   const branch = selectedProfile?.branchId || 'branch_1';
@@ -32,6 +33,7 @@ export default function AdvanceOrders() {
   const [quantity, setQuantity] = useState('1');
   const [searchTerm, setSearchTerm] = useState('');
   const [printOrderId, setPrintOrderId] = useState<string | null>(null);
+  const [completedReceiptOrder, setCompletedReceiptOrder] = useState<AdvanceOrder | null>(null);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -108,9 +110,13 @@ export default function AdvanceOrders() {
   };
 
   const handleCompleteOrder = async (id: string) => {
-    if (confirm("Mark this order as completed and handed over to customer?")) {
+    if (confirm("Mark this order as completed and handed over to customer? This will automatically add the final amount to today's POS sales and profit.")) {
+      const order = advanceOrders.find(o => o.id === id);
+      if (order) {
+         await createSale('branch', order.branch as any, order.items, 'cash', order.customerName, order.customerPhone, order.total);
+      }
       await updateAdvanceOrderStatus(id, 'completed');
-      toast.success("Order marked as completed!");
+      toast.success("Order marked as completed and added to Sales History!");
     }
   };
 
@@ -272,7 +278,13 @@ export default function AdvanceOrders() {
             <TableCell className="text-center">{getStatusBadge(order.status)}</TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
-                <Button size="sm" variant="outline" onClick={() => handlePrint(order.id)}>
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (order.status === 'completed') {
+                    setCompletedReceiptOrder(order);
+                  } else {
+                    handlePrint(order.id);
+                  }
+                }}>
                   <Printer className="h-3 w-3 mr-1" /> Print
                 </Button>
                 {showComplete && order.status === 'received' && (
@@ -483,6 +495,26 @@ export default function AdvanceOrders() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Print Completed Order Final Bill */}
+      {completedReceiptOrder && (
+        <ReceiptDialog
+          open={!!completedReceiptOrder}
+          onClose={() => setCompletedReceiptOrder(null)}
+          items={completedReceiptOrder.items.map(i => {
+            const p = getProductById(i.productId);
+            return { name: p?.name || 'Unknown', quantity: i.quantity, unitPrice: i.unitPrice };
+          })}
+          total={completedReceiptOrder.total}
+          paymentMethod="cash"
+          branch={completedReceiptOrder.branch}
+          saleId={`AOT-${completedReceiptOrder.id.slice(-6).toUpperCase()}`}
+          date={completedReceiptOrder.createdAt}
+          customerName={completedReceiptOrder.customerName}
+          customerPhone={completedReceiptOrder.customerPhone}
+          autoPrint={true}
+        />
       )}
     </div>
   );
