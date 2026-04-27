@@ -11,6 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
+import { Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 
 export default function Accounts() {
   const { 
@@ -24,6 +32,7 @@ export default function Accounts() {
   } = useApp();
 
   const [ledgerType, setLedgerType] = useState('general');
+  const [activeTab, setActiveTab] = useState('overview');
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
 
@@ -181,6 +190,168 @@ export default function Accounts() {
     toast.success(`${ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1)} ledger cleared from backend`);
   };
 
+  const handleExportData = (type: 'pdf' | 'excel') => {
+    let title = '';
+    let fileName = '';
+    let headers: string[] = [];
+    let data: any[] = [];
+
+    if (activeTab === 'overview') {
+      title = 'Staff Directory';
+      fileName = 'staff_directory';
+      headers = ['Name', 'Department', 'Base Salary', 'Total Deductions', 'Net Payable', 'Status'];
+      
+      const rawData = activeStaff.map(member => {
+        const totalDeductions = staffDeductions
+          .filter(d => d.staffId === member.id)
+          .reduce((sum, d) => sum + d.amount, 0);
+        
+        const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+        const currentYear = new Date().getFullYear();
+        const isPaid = salaryVouchers.find(v => 
+          v.staffId === member.id && v.month === currentMonth && v.year === currentYear
+        );
+
+        return {
+          name: member.name,
+          department: member.department,
+          baseSalary: member.baseSalary,
+          totalDeductions: totalDeductions,
+          netPayable: member.baseSalary - totalDeductions,
+          status: isPaid ? `Paid (${currentMonth})` : 'Unpaid'
+        };
+      });
+
+      if (type === 'pdf') {
+        data = rawData.map(r => [r.name, r.department, r.baseSalary.toFixed(2), r.totalDeductions.toFixed(2), r.netPayable.toFixed(2), r.status]);
+      } else {
+        data = rawData;
+      }
+    } else if (activeTab === 'vouchers') {
+      title = 'Salary Vouchers';
+      fileName = 'salary_vouchers';
+      headers = ['Voucher ID', 'Staff Name', 'Period', 'Date Paid', 'Amount Paid'];
+      
+      const rawData = salaryVouchers.map(v => {
+        const member = staff.find(s => s.id === v.staffId);
+        return {
+          id: v.id,
+          name: member?.name || 'Unknown',
+          period: `${v.month} ${v.year}`,
+          date: v.date,
+          amount: v.amount
+        };
+      });
+
+      if (type === 'pdf') {
+        data = rawData.map(r => [r.id, r.name, r.period, r.date, r.amount.toFixed(2)]);
+      } else {
+        data = rawData;
+      }
+    } else if (activeTab === 'deductions') {
+      title = 'Deductions & Advances';
+      fileName = 'staff_deductions';
+      headers = ['Staff Name', 'Reason', 'Date', 'Amount'];
+      
+      const rawData = staffDeductions.map(d => {
+        const member = staff.find(s => s.id === d.staffId);
+        return {
+          name: member?.name || 'Unknown',
+          reason: d.reason,
+          date: d.date,
+          amount: d.amount
+        };
+      });
+
+      if (type === 'pdf') {
+        data = rawData.map(r => [r.name, r.reason, r.date, r.amount.toFixed(2)]);
+      } else {
+        data = rawData;
+      }
+    } else if (activeTab === 'ledgers') {
+      if (ledgerType === 'vendor') {
+        title = 'Vendor Ledger';
+        fileName = 'vendor_ledger';
+        headers = ['Vendor Name', 'Debit (Paid)', 'Credit (Purchases)', 'Closing Balance'];
+        
+        const vendors = Array.from(new Set([...purchases.map(p => p.vendorName), ...ledgerEntries.filter(e => e.category === 'vendor').map(e => e.name)].filter(Boolean)));
+        const rawData = vendors.map(vendor => {
+          const vendorPurchases = purchases.filter(p => p.vendorName === vendor);
+          const vendorManual = ledgerEntries.filter(e => e.category === 'vendor' && e.name === vendor);
+          const debit = vendorPurchases.reduce((sum, p) => sum + p.amountPaid, 0) + vendorManual.reduce((sum, e) => sum + e.debit, 0);
+          const credit = vendorPurchases.reduce((sum, p) => sum + p.totalCost, 0) + vendorManual.reduce((sum, e) => sum + e.credit, 0);
+          const balance = credit - debit;
+          return { name: vendor, debit, credit, balance };
+        });
+
+        if (type === 'pdf') {
+          data = rawData.map(r => [r.name, r.debit.toLocaleString(), r.credit.toLocaleString(), r.balance.toLocaleString()]);
+        } else {
+          data = rawData;
+        }
+      } else if (ledgerType === 'customer') {
+        title = 'Customer Ledger';
+        fileName = 'customer_ledger';
+        headers = ['Customer Name', 'Station', 'Debit (Sales)', 'Credit (Paid)', 'Closing Balance'];
+        
+        const customers = Array.from(new Set([...sales.filter(s => s.customerName).map(s => s.customerName), ...ledgerEntries.filter(e => e.category === 'customer').map(e => e.name)].filter(Boolean)));
+        const rawData = customers.map(customer => {
+          const customerSales = sales.filter(s => s.customerName === customer);
+          const customerManual = ledgerEntries.filter(e => e.category === 'customer' && e.name === customer);
+          const debit = customerSales.reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.debit, 0);
+          const credit = customerSales.filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid).reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.credit, 0);
+          const balance = debit - credit;
+          const station = customerManual.length > 0 ? customerManual[0].station : 'NWS';
+          return { name: customer, station, debit, credit, balance };
+        });
+
+        if (type === 'pdf') {
+          data = rawData.map(r => [r.name, r.station, r.debit.toLocaleString(), r.credit.toLocaleString(), r.balance.toLocaleString()]);
+        } else {
+          data = rawData;
+        }
+      } else {
+        title = 'General Ledger';
+        fileName = 'general_ledger';
+        headers = ['Account Head', 'Type', 'Debit', 'Credit', 'Balance'];
+        
+        const totalSales = sales.reduce((sum, s) => sum + s.total, 0);
+        const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+        const totalPurchases = purchases.reduce((sum, p) => sum + p.totalCost, 0);
+        const totalSalaries = salaryVouchers.reduce((sum, v) => sum + v.amount, 0);
+        const totalAdvances = staffDeductions.reduce((sum, d) => sum + d.amount, 0);
+        const totalCustomerCredit = sales.filter(s => s.paymentMethod === 'credit' && !s.isCreditPaid).reduce((sum, s) => sum + s.total, 0);
+        const totalVendorPayable = purchases.reduce((sum, p) => sum + (p.totalCost - p.amountPaid), 0);
+
+        const heads = [
+          { name: 'Sales Income', type: 'Income', debit: ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.debit, 0), credit: totalSales + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Sales Income').reduce((sum, e) => sum + e.credit, 0), bal: totalSales },
+          { name: 'Operating Expenses', type: 'Expense', debit: totalExpenses + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.debit, 0), credit: ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Operating Expenses').reduce((sum, e) => sum + e.credit, 0), bal: totalExpenses },
+          { name: 'Raw Material Purchases', type: 'Expense', debit: totalPurchases + ledgerEntries.filter(e => e.category === 'general' && e.accountHead === 'Raw Material Purchases').reduce((sum, e) => sum + e.debit, 0), credit: 0, bal: totalPurchases },
+          { name: 'Staff Salaries', type: 'Expense', debit: totalSalaries, credit: 0, bal: totalSalaries },
+          { name: 'Staff Advances', type: 'Asset', debit: totalAdvances, credit: 0, bal: totalAdvances },
+          { name: 'Accounts Receivable', type: 'Asset', debit: totalCustomerCredit, credit: 0, bal: totalCustomerCredit },
+          { name: 'Accounts Payable', type: 'Liability', debit: 0, credit: totalVendorPayable, bal: totalVendorPayable },
+          ...ledgerEntries.filter(e => e.category === 'general' && !['Sales Income', 'Operating Expenses', 'Raw Material Purchases'].includes(e.accountHead)).map(e => ({
+            name: e.accountHead, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit)
+          }))
+        ];
+
+        if (type === 'pdf') {
+          data = heads.map(h => [h.name, h.type, h.debit.toLocaleString(), h.credit.toLocaleString(), h.bal.toLocaleString()]);
+        } else {
+          data = heads;
+        }
+      }
+    }
+
+    if (type === 'pdf') {
+      exportToPDF(title, headers, data, fileName);
+    } else {
+      exportToExcel(data, fileName, title);
+    }
+    toast.success(`Exported ${title} to ${type.toUpperCase()}`);
+  };
+
   const activeStaff = staff.filter(s => s.isActive);
 
   return (
@@ -267,10 +438,29 @@ export default function Accounts() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportData('pdf')} className="flex items-center gap-2 cursor-pointer">
+                <FileText className="h-4 w-4 text-destructive" />
+                <span>Export to PDF</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportData('excel')} className="flex items-center gap-2 cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 text-success" />
+                <span>Export to Excel</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="overview">Staff Overview</TabsTrigger>
           <TabsTrigger value="vouchers">Salary Vouchers</TabsTrigger>
