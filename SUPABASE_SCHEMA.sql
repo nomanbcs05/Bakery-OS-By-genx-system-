@@ -335,6 +335,37 @@ CREATE TABLE IF NOT EXISTS recipes (
 -- Forcefully refresh the PostgREST API schema cache
 NOTIFY pgrst, 'reload schema';
 
+-- 17. Advance Orders Table
+CREATE TABLE IF NOT EXISTS advance_orders (
+  id TEXT PRIMARY KEY,
+  branch TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT,
+  items JSONB NOT NULL,
+  total DECIMAL NOT NULL,
+  delivery_date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  status TEXT DEFAULT 'pending',
+  notes TEXT,
+  sync_status TEXT DEFAULT 'synced'
+);
+
+-- 18. Ledger Entries Table
+CREATE TABLE IF NOT EXISTS ledger_entries (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  account_head TEXT NOT NULL,
+  account_type TEXT NOT NULL,
+  debit DECIMAL DEFAULT 0,
+  credit DECIMAL DEFAULT 0,
+  name TEXT,
+  station TEXT,
+  account_no TEXT,
+  closing_balance DECIMAL DEFAULT 0,
+  category TEXT NOT NULL,
+  sync_status TEXT DEFAULT 'synced'
+);
+
 
 -- 16. App Settings Table
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -370,7 +401,9 @@ BEGIN
     staff_deductions, 
     salary_vouchers, 
     purchases, 
-    app_settings;
+    app_settings,
+    advance_orders,
+    ledger_entries;
 END $$;
 
 -- Disable RLS for all tables to ensure seamless synchronization across all devices
@@ -390,6 +423,8 @@ ALTER TABLE staff_deductions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_vouchers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE advance_orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE ledger_entries DISABLE ROW LEVEL SECURITY;
 
 -- Final schema cache refresh to fix "column not found" errors
 NOTIFY pgrst, 'reload schema';

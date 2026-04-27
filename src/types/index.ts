@@ -389,3 +389,31 @@ export interface DBLedgerEntry {
   category: string;
   sync_status: 'synced' | 'pending';
 }
+
+export interface AdvanceOrder {
+  id: string;
+  branch: 'branch_1' | 'branch_2';
+  customerName: string;
+  customerPhone: string;
+  items: SaleItem[];
+  total: number;
+  deliveryDate: string;
+  createdAt: string;
+  status: 'pending' | 'received' | 'completed';
+  notes?: string;
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface DBAdvanceOrder {
+  id: string;
+  branch: string;
+  customer_name: string;
+  customer_phone: string;
+  items: any;
+  total: number;
+  delivery_date: string;
+  created_at: string;
+  status: string;
+  notes?: string;
+  sync_status: 'synced' | 'pending';
+}

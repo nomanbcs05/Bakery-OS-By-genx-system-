@@ -3,7 +3,7 @@ import type {
   User, Product, ProductionBatch, Dispatch, DispatchDestination,
   DispatchItem, Sale, SaleItem, SaleType, PaymentMethod, Expense, AuditLog, InventorySnapshot, UserRole,
   RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings, Recipe, DBRecipe,
-  StaffMember, StaffDeduction, SalaryVoucher,
+  StaffMember, StaffDeduction, SalaryVoucher, AdvanceOrder, DBAdvanceOrder,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
   DBStaffMember, DBStaffDeduction, DBSalaryVoucher, Purchase, DBPurchase
 } from '@/types';
@@ -176,6 +176,10 @@ interface AppContextType extends AppState {
   ledgerEntries: LedgerEntry[];
   addLedgerEntry: (entry: Omit<LedgerEntry, 'id' | 'syncStatus'>) => Promise<void>;
   clearLedgerEntries: (category: 'general' | 'customer' | 'vendor') => Promise<void>;
+  // Advance Orders
+  advanceOrders: AdvanceOrder[];
+  addAdvanceOrder: (order: Omit<AdvanceOrder, 'id' | 'syncStatus' | 'createdAt' | 'status'>) => Promise<string>;
+  updateAdvanceOrderStatus: (id: string, status: 'pending' | 'received' | 'completed') => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -247,6 +251,18 @@ const toDBLedgerEntry = (l: LedgerEntry): DBLedgerEntry => ({
   debit: l.debit, credit: l.credit, name: l.name, station: l.station,
   account_no: l.accountNo, closing_balance: l.closingBalance,
   category: l.category, sync_status: l.syncStatus
+});
+
+const fromDBAdvanceOrder = (o: DBAdvanceOrder): AdvanceOrder => ({
+  id: o.id, branch: o.branch as any, customerName: o.customer_name, customerPhone: o.customer_phone,
+  items: o.items || [], total: o.total, deliveryDate: o.delivery_date, createdAt: o.created_at,
+  status: o.status as any, notes: o.notes, syncStatus: o.sync_status || 'synced'
+});
+
+const toDBAdvanceOrder = (o: AdvanceOrder): DBAdvanceOrder => ({
+  id: o.id, branch: o.branch, customer_name: o.customerName, customer_phone: o.customerPhone,
+  items: o.items, total: o.total, delivery_date: o.deliveryDate, created_at: o.createdAt,
+  status: o.status, notes: o.notes, sync_status: o.syncStatus
 });
 
 // Helper to convert frontend objects to DB snake_case
@@ -448,6 +464,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const ledgerEntriesRef = React.useRef(ledgerEntries);
   useEffect(() => { ledgerEntriesRef.current = ledgerEntries; }, [ledgerEntries]);
 
+  const [advanceOrders, setAdvanceOrders] = useState<AdvanceOrder[]>([]);
+  const advanceOrdersRef = React.useRef(advanceOrders);
+  useEffect(() => { advanceOrdersRef.current = advanceOrders; }, [advanceOrders]);
+
   const syncOfflineData = useCallback(async () => {
     if (!hasSupabaseConfig || !navigator.onLine) return;
     
@@ -482,7 +502,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       syncTable('purchases', purchasesRef.current, toDBPurchase, setPurchases),
       syncTable('recipes', recipesRef.current, toDBRecipe, setRecipes),
       syncTable('raw_material_adjustments', rawMaterialAdjustmentsRef.current, toDBRawAdjustment, setRawMaterialAdjustments),
-      syncTable('ledger_entries', ledgerEntriesRef.current, toDBLedgerEntry, setLedgerEntries)
+      syncTable('ledger_entries', ledgerEntriesRef.current, toDBLedgerEntry, setLedgerEntries),
+      syncTable('advance_orders', advanceOrdersRef.current, toDBAdvanceOrder, setAdvanceOrders)
     ]);
 
     if (syncCount > 0) {
@@ -560,6 +581,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const leData = await fetchTable('ledger_entries', 'date');
     if (leData) setLedgerEntries(prev => merge(leData, prev, fromDBLedgerEntry));
+
+    const aoData = await fetchTable('advance_orders', 'created_at');
+    if (aoData) setAdvanceOrders(prev => merge(aoData, prev, fromDBAdvanceOrder));
 
     const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
     if (settingsData?.settings) {
@@ -1235,6 +1259,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addAdvanceOrder = async (order: Omit<AdvanceOrder, 'id' | 'syncStatus' | 'createdAt' | 'status'>): Promise<string> => {
+    const id = `ao${Date.now()}`;
+    const newOrder: AdvanceOrder = { ...order, id, createdAt: new Date().toISOString(), status: 'pending', syncStatus: isOnline ? 'synced' : 'pending' };
+    setAdvanceOrders(prev => [...prev, newOrder]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        const { error } = await supabase.from('advance_orders').upsert([toDBAdvanceOrder(newOrder)]);
+        if (error) throw error;
+      } catch (err) {
+        setAdvanceOrders(prev => prev.map(o => o.id === id ? { ...o, syncStatus: 'pending' } : o));
+      }
+    }
+    return id;
+  };
+
+  const updateAdvanceOrderStatus = async (id: string, status: 'pending' | 'received' | 'completed') => {
+    setAdvanceOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('advance_orders').update({ status }).eq('id', id); } catch (err) { console.error(err); }
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, selectedProfile, isProfileLocked, products, rawMaterials, rawMaterialAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, allUsers, isOnline, lastSyncTime, isLoading,
@@ -1336,6 +1382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
       ledgerEntries, addLedgerEntry, clearLedgerEntries,
+      advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
       hasSupabaseConfig
     }}>
       {children}

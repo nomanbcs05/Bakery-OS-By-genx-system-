@@ -26,6 +26,8 @@ import BranchSettings from "./pages/BranchSettings";
 import LoginPage from "./pages/Login";
 import RawMaterialStock from "./pages/RawMaterialStock";
 import ProfileSelection from "./pages/ProfileSelection";
+import AdvanceOrders from "./pages/AdvanceOrders";
+import AdvanceOrdersProduction from "./pages/AdvanceOrdersProduction";
 import NotFound from "./pages/NotFound";
 import type { UserRole } from "@/types";
 
@@ -185,6 +187,16 @@ const AppRoutes = () => {
         <Route path="/branch-settings" element={
           <ProtectedRoute allowedRoles={['admin', 'branch_staff']}>
             <BranchSettings />
+          </ProtectedRoute>
+        } />
+        <Route path="/advance-orders" element={
+          <ProtectedRoute allowedRoles={['admin', 'branch_staff']}>
+            <AdvanceOrders />
+          </ProtectedRoute>
+        } />
+        <Route path="/advance-orders-production" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
+            <AdvanceOrdersProduction />
           </ProtectedRoute>
         } />
         <Route path="*" element={<NotFound />} />
