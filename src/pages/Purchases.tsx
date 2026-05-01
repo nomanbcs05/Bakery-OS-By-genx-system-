@@ -125,13 +125,13 @@ export default function Purchases() {
               New Entry
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl rounded-3xl p-6 overflow-hidden">
+          <DialogContent className="max-w-2xl rounded-3xl p-6 overflow-y-auto max-h-[90vh]">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-xl font-bold">New Procurement</DialogTitle>
               <DialogDescription>Record a new purchase and update inventory</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Material</Label>
                 <Select onValueChange={(v) => setNewPurchase({...newPurchase, materialId: v})}>
                   <SelectTrigger className="rounded-xl h-11 border-slate-200">
