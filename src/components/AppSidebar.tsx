@@ -76,7 +76,7 @@ export function AppSidebar() {
 
   const filteredManagementNav = managementNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return false;
+    if (isRole(['production_manager'])) return ['Accounts'].includes(item.title);
     if (isRole(['accountant'])) return ['Sales History', 'Sales Details', 'Inventory', 'Reports', 'Expenses', 'Accounts', 'Credits'].includes(item.title);
     if (isRole(['branch_staff'])) return ['Branch Products', 'Sales Details', 'Expenses'].includes(item.title);
     return false;
