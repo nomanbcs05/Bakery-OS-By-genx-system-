@@ -23,15 +23,20 @@ import {
   Filter,
   ArrowDownLeft,
   DollarSign,
-  TrendingDown
+  TrendingDown,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Purchases() {
-  const { rawMaterials, purchases, addPurchase } = useApp();
+  const { rawMaterials, purchases, addPurchase, addRawMaterial } = useApp();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [newMaterial, setNewMaterial] = useState({ name: '', category: 'Dry', unit: 'kg' });
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const categories = Array.from(new Set(rawMaterials.map(m => m.category)));
   
   const [newPurchase, setNewPurchase] = useState({
     materialId: '',
@@ -45,12 +50,36 @@ export default function Purchases() {
   });
 
   const handleAddPurchase = async () => {
-    if (!newPurchase.materialId || !newPurchase.vendorName || newPurchase.quantity <= 0) {
+    let finalMaterialId = newPurchase.materialId;
+
+    if (finalMaterialId === 'new') {
+      if (!newMaterial.name) {
+        toast.error("Material name is required");
+        return;
+      }
+      finalMaterialId = await addRawMaterial({
+        name: newMaterial.name,
+        category: newMaterial.category,
+        unit: newMaterial.unit,
+        minStockLevel: 0,
+        costPerUnit: newPurchase.quantity > 0 ? (newPurchase.totalCost / newPurchase.quantity) : 0,
+        supplierName: newPurchase.vendorName
+      });
+    } else if (!finalMaterialId) {
+      toast.error("Please select a material");
+      return;
+    }
+
+    if (!newPurchase.vendorName || newPurchase.quantity <= 0) {
       toast.error("Please fill all required fields");
       return;
     }
 
-    await addPurchase(newPurchase);
+    await addPurchase({
+      ...newPurchase,
+      materialId: finalMaterialId
+    });
+    
     setIsAddOpen(false);
     setNewPurchase({
       materialId: '',
@@ -62,6 +91,8 @@ export default function Purchases() {
       vendorCity: '',
       date: new Date().toISOString().slice(0, 10)
     });
+    setNewMaterial({ name: '', category: 'Dry', unit: 'kg' });
+    setIsCustomCategory(false);
   };
 
   const filteredPurchases = purchases.filter(p => 
@@ -100,19 +131,86 @@ export default function Purchases() {
               <DialogDescription>Record a new purchase and update inventory</DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
                 <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Material</Label>
                 <Select onValueChange={(v) => setNewPurchase({...newPurchase, materialId: v})}>
                   <SelectTrigger className="rounded-xl h-11 border-slate-200">
                     <SelectValue placeholder="Select Material" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
+                    <SelectItem value="new" className="text-primary font-bold border-b mb-1">+ Add New Material</SelectItem>
                     {rawMaterials.map(m => (
                       <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {newPurchase.materialId === 'new' && (
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 mb-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Material Name</Label>
+                    <Input 
+                      placeholder="e.g. Flour" 
+                      className="h-11 rounded-xl bg-white"
+                      value={newMaterial.name}
+                      onChange={e => setNewMaterial({...newMaterial, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Category</Label>
+                    {isCustomCategory ? (
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="Category name" 
+                          className="h-11 rounded-xl bg-white"
+                          value={newMaterial.category}
+                          onChange={e => setNewMaterial({...newMaterial, category: e.target.value})}
+                          autoFocus
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="h-11 w-11 shrink-0 rounded-xl bg-white p-0"
+                          onClick={() => { setIsCustomCategory(false); setNewMaterial({...newMaterial, category: 'Dry'}); }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select value={newMaterial.category} onValueChange={v => {
+                        if (v === 'new') { setIsCustomCategory(true); setNewMaterial({...newMaterial, category: ''}); }
+                        else setNewMaterial({...newMaterial, category: v});
+                      }}>
+                        <SelectTrigger className="h-11 rounded-xl bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from(new Set(['Dry', 'Dairy', 'Liquid', 'Cold', 'Other', ...categories])).map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat === 'Dry' ? 'Dry Goods' : cat === 'Cold' ? 'Cold Storage' : cat}</SelectItem>
+                          ))}
+                          <SelectItem value="new" className="text-primary font-medium border-t mt-1">+ Add New Category</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Base Unit</Label>
+                    <Select value={newMaterial.unit} onValueChange={v => setNewMaterial({...newMaterial, unit: v})}>
+                      <SelectTrigger className="h-11 rounded-xl bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">kilograms (kg)</SelectItem>
+                        <SelectItem value="grams">grams (g)</SelectItem>
+                        <SelectItem value="liters">liters (L)</SelectItem>
+                        <SelectItem value="pcs">pieces (pcs)</SelectItem>
+                        <SelectItem value="bags">bags</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-slate-500 ml-1 uppercase tracking-wider">Qty</Label>
                 <Input type="number" className="h-11 rounded-xl border-slate-200" onChange={(e) => setNewPurchase({...newPurchase, quantity: parseFloat(e.target.value)})}/>

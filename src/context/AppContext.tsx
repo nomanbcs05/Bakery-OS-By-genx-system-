@@ -120,7 +120,7 @@ interface AppContextType extends AppState {
   addProduct: (p: Omit<Product, 'id' | 'createdAt' | 'isActive'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string, soft?: boolean) => Promise<void>;
-  addRawMaterial: (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => Promise<void>;
+  addRawMaterial: (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => Promise<string>;
   updateRawMaterial: (id: string, updates: Partial<RawMaterial>) => Promise<void>;
   deleteRawMaterial: (id: string) => Promise<void>;
   adjustRawMaterialStock: (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => Promise<boolean>;
@@ -898,13 +898,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addLog('delete', 'product', id, `Soft deleted product`);
   };
 
-  const addRawMaterial = async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>) => {
+  const addRawMaterial = async (m: Omit<RawMaterial, 'id' | 'lastUpdated' | 'isActive' | 'currentStock'>): Promise<string> => {
     const newM: RawMaterial = { ...m, id: `rm${Date.now()}`, lastUpdated: new Date().toISOString(), isActive: true, currentStock: 0 };
     setRawMaterials(prev => [...prev, newM]);
     if (isOnline && hasSupabaseConfig) {
       try { await supabase.from('raw_materials').upsert([toDBRawMaterial(newM)]); } catch (err) { console.error('Material sync error'); }
     }
     addLog('create', 'raw_material', newM.id, `Added material ${newM.name}`);
+    return newM.id;
   };
 
   const updateRawMaterial = async (id: string, u: Partial<RawMaterial>) => {
