@@ -1059,9 +1059,6 @@ export default function Accounts() {
                       };
 
                       const allCustomerRecords = [
-                        ...filterData(sales.map(s => ({...s, station: 'NWS'}))).map(s => ({
-                          id: s.id, date: s.date, name: s.customerName || 'Walk-in', station: 'NWS', debit: s.total, credit: (s.paymentMethod !== 'credit' || s.isCreditPaid) ? s.total : 0, type: 'Sale'
-                        })),
                         ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
                           id: e.id, date: e.date, name: e.name, station: e.station || 'NWS', debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
                         }))
