@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History } from 'lucide-react';
+import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History, Edit } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
@@ -28,7 +28,8 @@ export default function Accounts() {
     createSalaryVoucher, deleteSalaryVoucher,
     addExpense,
     sales, purchases, expenses, rawMaterials, ledgerEntries,
-    addPurchase, createSale, clearSales, clearPurchases, clearExpenses, clearSalaryVouchers, clearStaffDeductions, addLedgerEntry, clearLedgerEntries
+    addPurchase, createSale, clearSales, clearPurchases, clearExpenses, clearSalaryVouchers, clearStaffDeductions, addLedgerEntry, clearLedgerEntries,
+    deleteCustomer, updateCustomer, deleteVendor, updateVendor, deleteLedgerEntry, updateLedgerEntry
   } = useApp();
 
   const [ledgerType, setLedgerType] = useState('general');
@@ -59,6 +60,15 @@ export default function Accounts() {
 
   const [isAddDeductionOpen, setIsAddDeductionOpen] = useState(false);
   const [newDeduction, setNewDeduction] = useState({ staffId: '', amount: '', reason: '' });
+
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState({ oldName: '', name: '', station: '' });
+  
+  const [isEditVendorOpen, setIsEditVendorOpen] = useState(false);
+  const [editingVendor, setEditingVendor] = useState({ oldName: '', name: '' });
+
+  const [isEditEntryOpen, setIsEditEntryOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Partial<LedgerEntry>>({});
 
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.department || !newStaff.baseSalary) {
@@ -479,6 +489,124 @@ export default function Accounts() {
           <TabsTrigger value="ledgers">Account Ledgers</TabsTrigger>
         </TabsList>
 
+        <Dialog open={isEditCustomerOpen} onOpenChange={setIsEditCustomerOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Customer Account</DialogTitle>
+              <DialogDescription>Update the name or station for this customer across all records.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Customer Name</Label>
+                <Input value={editingCustomer.name} onChange={e => setEditingCustomer({...editingCustomer, name: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Station / City</Label>
+                <Input value={editingCustomer.station} onChange={e => setEditingCustomer({...editingCustomer, station: e.target.value})} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditCustomerOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                await updateCustomer(editingCustomer.oldName, editingCustomer.name, editingCustomer.station);
+                setIsEditCustomerOpen(false);
+              }}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditVendorOpen} onOpenChange={setIsEditVendorOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Vendor Account</DialogTitle>
+              <DialogDescription>Update the name for this vendor across all records.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Vendor Name</Label>
+                <Input value={editingVendor.name} onChange={e => setEditingVendor({...editingVendor, name: e.target.value})} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditVendorOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                await updateVendor(editingVendor.oldName, editingVendor.name);
+                setIsEditVendorOpen(false);
+              }}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditEntryOpen} onOpenChange={setIsEditEntryOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Ledger Entry</DialogTitle>
+              <DialogDescription>Update the details for this manual ledger entry.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Date</Label>
+                <Input type="date" value={editingEntry.date?.split('T')[0]} onChange={e => setEditingEntry({...editingEntry, date: e.target.value})} />
+              </div>
+              
+              <div className="space-y-2 col-span-2">
+                <Label>Name / Title of Account</Label>
+                <Input value={editingEntry.name || editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value, accountHead: e.target.value})} />
+              </div>
+
+              {editingEntry.category === 'customer' && (
+                <div className="space-y-2 col-span-2">
+                  <Label>Station / City</Label>
+                  <Input value={editingEntry.station || ''} onChange={e => setEditingEntry({...editingEntry, station: e.target.value})} />
+                </div>
+              )}
+
+              {editingEntry.category === 'general' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Account No</Label>
+                    <Input value={editingEntry.accountNo || ''} onChange={e => setEditingEntry({...editingEntry, accountNo: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={editingEntry.accountType} onValueChange={v => setEditingEntry({...editingEntry, accountType: v as any})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Income">Income</SelectItem>
+                        <SelectItem value="Expense">Expense</SelectItem>
+                        <SelectItem value="Asset">Asset</SelectItem>
+                        <SelectItem value="Liability">Liability</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-destructive font-bold">Debit</Label>
+                <Input type="number" value={editingEntry.debit} onChange={e => setEditingEntry({...editingEntry, debit: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-success font-bold">Credit</Label>
+                <Input type="number" value={editingEntry.credit} onChange={e => setEditingEntry({...editingEntry, credit: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Closing Balance</Label>
+                <Input type="number" value={editingEntry.closingBalance} onChange={e => setEditingEntry({...editingEntry, closingBalance: Number(e.target.value)})} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditEntryOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (editingEntry.id) {
+                  await updateLedgerEntry(editingEntry.id, editingEntry);
+                  setIsEditEntryOpen(false);
+                }
+              }}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <TabsContent value="overview">
           <Card>
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5" /> Staff Directory</CardTitle></CardHeader>
@@ -836,44 +964,70 @@ export default function Accounts() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Title of Account</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Vendor Name</TableHead>
                       <TableHead className="text-right">Debit (Paid)</TableHead>
                       <TableHead className="text-right">Credit (Purchases)</TableHead>
-                      <TableHead className="text-right">Closing Balance</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      const vendors = Array.from(new Set([...purchases.map(p => p.vendorName), ...ledgerEntries.filter(e => e.category === 'vendor').map(e => e.name)].filter(Boolean)));
-                      if (vendors.length === 0) return <TableRow><TableCell colSpan={4} className="text-center py-8">No vendor data found</TableCell></TableRow>;
-                      
-                      return vendors.map(vendor => {
-                        const filterData = <T extends { date: string }>(items: T[]) => {
-                          return items.filter(item => {
-                            const date = new Date(item.date);
-                            const yearMatch = date.getFullYear().toString() === filterYear;
-                            const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
-                            return yearMatch && monthMatch;
-                          });
-                        };
+                      const filterData = <T extends { date: string }>(items: T[]) => {
+                        return items.filter(item => {
+                          const date = new Date(item.date);
+                          const yearMatch = date.getFullYear().toString() === filterYear;
+                          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                          return yearMatch && monthMatch;
+                        });
+                      };
 
-                        const vendorPurchases = filterData(purchases.filter(p => p.vendorName === vendor));
-                        const vendorManual = filterData(ledgerEntries.filter(e => e.category === 'vendor' && e.name === vendor));
-                        
-                        const debit = vendorPurchases.reduce((sum, p) => sum + p.amountPaid, 0) + vendorManual.reduce((sum, e) => sum + e.debit, 0);
-                        const credit = vendorPurchases.reduce((sum, p) => sum + p.totalCost, 0) + vendorManual.reduce((sum, e) => sum + e.credit, 0);
-                        const manualClosing = vendorManual.length > 0 ? vendorManual[vendorManual.length - 1].closingBalance || 0 : 0;
-                        const balance = manualClosing || (credit - debit);
-                        
-                        return (
-                          <TableRow key={vendor}>
-                            <TableCell className="font-medium">{vendor}</TableCell>
-                            <TableCell className="text-right font-mono text-success">Rs. {debit.toLocaleString()}</TableCell>
-                            <TableCell className="text-right font-mono text-destructive">Rs. {credit.toLocaleString()}</TableCell>
-                            <TableCell className="text-right font-mono font-bold">Rs. {balance.toLocaleString()}</TableCell>
-                          </TableRow>
-                        );
-                      });
+                      const allVendorRecords = [
+                        ...filterData(purchases).map(p => ({
+                          id: p.id, date: p.date, name: p.vendorName, debit: p.amountPaid, credit: p.totalCost, type: 'Purchase'
+                        })),
+                        ...filterData(ledgerEntries.filter(e => e.category === 'vendor')).map(e => ({
+                          id: e.id, date: e.date, name: e.name, debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+                        }))
+                      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                      if (allVendorRecords.length === 0) return <TableRow><TableCell colSpan={6} className="text-center py-8">No vendor data found</TableCell></TableRow>;
+                      
+                      return allVendorRecords.map((rec, idx) => (
+                        <TableRow key={`${rec.id}-${idx}`}>
+                          <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{rec.name}</span>
+                              <Badge variant="outline" className="w-fit text-[8px] h-3 px-1 mt-1">{rec.type}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-success">Rs. {rec.debit.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-destructive">Rs. {rec.credit.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono font-bold">Rs. {(rec.credit - rec.debit).toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            {rec.isManual && (
+                              <div className="flex justify-end gap-2">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                                  const entry = ledgerEntries.find(e => e.id === rec.id);
+                                  if (entry) {
+                                    setEditingEntry(entry);
+                                    setIsEditEntryOpen(true);
+                                  }
+                                }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
+                                  if (confirm(`Delete this ledger record?`)) deleteLedgerEntry(rec.id!);
+                                }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ));
                     })()}
                   </TableBody>
                 </Table>
@@ -883,51 +1037,73 @@ export default function Accounts() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Title of Account</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Customer Name</TableHead>
                       <TableHead>Station</TableHead>
                       <TableHead className="text-right">Debit (Sales)</TableHead>
                       <TableHead className="text-right">Credit (Paid)</TableHead>
-                      <TableHead className="text-right">Closing Balance</TableHead>
+                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      const customers = Array.from(new Set([...sales.filter(s => s.customerName).map(s => s.customerName), ...ledgerEntries.filter(e => e.category === 'customer').map(e => e.name)].filter(Boolean)));
-                      if (customers.length === 0) return <TableRow><TableCell colSpan={5} className="text-center py-8">No customer data found</TableCell></TableRow>;
+                      const filterData = <T extends { date: string, station?: string }>(items: T[]) => {
+                        return items.filter(item => {
+                          const date = new Date(item.date);
+                          const yearMatch = date.getFullYear().toString() === filterYear;
+                          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                          const stationMatch = filterStation === 'all' || item.station === filterStation;
+                          return yearMatch && monthMatch && stationMatch;
+                        });
+                      };
+
+                      const allCustomerRecords = [
+                        ...filterData(sales.map(s => ({...s, station: 'NWS'}))).map(s => ({
+                          id: s.id, date: s.date, name: s.customerName || 'Walk-in', station: 'NWS', debit: s.total, credit: (s.paymentMethod !== 'credit' || s.isCreditPaid) ? s.total : 0, type: 'Sale'
+                        })),
+                        ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
+                          id: e.id, date: e.date, name: e.name, station: e.station || 'NWS', debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+                        }))
+                      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                      if (allCustomerRecords.length === 0) return <TableRow><TableCell colSpan={7} className="text-center py-8">No customer data found</TableCell></TableRow>;
                       
-                      return customers.map(customer => {
-                        const filterData = <T extends { date: string, station?: string }>(items: T[]) => {
-                          return items.filter(item => {
-                            const date = new Date(item.date);
-                            const yearMatch = date.getFullYear().toString() === filterYear;
-                            const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
-                            const stationMatch = filterStation === 'all' || item.station === filterStation;
-                            return yearMatch && monthMatch && stationMatch;
-                          });
-                        };
-
-                        const customerSales = filterData(sales.filter(s => s.customerName === customer).map(s => ({...s, station: 'NWS'})));
-                        const customerManual = filterData(ledgerEntries.filter(e => e.category === 'customer' && e.name === customer));
-
-                        const debit = customerSales.reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.debit, 0);
-                        const credit = customerSales.filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid).reduce((sum, s) => sum + s.total, 0) + customerManual.reduce((sum, e) => sum + e.credit, 0);
-                        const manualClosing = customerManual.length > 0 ? customerManual[customerManual.length - 1].closingBalance || 0 : 0;
-                        const balance = manualClosing || (debit - credit);
-                        
-                        const station = customerManual.length > 0 ? customerManual[0].station : 'NWS';
-                        
-                        if (filterStation !== 'all' && station !== filterStation) return null;
-
-                        return (
-                          <TableRow key={customer as string}>
-                            <TableCell className="font-medium">{customer}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-[10px]">{station}</Badge></TableCell>
-                            <TableCell className="text-right font-mono text-destructive">Rs. {debit.toLocaleString()}</TableCell>
-                            <TableCell className="text-right font-mono text-success">Rs. {credit.toLocaleString()}</TableCell>
-                            <TableCell className="text-right font-mono font-bold">Rs. {balance.toLocaleString()}</TableCell>
-                          </TableRow>
-                        );
-                      }).filter(Boolean);
+                      return allCustomerRecords.map((rec, idx) => (
+                        <TableRow key={`${rec.id}-${idx}`}>
+                          <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{rec.name}</span>
+                              <Badge variant="outline" className="w-fit text-[8px] h-3 px-1 mt-1">{rec.type}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell><Badge variant="outline" className="text-[10px]">{rec.station}</Badge></TableCell>
+                          <TableCell className="text-right font-mono text-destructive">Rs. {rec.debit.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono text-success">Rs. {rec.credit.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-mono font-bold">Rs. {(rec.debit - rec.credit).toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            {rec.isManual && (
+                              <div className="flex justify-end gap-2">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                                  const entry = ledgerEntries.find(e => e.id === rec.id);
+                                  if (entry) {
+                                    setEditingEntry(entry);
+                                    setIsEditEntryOpen(true);
+                                  }
+                                }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
+                                  if (confirm(`Delete this ledger record?`)) deleteLedgerEntry(rec.id!);
+                                }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ));
                     })()}
                   </TableBody>
                 </Table>
@@ -942,6 +1118,7 @@ export default function Accounts() {
                       <TableHead className="text-right">Debit</TableHead>
                       <TableHead className="text-right">Credit</TableHead>
                       <TableHead className="text-right">Closing Balance</TableHead>
+                      <TableHead className="text-right w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -981,9 +1158,9 @@ export default function Accounts() {
                         ...fLedgerEntries.filter(e => e.category === 'general' && !['Sales Income', 'Operating Expenses', 'Raw Material Purchases'].includes(e.accountHead))
                           .filter(e => filterType === 'all' || e.accountType === filterType)
                           .map(e => ({
-                          name: e.accountHead, accountNo: e.accountNo, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive'
+                          id: e.id, name: e.accountHead, accountNo: e.accountNo, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive', isManual: true
                         }))
-                      ];
+                      ].filter(h => h.isManual || h.debit !== 0 || h.credit !== 0);
 
                       return heads.map((head, idx) => (
                         <TableRow key={`${head.name}-${idx}`}>
@@ -996,7 +1173,27 @@ export default function Accounts() {
                           <TableCell><Badge variant="outline">{head.type}</Badge></TableCell>
                           <TableCell className="text-right font-mono">Rs. {head.debit.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-mono">Rs. {head.credit.toLocaleString()}</TableCell>
-                          <TableCell className={`text-right font-mono font-bold ${head.color}`}>Rs. {(head.credit - head.debit || head.debit - head.credit).toLocaleString()}</TableCell>
+                          <TableCell className={`text-right font-mono font-bold ${head.color}`}>Rs. {head.bal.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            {head.isManual && (
+                              <div className="flex justify-end gap-2">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                                  const entry = ledgerEntries.find(e => e.id === head.id);
+                                  if (entry) {
+                                    setEditingEntry(entry);
+                                    setIsEditEntryOpen(true);
+                                  }
+                                }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
+                                  if (confirm(`Delete this ledger entry?`)) deleteLedgerEntry(head.id!);
+                                }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ));
                     })()}

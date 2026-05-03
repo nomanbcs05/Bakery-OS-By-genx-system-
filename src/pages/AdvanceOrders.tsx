@@ -130,15 +130,15 @@ export default function AdvanceOrders() {
           printWindow.document.write(`
             <html><head><title>Advance Order</title>
             <style>
-              body { font-family: 'Courier New', monospace; width: 80mm; margin: 0 auto; padding: 10px; font-size: 12px; }
+              body { font-family: 'Courier New', monospace; width: 80mm; margin: 0 auto; padding: 10px; font-size: 14px; }
               .center { text-align: center; }
               .bold { font-weight: bold; }
               .line { border-top: 1px dashed #000; margin: 5px 0; }
               table { width: 100%; border-collapse: collapse; }
               td { padding: 2px 0; }
               .right { text-align: right; }
-              h2 { margin: 5px 0; font-size: 16px; }
-              h3 { margin: 3px 0; font-size: 13px; }
+              h2 { margin: 5px 0; font-size: 18px; }
+              h3 { margin: 3px 0; font-size: 15px; }
               p { margin: 2px 0; }
               @media print { body { width: 80mm; } }
             </style>
@@ -160,13 +160,13 @@ export default function AdvanceOrders() {
     const aotNumber = `AOT-${order.id.slice(-6).toUpperCase()}`;
     
     return (
-      <div id="advance-order-print" style={{ fontFamily: "'Courier New', monospace", width: '80mm', margin: '0 auto', padding: '10px', fontSize: '12px' }}>
+      <div id="advance-order-print" style={{ fontFamily: "'Courier New', monospace", width: '80mm', margin: '0 auto', padding: '10px', fontSize: '14px' }}>
         <div className="center" style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: '5px 0', fontSize: '16px' }}>{receiptSettings?.brandName || "BakeryOS"}</h2>
-          <p style={{ margin: '2px 0', fontSize: '10px' }}>{receiptSettings?.tagline || ''}</p>
+          <h2 style={{ margin: '5px 0', fontSize: '18px' }}>{receiptSettings?.brandName || "BakeryOS"}</h2>
+          <p style={{ margin: '2px 0', fontSize: '12px' }}>{receiptSettings?.tagline || ''}</p>
           <div style={{ borderTop: '1px dashed #000', margin: '5px 0' }} />
-          <h3 style={{ margin: '3px 0', fontSize: '14px', fontWeight: 'bold' }}>ADVANCE ORDER TOKEN</h3>
-          <h2 style={{ margin: '5px 0', fontSize: '20px', fontWeight: 'bold' }}>{aotNumber}</h2>
+          <h3 style={{ margin: '3px 0', fontSize: '16px', fontWeight: 'bold' }}>ADVANCE ORDER TOKEN</h3>
+          <h2 style={{ margin: '5px 0', fontSize: '24px', fontWeight: 'bold' }}>{aotNumber}</h2>
           <div style={{ borderTop: '1px dashed #000', margin: '5px 0' }} />
         </div>
         
@@ -196,7 +196,7 @@ export default function AdvanceOrders() {
               const product = getProductById(item.productId);
               return (
                 <tr key={idx}>
-                  <td style={{ padding: '2px 0', fontSize: '11px' }}>{product?.name || 'Unknown'}</td>
+                  <td style={{ padding: '2px 0', fontSize: '13px' }}>{product?.name || 'Unknown'}</td>
                   <td style={{ padding: '2px 0', textAlign: 'center' }}>{item.quantity}</td>
                   <td style={{ padding: '2px 0', textAlign: 'right' }}>{item.unitPrice}</td>
                   <td style={{ padding: '2px 0', textAlign: 'right' }}>{(item.quantity * item.unitPrice).toLocaleString()}</td>
@@ -209,7 +209,7 @@ export default function AdvanceOrders() {
         <div style={{ borderTop: '1px dashed #000', margin: '5px 0' }} />
         <table style={{ width: '100%' }}>
           <tbody>
-            <tr><td style={{ fontWeight: 'bold', fontSize: '14px' }}>TOTAL:</td><td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '14px' }}>Rs. {order.total.toLocaleString()}</td></tr>
+            <tr><td style={{ fontWeight: 'bold', fontSize: '16px' }}>TOTAL:</td><td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '16px' }}>Rs. {order.total.toLocaleString()}</td></tr>
             <tr><td>Items:</td><td style={{ textAlign: 'right' }}>{order.items.length} items ({order.items.reduce((s, i) => s + i.quantity, 0)} pcs)</td></tr>
           </tbody>
         </table>
@@ -217,12 +217,12 @@ export default function AdvanceOrders() {
         {order.notes && (
           <>
             <div style={{ borderTop: '1px dashed #000', margin: '5px 0' }} />
-            <p style={{ fontSize: '10px' }}>Notes: {order.notes}</p>
+            <p style={{ fontSize: '12px' }}>Notes: {order.notes}</p>
           </>
         )}
         
         <div style={{ borderTop: '1px dashed #000', margin: '5px 0' }} />
-        <div style={{ textAlign: 'center', fontSize: '10px' }}>
+        <div style={{ textAlign: 'center', fontSize: '12px' }}>
           <p>Status: {order.status.toUpperCase()}</p>
           <p>{receiptSettings?.footerMessage2 || 'Powered by GenX Systems'}</p>
         </div>

@@ -180,6 +180,12 @@ interface AppContextType extends AppState {
   advanceOrders: AdvanceOrder[];
   addAdvanceOrder: (order: Omit<AdvanceOrder, 'id' | 'syncStatus' | 'createdAt' | 'status'>) => Promise<string>;
   updateAdvanceOrderStatus: (id: string, status: 'pending' | 'received' | 'completed') => Promise<void>;
+  deleteCustomer: (name: string) => Promise<void>;
+  updateCustomer: (oldName: string, newName: string, newStation: string) => Promise<void>;
+  deleteVendor: (name: string) => Promise<void>;
+  updateVendor: (oldName: string, newName: string) => Promise<void>;
+  deleteLedgerEntry: (id: string) => Promise<void>;
+  updateLedgerEntry: (id: string, updates: Partial<LedgerEntry>) => Promise<void>;
   hasSupabaseConfig: boolean;
 }
 
@@ -1060,13 +1066,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    if (destination === 'walkin') {
+    const isSaleDestination = !['branch_1', 'branch_2'].includes(destination);
+    
+    if (isSaleDestination) {
       const saleItems: SaleItem[] = items.map(i => {
         const product = products.find(p => p.id === i.productId);
         return { productId: i.productId, quantity: i.quantity, unitPrice: product?.price || 0 };
       });
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
-      const walkinSale: Sale = { id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName, customerPhone, isCreditPaid: true, date: today, syncStatus: isOnline ? 'synced' : 'pending' };
+      const saleName = destination === 'walkin' ? customerName : destination;
+      const walkinSale: Sale = { id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName: saleName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: today, syncStatus: isOnline ? 'synced' : 'pending' };
       setSales(prev => [...prev, walkinSale]);
       if (isOnline && hasSupabaseConfig) {
         try {
@@ -1284,6 +1293,72 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteCustomer = async (name: string) => {
+    setLedgerEntries(prev => prev.filter(e => !(e.category === 'customer' && e.name === name)));
+    setSales(prev => prev.map(s => s.customerName === name ? { ...s, customerName: undefined } : s));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await Promise.all([
+          supabase.from('ledger_entries').delete().eq('category', 'customer').eq('name', name),
+          supabase.from('sales').update({ customer_name: null }).eq('customer_name', name)
+        ]);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const updateCustomer = async (oldName: string, newName: string, newStation: string) => {
+    setLedgerEntries(prev => prev.map(e => (e.category === 'customer' && e.name === oldName) ? { ...e, name: newName, station: newStation } : e));
+    setSales(prev => prev.map(s => s.customerName === oldName ? { ...s, customerName: newName } : s));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await Promise.all([
+          supabase.from('ledger_entries').update({ name: newName, station: newStation }).eq('category', 'customer').eq('name', oldName),
+          supabase.from('sales').update({ customer_name: newName }).eq('customer_name', oldName)
+        ]);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const deleteVendor = async (name: string) => {
+    setLedgerEntries(prev => prev.filter(e => !(e.category === 'vendor' && e.name === name)));
+    setPurchases(prev => prev.map(p => p.vendorName === name ? { ...p, vendorName: '' } : p));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await Promise.all([
+          supabase.from('ledger_entries').delete().eq('category', 'vendor').eq('name', name),
+          supabase.from('purchases').update({ vendor_name: '' }).eq('vendor_name', name)
+        ]);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const updateVendor = async (oldName: string, newName: string) => {
+    setLedgerEntries(prev => prev.map(e => (e.category === 'vendor' && e.name === oldName) ? { ...e, name: newName } : e));
+    setPurchases(prev => prev.map(p => p.vendorName === oldName ? { ...p, vendorName: newName } : p));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await Promise.all([
+          supabase.from('ledger_entries').update({ name: newName }).eq('category', 'vendor').eq('name', oldName),
+          supabase.from('purchases').update({ vendor_name: newName }).eq('vendor_name', oldName)
+        ]);
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const deleteLedgerEntry = async (id: string) => {
+    setLedgerEntries(prev => prev.filter(e => e.id !== id));
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('ledger_entries').delete().eq('id', id); } catch (err) { console.error(err); }
+    }
+  };
+
+  const updateLedgerEntry = async (id: string, updates: Partial<LedgerEntry>) => {
+    setLedgerEntries(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('ledger_entries').update(toDBLedgerEntry({ ...ledgerEntries.find(e => e.id === id)!, ...updates })).eq('id', id); } catch (err) { console.error(err); }
+    }
+  };
+
   const addAdvanceOrder = async (order: Omit<AdvanceOrder, 'id' | 'syncStatus' | 'createdAt' | 'status'>): Promise<string> => {
     const id = `ao${Date.now()}`;
     const newOrder: AdvanceOrder = { ...order, id, createdAt: new Date().toISOString(), status: 'pending', syncStatus: isOnline ? 'synced' : 'pending' };
@@ -1407,6 +1482,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
       ledgerEntries, addLedgerEntry, clearLedgerEntries,
+      deleteCustomer, updateCustomer, deleteVendor, updateVendor,
+      deleteLedgerEntry, updateLedgerEntry,
       advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
       hasSupabaseConfig
     }}>

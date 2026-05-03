@@ -35,7 +35,7 @@ export default function AdvanceOrdersProduction() {
     const itemsHtml = order.items.map(item => {
       const p = getProductById(item.productId);
       return `<tr>
-        <td style="padding:3px 0;font-size:11px">${p?.name || 'Unknown'}</td>
+        <td style="padding:3px 0;font-size:13px">${p?.name || 'Unknown'}</td>
         <td style="padding:3px 0;text-align:center">${item.quantity}</td>
         <td style="padding:3px 0;text-align:right">${item.unitPrice}</td>
         <td style="padding:3px 0;text-align:right">${(item.quantity * item.unitPrice).toLocaleString()}</td>
@@ -47,7 +47,7 @@ export default function AdvanceOrdersProduction() {
       printWindow.document.write(`
         <html><head><title>AOT ${aotNumber}</title>
         <style>
-          body { font-family: 'Courier New', monospace; width: 80mm; margin: 0 auto; padding: 10px; font-size: 12px; }
+          body { font-family: 'Courier New', monospace; width: 80mm; margin: 0 auto; padding: 10px; font-size: 14px; }
           .center { text-align: center; }
           .line { border-top: 1px dashed #000; margin: 5px 0; }
           table { width: 100%; border-collapse: collapse; }
@@ -55,11 +55,11 @@ export default function AdvanceOrdersProduction() {
         </style></head>
         <body>
           <div class="center">
-            <h2 style="margin:5px 0;font-size:16px">${receiptSettings?.brandName || "BakeryOS"}</h2>
-            <p style="margin:2px 0;font-size:10px">${receiptSettings?.tagline || ''}</p>
+            <h2 style="margin:5px 0;font-size:18px">${receiptSettings?.brandName || "BakeryOS"}</h2>
+            <p style="margin:2px 0;font-size:12px">${receiptSettings?.tagline || ''}</p>
             <div class="line"></div>
-            <h3 style="font-size:14px;margin:3px 0">ADVANCE ORDER - PRODUCTION</h3>
-            <h2 style="font-size:20px;margin:5px 0;font-weight:bold">${aotNumber}</h2>
+            <h3 style="font-size:16px;margin:3px 0">ADVANCE ORDER - PRODUCTION</h3>
+            <h2 style="font-size:24px;margin:5px 0;font-weight:bold">${aotNumber}</h2>
             <div class="line"></div>
           </div>
           <table>
@@ -81,12 +81,12 @@ export default function AdvanceOrdersProduction() {
           </table>
           <div class="line"></div>
           <table>
-            <tr><td style="font-weight:bold;font-size:14px">TOTAL:</td><td style="text-align:right;font-weight:bold;font-size:14px">Rs. ${order.total.toLocaleString()}</td></tr>
+            <tr><td style="font-weight:bold;font-size:16px">TOTAL:</td><td style="text-align:right;font-weight:bold;font-size:16px">Rs. ${order.total.toLocaleString()}</td></tr>
             <tr><td>Items:</td><td style="text-align:right">${order.items.length} items (${order.items.reduce((s, i) => s + i.quantity, 0)} pcs)</td></tr>
           </table>
-          ${order.notes ? `<div class="line"></div><p style="font-size:10px">Notes: ${order.notes}</p>` : ''}
+          ${order.notes ? `<div class="line"></div><p style="font-size:12px">Notes: ${order.notes}</p>` : ''}
           <div class="line"></div>
-          <div class="center" style="font-size:10px">
+          <div class="center" style="font-size:12px">
             <p>${receiptSettings?.footerMessage2 || 'Powered by GenX Systems'}</p>
           </div>
         </body></html>

@@ -10,7 +10,7 @@ import { Navigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function BranchProducts() {
-  const { currentUser, selectedProfile, products, stock, getBranchStock, adjustBranchStock } = useApp();
+  const { currentUser, selectedProfile, products, stock, getBranchStock, adjustBranchStock, updateProduct } = useApp();
 
   if (!currentUser || !selectedProfile) return <Navigate to="/login" replace />;
 
@@ -29,6 +29,7 @@ export default function BranchProducts() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showHidden, setShowHidden] = useState(false);
 
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
 
@@ -36,7 +37,8 @@ export default function BranchProducts() {
   const groupedProducts = useMemo(() => {
     const groups: Record<string, any[]> = {};
     
-    products.filter(p => p.isActive).forEach(product => {
+    products.forEach(product => {
+      if (!showHidden && !product.isActive) return;
       if (selectedCategory !== 'All' && product.category !== selectedCategory) return;
       if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) return;
 
@@ -53,7 +55,7 @@ export default function BranchProducts() {
     });
     
     return groups;
-  }, [products, stock, branchView, selectedCategory, searchQuery]);
+  }, [products, stock, branchView, selectedCategory, searchQuery, showHidden]);
 
   const handleAdjust = () => {
     if (!selectedProductId || !adjustQuantity || parseFloat(adjustQuantity) <= 0) return;
@@ -95,6 +97,17 @@ export default function BranchProducts() {
           <p className="text-sm text-muted-foreground">
             Current stock received at {branchView === 'branch_1' ? 'Branch 1' : 'Branch 2'}. Adjust stock for wastage or counting errors.
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">Show Hidden Products</Label>
+          <Button 
+            variant={showHidden ? "default" : "outline"} 
+            size="sm" 
+            className="h-8 px-3"
+            onClick={() => setShowHidden(!showHidden)}
+          >
+            {showHidden ? "On" : "Off"}
+          </Button>
         </div>
       </div>
       
@@ -153,23 +166,40 @@ export default function BranchProducts() {
                         <CardTitle className="text-sm font-semibold truncate" title={item.productDetails.name}>
                           {item.productDetails.name}
                         </CardTitle>
-                        <Badge variant="secondary" className="font-mono text-[10px] uppercase font-bold tracking-tight bg-background">
-                          {item.stock} {item.productDetails.unit}s
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          {!item.productDetails.isActive && <Badge variant="destructive" className="text-[8px] h-4 px-1">Hidden</Badge>}
+                          <Badge variant="secondary" className="font-mono text-[10px] uppercase font-bold tracking-tight bg-background">
+                            {item.stock} {item.productDetails.unit}s
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="p-4 bg-card flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
                         Price: Rs. {item.productDetails.price.toFixed(2)}
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8 text-xs font-semibold text-destructive/80 hover:text-destructive border-destructive/20 hover:bg-destructive/5"
-                        onClick={() => openAdjustmentDialog(item.productId)}
-                      >
-                        Adjust
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className={`h-8 px-2 text-[10px] font-bold ${item.productDetails.isActive ? 'text-muted-foreground hover:text-destructive' : 'text-success hover:text-success'}`}
+                          onClick={() => {
+                            if (confirm(`${item.productDetails.isActive ? 'Hide' : 'Show'} this product on POS dashboard?`)) {
+                              updateProduct(item.productDetails.id, { isActive: !item.productDetails.isActive });
+                            }
+                          }}
+                        >
+                          {item.productDetails.isActive ? 'Hide from POS' : 'Show on POS'}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 text-xs font-semibold text-destructive/80 hover:text-destructive border-destructive/20 hover:bg-destructive/5"
+                          onClick={() => openAdjustmentDialog(item.productId)}
+                        >
+                          Adjust
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}

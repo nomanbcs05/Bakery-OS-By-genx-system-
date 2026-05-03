@@ -67,7 +67,7 @@ export interface ProductionBatch {
   syncStatus: 'synced' | 'pending';
 }
 
-export type DispatchDestination = 'branch_1' | 'branch_2' | 'walkin';
+export type DispatchDestination = 'branch_1' | 'branch_2' | 'walkin' | string;
 
 export interface Dispatch {
   id: string;

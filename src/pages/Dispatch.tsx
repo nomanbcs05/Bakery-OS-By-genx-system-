@@ -18,7 +18,7 @@ import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
 import { toast } from 'sonner';
 
 export default function DispatchPage() {
-  const { currentUser, products, stock, createDispatch, dispatches, getProductById } = useApp();
+  const { currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [destination, setDestination] = useState<DispatchDestination | ''>('');
@@ -101,7 +101,8 @@ export default function DispatchPage() {
 
   const handleWalkinDispatch = () => {
     if (!destination || items.length === 0) return;
-    if (destination === 'walkin') {
+    const isSale = !['branch_1', 'branch_2'].includes(destination);
+    if (isSale) {
       setIsPaymentOpen(true);
     } else {
       handleDispatch();
@@ -126,6 +127,7 @@ export default function DispatchPage() {
   const availableProducts = products.filter(p => (stock[p.id]?.production || 0) > 0);
 
   const destLabels: Record<string, string> = { branch_1: 'Branch 1', branch_2: 'Branch 2', walkin: 'Walk-in (Factory)' };
+  const customerDestinations = Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer' && e.name).map(e => e.name!)));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -145,6 +147,10 @@ export default function DispatchPage() {
                 <SelectItem value="branch_1">Branch 1</SelectItem>
                 <SelectItem value="branch_2">Branch 2</SelectItem>
                 <SelectItem value="walkin">Walk-in (Factory Gate Sale)</SelectItem>
+                {customerDestinations.length > 0 && <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t">Customers</div>}
+                {customerDestinations.map(name => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -196,7 +202,7 @@ export default function DispatchPage() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            {destination === 'walkin' ? (
+            {!['branch_1', 'branch_2'].includes(destination) ? (
               <Button onClick={handleWalkinDispatch} disabled={items.length === 0} className="flex-1 sm:flex-none bg-success hover:bg-success/90">
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
               </Button>
@@ -326,7 +332,7 @@ export default function DispatchPage() {
               {[...dispatches].reverse().map(d => (
                 <TableRow key={d.id}>
                   <TableCell>{d.date}</TableCell>
-                  <TableCell><Badge variant="secondary">{destLabels[d.destination]}</Badge></TableCell>
+                  <TableCell><Badge variant="secondary">{destLabels[d.destination] || d.destination}</Badge></TableCell>
                   <TableCell>
                     {d.items.map(i => {
                       const p = getProductById(i.productId);
