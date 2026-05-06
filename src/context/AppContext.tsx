@@ -525,6 +525,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadedModulesRef = useRef<Set<string>>(new Set());
   const hasInitialFetched = useRef(false);
   const activeFetches = useRef<Map<string, Promise<any>>>(new Map());
+  const dataCache = useRef<Map<string, { data: any, timestamp: number }>>(new Map());
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
   // Standardized Column Selections to ensure deduplication works
   const SALES_COLS = 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status';
@@ -537,6 +539,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fetchTable = async (table: string, orderField: string = 'date', columns: string = '*', limit: number = 1000) => {
     // Request deduplication/in-flight guard
     const fetchKey = `${table}-${columns}-${limit}`;
+    
+    // Check Cache first
+    const cached = dataCache.current.get(fetchKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      // console.log(`Returning cached data for ${table}`);
+      return cached.data;
+    }
+
     if (activeFetches.current.has(fetchKey)) {
       return activeFetches.current.get(fetchKey);
     }
@@ -545,6 +555,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await supabase.from(table).select(columns).order(orderField, { ascending: false }).limit(limit);
         if (error) throw error;
+        
+        // Update cache
+        dataCache.current.set(fetchKey, { data, timestamp: Date.now() });
         return data;
       } catch (err) {
         console.warn(`Failed to fetch ${table}:`, err);
@@ -665,11 +678,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // If it's a background pull, refresh any modules that are already loaded
     if (!isInitial) {
-      if (loadedModules.includes('sales')) {
+      if (loadedModulesRef.current.has('sales')) {
         tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
         tasks.push(fetchTable('dispatches', 'date', DISPATCH_COLS, 300));
       }
-      if (loadedModules.includes('inventory')) {
+      if (loadedModulesRef.current.has('inventory')) {
         tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
         tasks.push(fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status'));
       }
@@ -698,7 +711,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLastSyncTime(new Date().toISOString());
     setIsLoading(false);
     setTimeout(() => syncOfflineData(), 1000);
-  }, [currentUser, hasSupabaseConfig, syncOfflineData, fetchAppSettings, loadedModules]);
+  }, [currentUser, hasSupabaseConfig, syncOfflineData, fetchAppSettings]); // Stable: removed loadedModules dependency
 
   useEffect(() => { 
     if (currentUser && hasSupabaseConfig && !hasInitialFetched.current) {
@@ -718,6 +731,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const forceSync = useCallback(async () => {
     if (!navigator.onLine || !hasSupabaseConfig) return;
     toast.loading('Syncing...');
+    dataCache.current.clear(); // Clear cache for manual sync
     try {
       await syncOfflineData();
       await fetchData();
@@ -769,7 +783,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) fetchUserProfile(session.user.id);
-      else { setCurrentUser(null); setSelectedProfile(null); setAllUsers([]); setIsLoading(false); }
+      else { 
+        setCurrentUser(null); 
+        setSelectedProfile(null); 
+        setAllUsers([]); 
+        setIsLoading(false); 
+        dataCache.current.clear(); // Clear cache on logout
+        loadedModulesRef.current.clear();
+        setLoadedModules([]);
+        hasInitialFetched.current = false;
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
