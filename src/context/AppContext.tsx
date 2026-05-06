@@ -521,7 +521,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [hasSupabaseConfig]); // Stable dependency
 
   const [loadedModules, setLoadedModules] = useState<string[]>([]);
+  const loadingModules = useRef<Set<string>>(new Set());
+  const loadedModulesRef = useRef<Set<string>>(new Set());
+  const hasInitialFetched = useRef(false);
   const activeFetches = useRef<Map<string, Promise<any>>>(new Map());
+
+  // Standardized Column Selections to ensure deduplication works
+  const SALES_COLS = 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status';
+  const BATCH_COLS = 'id,items,date,notes,sync_status';
+  const PRODUCT_COLS = 'id,name,category,price,unit,is_active,created_at';
+  const RM_COLS = 'id,name,category,unit,current_stock,min_stock_level,cost_per_unit,supplier_name,is_active,last_updated';
+  const DISPATCH_COLS = 'id,destination,date,status,items,token_number,sync_status';
+  const ADVANCE_ORDER_COLS = 'id,branch,customer_name,customer_phone,items,total,delivery_date,created_at,status,notes,sync_status';
 
   const fetchTable = async (table: string, orderField: string = 'date', columns: string = '*', limit: number = 1000) => {
     // Request deduplication/in-flight guard
@@ -577,16 +588,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadModuleData = useCallback(async (module: 'sales' | 'inventory' | 'hr' | 'finance' | 'audit') => {
     if (!currentUser || !hasSupabaseConfig) return;
-    if (loadedModules.includes(module)) return;
+    if (loadedModulesRef.current.has(module) || loadingModules.current.has(module)) return;
 
-    // console.log(`Lazy loading module: ${module}`);
+    loadingModules.current.add(module);
+    // console.log(`Lazy loading module started: ${module}`);
     
     switch (module) {
       case 'sales':
         const [sData, dData, aoData] = await Promise.all([
-          fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 500),
-          fetchTable('dispatches', 'date', 'id,destination,date,status,items,token_number,sync_status', 300),
-          fetchTable('advance_orders', 'created_at', 'id,branch,customer_name,customer_phone,items,total,delivery_date,created_at,status,notes,sync_status', 200)
+          fetchTable('sales', 'date', SALES_COLS, 500),
+          fetchTable('dispatches', 'date', DISPATCH_COLS, 300),
+          fetchTable('advance_orders', 'created_at', ADVANCE_ORDER_COLS, 200)
         ]);
         if (sData) setSales(prev => merge(sData, prev, fromDBSale));
         if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
@@ -597,8 +609,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const [rmaData, bsaData, rmData, pData, purData, recData] = await Promise.all([
           fetchTable('raw_material_adjustments', 'date', 'id,material_id,type,quantity,reason,date,user_id,sync_status', 300),
           fetchTable('branch_stock_adjustments', 'date', 'id,product_id,branch,quantity,reason,date,user_id', 200),
-          fetchTable('raw_materials', 'last_updated', 'id,name,category,unit,current_stock,min_stock_level,cost_per_unit,supplier_name,is_active,last_updated'),
-          fetchTable('products', 'created_at', 'id,name,category,price,unit,is_active,created_at'),
+          fetchTable('raw_materials', 'last_updated', RM_COLS, 1000),
+          fetchTable('products', 'created_at', PRODUCT_COLS, 1000),
           fetchTable('purchases', 'date', 'id,material_id,quantity,total_cost,amount_paid,payment_method,vendor_name,vendor_city,date,sync_status', 300),
           fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status')
         ]);
@@ -636,33 +648,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         break;
     }
 
-    setLoadedModules(prev => [...prev, module]);
-  }, [currentUser, hasSupabaseConfig, loadedModules]);
+    loadingModules.current.delete(module);
+    loadedModulesRef.current.add(module);
+    setLoadedModules(Array.from(loadedModulesRef.current));
+  }, [currentUser, hasSupabaseConfig]); // Stable: no dependency on loadedModules state
 
   const fetchData = useCallback(async (isInitial = false) => {
     if (!currentUser || !hasSupabaseConfig) return;
 
     // Initial/Essential data fetch only
     const tasks = [
-      fetchTable('products', 'created_at', 'id,name,category,price,unit,is_active,created_at'),
-      fetchTable('raw_materials', 'last_updated', 'id,name,category,unit,current_stock,min_stock_level,cost_per_unit,supplier_name,is_active,last_updated'),
+      fetchTable('products', 'created_at', PRODUCT_COLS, 1000),
+      fetchTable('raw_materials', 'last_updated', RM_COLS, 1000),
       fetchAppSettings()
     ];
 
     // If it's a background pull, refresh any modules that are already loaded
     if (!isInitial) {
       if (loadedModules.includes('sales')) {
-        tasks.push(fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 500));
-        tasks.push(fetchTable('dispatches', 'date', 'id,destination,date,status,items,token_number,sync_status', 300));
+        tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
+        tasks.push(fetchTable('dispatches', 'date', DISPATCH_COLS, 300));
       }
       if (loadedModules.includes('inventory')) {
-        tasks.push(fetchTable('production_batches', 'date', 'id,items,date,notes,sync_status', 300));
+        tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
         tasks.push(fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status'));
       }
     } else {
       // On initial load, fetch just enough for the dashboard
-      tasks.push(fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 100));
-      tasks.push(fetchTable('production_batches', 'date', 'id,items,date,notes,sync_status', 100));
+      // Use the same parameters if we expect them to be requested soon to leverage deduplication
+      tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
+      tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
     }
 
     const results = await Promise.all(tasks);
@@ -686,7 +701,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUser, hasSupabaseConfig, syncOfflineData, fetchAppSettings, loadedModules]);
 
   useEffect(() => { 
-    if (currentUser && hasSupabaseConfig) {
+    if (currentUser && hasSupabaseConfig && !hasInitialFetched.current) {
+      hasInitialFetched.current = true;
       fetchData(true); 
     }
   }, [currentUser, hasSupabaseConfig, fetchData]);
@@ -759,20 +775,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (!error && data) {
-        setCurrentUser({
-          id: data.id, name: data.name, email: data.email, role: data.role as UserRole,
-          branchId: data.branch_id, pinCode: data.pin_code, avatarUrl: data.avatar_url
-        });
-        fetchAllUsers();
+    const fetchKey = `profile-${userId}`;
+    if (activeFetches.current.has(fetchKey)) return activeFetches.current.get(fetchKey);
+
+    const promise = (async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (!error && data) {
+          setCurrentUser({
+            id: data.id, name: data.name, email: data.email, role: data.role as UserRole,
+            branchId: data.branch_id, pinCode: data.pin_code, avatarUrl: data.avatar_url
+          });
+          fetchAllUsers();
+        }
+      } catch (e) { console.error(e); } finally { 
+        setIsLoading(false); 
+        activeFetches.current.delete(fetchKey);
       }
-    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+    })();
+
+    activeFetches.current.set(fetchKey, promise);
+    return promise;
   };
 
   const fetchAllUsers = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('role');
+    const data = await fetchTable('profiles', 'role', '*', 100);
     if (data) setAllUsers(data.map(d => ({
       id: d.id, name: d.name, email: d.email, role: d.role as UserRole,
       branchId: d.branch_id, pinCode: d.pin_code, avatarUrl: d.avatar_url
