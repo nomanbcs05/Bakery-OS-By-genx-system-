@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,11 @@ import { toast } from 'sonner';
 const MEASURES = ['pcs', 'kg', 'box', 'dozen', 'tray', 'pkt', 'pound'];
 
 export default function Production() {
-  const { currentUser, products, batches, addMultiProduction, addProduct, getProductById, stock } = useApp();
+  const { currentUser, products, batches, addMultiProduction, addProduct, getProductById, stock, loadModuleData } = useApp();
+
+  useEffect(() => {
+    loadModuleData('inventory');
+  }, [loadModuleData]);
 
   if (!currentUser) return <Navigate to="/login" replace />;
 

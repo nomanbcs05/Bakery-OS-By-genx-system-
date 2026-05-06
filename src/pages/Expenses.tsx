@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,11 @@ import { toast } from 'sonner';
 const categories = ['Raw Materials', 'Utilities', 'Rent', 'Salaries', 'Equipment', 'Transport', 'Marketing', 'Maintenance', 'Other'];
 
 export default function Expenses() {
-  const { currentUser, selectedProfile, expenses, addExpense } = useApp();
+  const { currentUser, selectedProfile, expenses, addExpense, loadModuleData } = useApp();
+
+  useEffect(() => {
+    loadModuleData('finance');
+  }, [loadModuleData]);
 
   if (!currentUser || !selectedProfile) return <Navigate to="/login" replace />;
   

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,11 @@ interface POSProps {
 }
 
 export default function POS({ branch }: POSProps) {
-  const { currentUser, products, stock, createSale, getProductById, getBranchStock, sales } = useApp();
+  const { currentUser, products, stock, createSale, getProductById, getBranchStock, sales, loadModuleData } = useApp();
+
+  useEffect(() => {
+    loadModuleData('sales');
+  }, [loadModuleData]);
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);

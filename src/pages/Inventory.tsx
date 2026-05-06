@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -6,7 +7,12 @@ import { Package } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function Inventory() {
-  const { currentUser, getInventorySnapshots, getProductById } = useApp();
+  const { currentUser, getInventorySnapshots, getProductById, loadModuleData } = useApp();
+
+  useEffect(() => {
+    loadModuleData('inventory');
+    loadModuleData('sales');
+  }, [loadModuleData]);
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const snapshots = getInventorySnapshots();

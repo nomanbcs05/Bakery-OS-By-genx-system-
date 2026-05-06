@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,12 @@ import type { SaleItem, AdvanceOrder } from '@/types';
 export default function AdvanceOrders() {
   const { 
     products, advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
-    selectedProfile, getProductById, receiptSettings, createSale
+    selectedProfile, getProductById, receiptSettings, createSale, loadModuleData
   } = useApp();
+
+  useEffect(() => {
+    loadModuleData('sales');
+  }, [loadModuleData]);
 
   const branch = selectedProfile?.branchId || 'branch_1';
   const branchLabel = branch === 'branch_1' ? 'Branch 1' : 'Branch 2';

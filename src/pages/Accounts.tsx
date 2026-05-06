@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,19 @@ export default function Accounts() {
     addExpense,
     sales, purchases, expenses, rawMaterials, ledgerEntries,
     addPurchase, createSale, clearSales, clearPurchases, clearExpenses, clearSalaryVouchers, clearStaffDeductions, addLedgerEntry, clearLedgerEntries,
-    deleteCustomer, updateCustomer, deleteVendor, updateVendor, deleteLedgerEntry, updateLedgerEntry
+    deleteCustomer, updateCustomer, deleteVendor, updateVendor, deleteLedgerEntry, updateLedgerEntry,
+    loadModuleData
   } = useApp();
+
+  useEffect(() => {
+    loadModuleData('hr');
+    loadModuleData('finance');
+    // Also load sales/inventory for ledgers if needed, 
+    // but the user wants to reduce payload, so let's stick to essential HR/Finance first.
+    // The ledgers logic uses sales/purchases, so we might need them too.
+    loadModuleData('sales');
+    loadModuleData('inventory');
+  }, [loadModuleData]);
 
   const [ledgerType, setLedgerType] = useState('general');
   const [activeTab, setActiveTab] = useState('overview');

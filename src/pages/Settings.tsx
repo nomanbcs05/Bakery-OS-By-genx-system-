@@ -28,8 +28,13 @@ export default function SettingsPage() {
     receiptSettings,
     updateReceiptSettings,
     hasSupabaseConfig,
-    createStaffMember
+    createStaffMember,
+    loadModuleData
   } = useApp();
+
+  useEffect(() => {
+    loadModuleData('audit');
+  }, [loadModuleData]);
 
   const [isPinManagementVerified, setIsPinManagementVerified] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState(currentUser?.email || '');

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +14,11 @@ import { cn } from '@/lib/utils';
 import { Navigate } from 'react-router-dom';
 
 export default function SalesDetails() {
-  const { currentUser, selectedProfile, sales, getProductById } = useApp();
+  const { currentUser, selectedProfile, sales, getProductById, loadModuleData } = useApp();
+
+  useEffect(() => {
+    loadModuleData('sales');
+  }, [loadModuleData]);
 
   if (!currentUser || !selectedProfile) return <Navigate to="/login" replace />;
 

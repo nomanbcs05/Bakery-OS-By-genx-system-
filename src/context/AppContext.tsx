@@ -114,6 +114,7 @@ interface AppState {
   salaryVouchers: SalaryVoucher[];
   recipes: Recipe[];
   purchases: Purchase[];
+  loadedModules: string[];
 }
 
 interface AppContextType extends AppState {
@@ -187,6 +188,7 @@ interface AppContextType extends AppState {
   deleteLedgerEntry: (id: string) => Promise<void>;
   updateLedgerEntry: (id: string, updates: Partial<LedgerEntry>) => Promise<void>;
   hasSupabaseConfig: boolean;
+  loadModuleData: (module: 'sales' | 'inventory' | 'hr' | 'finance' | 'audit') => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -518,104 +520,180 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [hasSupabaseConfig]); // Stable dependency
 
-  const fetchData = useCallback(async () => {
-    if (!currentUser || !hasSupabaseConfig) return;
+  const [loadedModules, setLoadedModules] = useState<string[]>([]);
+  const activeFetches = useRef<Map<string, Promise<any>>>(new Map());
 
-    const fetchTable = async (table: string, orderField: string = 'date') => {
+  const fetchTable = async (table: string, orderField: string = 'date', columns: string = '*', limit: number = 1000) => {
+    // Request deduplication/in-flight guard
+    const fetchKey = `${table}-${columns}-${limit}`;
+    if (activeFetches.current.has(fetchKey)) {
+      return activeFetches.current.get(fetchKey);
+    }
+
+    const fetchPromise = (async () => {
       try {
-        const { data, error } = await supabase.from(table).select('*').order(orderField, { ascending: false }).limit(1000);
+        const { data, error } = await supabase.from(table).select(columns).order(orderField, { ascending: false }).limit(limit);
         if (error) throw error;
         return data;
       } catch (err) {
         console.warn(`Failed to fetch ${table}:`, err);
         return null;
+      } finally {
+        activeFetches.current.delete(fetchKey);
       }
-    };
+    })();
 
-    const merge = (remote: any[], local: any[], fromDB: (d: any) => any) => {
-      if (!remote) return local;
-      const remoteMapped = remote.map(fromDB);
-      const localOnly = local.filter(l => !remoteMapped.find(r => r.id === l.id));
-      return [...remoteMapped, ...localOnly];
-    };
+    activeFetches.current.set(fetchKey, fetchPromise);
+    return fetchPromise;
+  };
 
-    // Fetch tables independently
-    const pData = await fetchTable('products', 'created_at');
-    if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
+  const merge = (remote: any[], local: any[], fromDB: (d: any) => any) => {
+    if (!remote) return local;
+    const remoteMapped = remote.map(fromDB);
+    const localOnly = local.filter(l => !remoteMapped.find(r => r.id === l.id));
+    return [...remoteMapped, ...localOnly];
+  };
 
-    const rmData = await fetchTable('raw_materials', 'last_updated');
-    if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
+  const fetchAppSettings = useCallback(async (force = false) => {
+    // Cache app_settings: only fetch if not loaded or forced
+    if (!force && (receiptSettings as any)._isLoaded) return;
 
-    const sData = await fetchTable('sales', 'date');
-    if (sData) setSales(prev => merge(sData, prev, fromDBSale));
+    try {
+      const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
+      if (settingsData?.settings) {
+        const remote = settingsData.settings;
+        const localSavedAt = (receiptSettingsRef.current as any)._savedAt || 0;
+        const remoteSavedAt = remote._savedAt || 0;
+        if (remoteSavedAt > localSavedAt) {
+          setReceiptSettings(prev => ({ ...prev, ...remote, _isLoaded: true, isLocked: false }));
+        } else {
+          setReceiptSettings(prev => ({ ...prev, _isLoaded: true }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch app_settings:', err);
+    }
+  }, [receiptSettings]);
 
-    const bData = await fetchTable('production_batches', 'date');
-    if (bData) setBatches(prev => merge(bData, prev, fromDBBatch));
+  const loadModuleData = useCallback(async (module: 'sales' | 'inventory' | 'hr' | 'finance' | 'audit') => {
+    if (!currentUser || !hasSupabaseConfig) return;
+    if (loadedModules.includes(module)) return;
 
-    const dData = await fetchTable('dispatches', 'date');
-    if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
+    // console.log(`Lazy loading module: ${module}`);
+    
+    switch (module) {
+      case 'sales':
+        const [sData, dData, aoData] = await Promise.all([
+          fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 500),
+          fetchTable('dispatches', 'date', 'id,destination,date,status,items,token_number,sync_status', 300),
+          fetchTable('advance_orders', 'created_at', 'id,branch,customer_name,customer_phone,items,total,delivery_date,created_at,status,notes,sync_status', 200)
+        ]);
+        if (sData) setSales(prev => merge(sData, prev, fromDBSale));
+        if (dData) setDispatches(prev => merge(dData, prev, fromDBDispatch));
+        if (aoData) setAdvanceOrders(prev => merge(aoData, prev, fromDBAdvanceOrder));
+        break;
 
-    const eData = await fetchTable('expenses', 'date');
-    if (eData) setExpenses(prev => merge(eData, prev, fromDBExpense));
+      case 'inventory':
+        const [rmaData, bsaData, rmData, pData, purData, recData] = await Promise.all([
+          fetchTable('raw_material_adjustments', 'date', 'id,material_id,type,quantity,reason,date,user_id,sync_status', 300),
+          fetchTable('branch_stock_adjustments', 'date', 'id,product_id,branch,quantity,reason,date,user_id', 200),
+          fetchTable('raw_materials', 'last_updated', 'id,name,category,unit,current_stock,min_stock_level,cost_per_unit,supplier_name,is_active,last_updated'),
+          fetchTable('products', 'created_at', 'id,name,category,price,unit,is_active,created_at'),
+          fetchTable('purchases', 'date', 'id,material_id,quantity,total_cost,amount_paid,payment_method,vendor_name,vendor_city,date,sync_status', 300),
+          fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status')
+        ]);
+        if (rmaData) setRawMaterialAdjustments(prev => merge(rmaData, prev, fromDBRawAdjustment));
+        if (bsaData) setBranchStockAdjustments(prev => merge(bsaData, prev, fromDBBranchAdjustment));
+        if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
+        if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
+        if (purData) setPurchases(prev => merge(purData.map(fromDBPurchase), prev, (d) => d));
+        if (recData) setRecipes(prev => merge(recData, prev, fromDBRecipe));
+        break;
 
-    const rmaData = await fetchTable('raw_material_adjustments', 'date');
-    if (rmaData) setRawMaterialAdjustments(prev => merge(rmaData, prev, fromDBRawAdjustment));
+      case 'hr':
+        const [stData, sdData, svData] = await Promise.all([
+          fetchTable('staff_members', 'created_at', 'id,name,department,base_salary,is_active,created_at'),
+          fetchTable('staff_deductions', 'date', 'id,staff_id,amount,reason,date,sync_status', 200),
+          fetchTable('salary_vouchers', 'date', 'id,staff_id,amount,month,year,date,status,sync_status', 200)
+        ]);
+        if (stData) setStaff(prev => merge(stData, prev, fromDBStaff));
+        if (sdData) setStaffDeductions(prev => merge(sdData, prev, fromDBDeduction));
+        if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
+        break;
 
-    const lData = await fetchTable('audit_logs', 'timestamp');
-    if (lData) setAuditLogs(lData.map(fromDBLog));
+      case 'finance':
+        const [leData, eData] = await Promise.all([
+          fetchTable('ledger_entries', 'date', 'id,date,account_head,account_type,debit,credit,name,station,account_no,closing_balance,category,sync_status', 300),
+          fetchTable('expenses', 'date', 'id,title,amount,category,date,branch_id,sync_status', 300)
+        ]);
+        if (leData) setLedgerEntries(prev => merge(leData, prev, fromDBLedgerEntry));
+        if (eData) setExpenses(prev => merge(eData, prev, fromDBExpense));
+        break;
 
-    const bsaData = await fetchTable('branch_stock_adjustments', 'date');
-    if (bsaData) setBranchStockAdjustments(prev => merge(bsaData, prev, fromDBBranchAdjustment));
-
-    const stData = await fetchTable('staff_members', 'created_at');
-    if (stData) setStaff(prev => merge(stData, prev, fromDBStaff));
-
-    const sdData = await fetchTable('staff_deductions', 'date');
-    if (sdData) setStaffDeductions(prev => merge(sdData, prev, fromDBDeduction));
-
-    const svData = await fetchTable('salary_vouchers', 'date');
-    if (svData) setSalaryVouchers(prev => merge(svData, prev, fromDBVoucher));
-
-    const purchasesData = await fetchTable('purchases', 'date');
-    if (purchasesData) {
-      const sanitized = purchasesData.map(fromDBPurchase);
-      setPurchases(prev => merge(sanitized, prev, (d) => d));
+      case 'audit':
+        const lData = await fetchTable('audit_logs', 'timestamp', 'id,action,entity,entity_id,details,user_id,timestamp', 100);
+        if (lData) setAuditLogs(lData.map(fromDBLog));
+        break;
     }
 
-    const recipesData = await fetchTable('recipes', 'id');
-    if (recipesData) setRecipes(prev => merge(recipesData, prev, fromDBRecipe));
+    setLoadedModules(prev => [...prev, module]);
+  }, [currentUser, hasSupabaseConfig, loadedModules]);
 
-    const leData = await fetchTable('ledger_entries', 'date');
-    if (leData) setLedgerEntries(prev => merge(leData, prev, fromDBLedgerEntry));
+  const fetchData = useCallback(async (isInitial = false) => {
+    if (!currentUser || !hasSupabaseConfig) return;
 
-    const aoData = await fetchTable('advance_orders', 'created_at');
-    if (aoData) setAdvanceOrders(prev => merge(aoData, prev, fromDBAdvanceOrder));
+    // Initial/Essential data fetch only
+    const tasks = [
+      fetchTable('products', 'created_at', 'id,name,category,price,unit,is_active,created_at'),
+      fetchTable('raw_materials', 'last_updated', 'id,name,category,unit,current_stock,min_stock_level,cost_per_unit,supplier_name,is_active,last_updated'),
+      fetchAppSettings()
+    ];
 
-    const { data: settingsData } = await supabase.from('app_settings').select('*').eq('id', 'receipt_config').maybeSingle();
-    if (settingsData?.settings) {
-      const remote = settingsData.settings;
-      const localSavedAt = (receiptSettingsRef.current as any)._savedAt || 0;
-      const remoteSavedAt = remote._savedAt || 0;
-      // Only overwrite if remote is strictly newer than local
-      if (remoteSavedAt > localSavedAt) {
-        setReceiptSettings(prev => ({ ...prev, ...remote, isLocked: false }));
+    // If it's a background pull, refresh any modules that are already loaded
+    if (!isInitial) {
+      if (loadedModules.includes('sales')) {
+        tasks.push(fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 500));
+        tasks.push(fetchTable('dispatches', 'date', 'id,destination,date,status,items,token_number,sync_status', 300));
       }
+      if (loadedModules.includes('inventory')) {
+        tasks.push(fetchTable('production_batches', 'date', 'id,items,date,notes,sync_status', 300));
+        tasks.push(fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status'));
+      }
+    } else {
+      // On initial load, fetch just enough for the dashboard
+      tasks.push(fetchTable('sales', 'date', 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status', 100));
+      tasks.push(fetchTable('production_batches', 'date', 'id,items,date,notes,sync_status', 100));
+    }
+
+    const results = await Promise.all(tasks);
+    
+    // Process core results
+    const pData = results[0];
+    const rmData = results[1];
+    if (pData) setProducts(prev => merge(pData, prev, fromDBProduct));
+    if (rmData) setRawMaterials(prev => merge(rmData, prev, fromDBRawMaterial));
+
+    if (isInitial) {
+      const initialSales = results[3];
+      const initialBatches = results[4];
+      if (initialSales) setSales(prev => merge(initialSales, prev, fromDBSale));
+      if (initialBatches) setBatches(prev => merge(initialBatches, prev, fromDBBatch));
     }
 
     setLastSyncTime(new Date().toISOString());
     setIsLoading(false);
     setTimeout(() => syncOfflineData(), 1000);
-  }, [currentUser, hasSupabaseConfig, syncOfflineData]);
+  }, [currentUser, hasSupabaseConfig, syncOfflineData, fetchAppSettings, loadedModules]);
 
   useEffect(() => { 
     if (currentUser && hasSupabaseConfig) {
-      fetchData(); 
+      fetchData(true); 
     }
   }, [currentUser, hasSupabaseConfig, fetchData]);
 
   useEffect(() => {
     if (isOnline && hasSupabaseConfig && currentUser) {
-      const pullInterval = setInterval(() => fetchData(), 30000); // Poll less frequently when realtime is on
+      const pullInterval = setInterval(() => fetchData(), 300000); // Polling every 5 minutes instead of 30s
       const pushInterval = setInterval(() => syncOfflineData(), 15000);
       return () => { clearInterval(pullInterval); clearInterval(pushInterval); };
     }
@@ -731,16 +809,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
           }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (p) => {
-          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-            const e = fromDBExpense(p.new as DBExpense);
-            setExpenses(prev => {
-              const idx = prev.findIndex(x => x.id === e.id);
-              if (idx === -1) return [...prev, e];
-              const next = [...prev]; next[idx] = e; return next;
-            });
-          }
-        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'dispatches' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
             const d = fromDBDispatch(p.new as DBDispatch);
@@ -771,16 +839,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
           }
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, (p) => {
-          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-            const st = fromDBStaff(p.new as DBStaffMember);
-            setStaff(prev => {
-              const idx = prev.findIndex(x => x.id === st.id);
-              if (idx === -1) return [...prev, st];
-              const next = [...prev]; next[idx] = st; return next;
-            });
-          }
-        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
             const data = p.new as any;
@@ -789,7 +847,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
               setReceiptSettings(prev => {
                 const localSavedAt = (prev as any)._savedAt || 0;
                 const remoteSavedAt = remote._savedAt || 0;
-                // Only overwrite if remote is strictly newer than local
                 if (remoteSavedAt > localSavedAt) {
                   return { ...prev, ...remote, isLocked: false };
                 }
@@ -808,18 +865,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
           } else if (p.eventType === 'DELETE') {
             setAdvanceOrders(prev => prev.filter(o => o.id !== (p.old as any).id));
-          }
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_entries' }, (p) => {
-          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
-            const le = fromDBLedgerEntry(p.new as DBLedgerEntry);
-            setLedgerEntries(prev => {
-              const idx = prev.findIndex(x => x.id === le.id);
-              if (idx === -1) return [...prev, le];
-              const next = [...prev]; next[idx] = le; return next;
-            });
-          } else if (p.eventType === 'DELETE') {
-            setLedgerEntries(prev => prev.filter(l => l.id !== (p.old as any).id));
           }
         })
         .subscribe((status) => {
@@ -1485,7 +1530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteCustomer, updateCustomer, deleteVendor, updateVendor,
       deleteLedgerEntry, updateLedgerEntry,
       advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
-      hasSupabaseConfig
+      hasSupabaseConfig, loadModuleData, loadedModules
     }}>
       {children}
     </AppContext.Provider>
