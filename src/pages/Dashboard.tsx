@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, TrendingUp, Factory, ShoppingCart, AlertTriangle, Layout, Share2, History, Trash2, Calendar, CalendarDays, CalendarRange, ChevronDown } from 'lucide-react';
+import { Package, TrendingUp, Factory, ShoppingCart, AlertTriangle, Layout, Share2, History, Trash2, Calendar, CalendarDays, CalendarRange, ChevronDown, ChefHat } from 'lucide-react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts';
 import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,7 +39,7 @@ export default function Dashboard() {
   const totalRevenue = todaySales
     .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
     .reduce((sum, s) => sum + s.total, 0);
-  const totalProduced = todayBatches.reduce((sum, b) => sum + b.quantity, 0);
+  const totalProduced = todayBatches.reduce((sum, b) => sum + (Array.isArray(b.items) ? b.items.reduce((s: number, i: any) => s + (i.quantity || 0), 0) : (b as any).quantity || 0), 0);
   const totalDispatched = todayDispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
   const totalSold = todaySales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0);
 
@@ -55,7 +55,12 @@ export default function Dashboard() {
 
   const categoryData = products.reduce((acc, p) => {
     const existing = acc.find(a => a.name === p.category);
-    const produced = batches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0);
+    const produced = batches.reduce((sum, b) => {
+      if (Array.isArray(b.items)) {
+        return sum + b.items.filter((i: any) => i.productId === p.id).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+      }
+      return (b as any).productId === p.id ? sum + ((b as any).quantity || 0) : sum;
+    }, 0);
     if (produced > 0) {
       if (existing) existing.value += produced;
       else acc.push({ name: p.category, value: produced });
@@ -302,43 +307,92 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Categories Distribution */}
+        {/* Production by Category */}
         <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
           <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
-             <div className="space-y-0.5">
-               <CardTitle className="text-sm font-bold text-slate-800">Production Focus</CardTitle>
-               <CardDescription className="text-[10px] font-medium text-slate-400">Category-wise resource allocation</CardDescription>
-             </div>
-             <Share2 className="h-4 w-4 text-slate-300" />
+            <div className="space-y-0.5">
+              <CardTitle className="text-sm font-bold text-slate-800">Production by Category</CardTitle>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Today's output distribution</CardDescription>
+            </div>
+            <Share2 className="h-4 w-4 text-slate-300" />
           </CardHeader>
           <CardContent className="p-6">
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie 
-                    data={categoryData} 
-                    cx="50%" 
-                    cy="50%" 
-                    innerRadius={60} 
-                    outerRadius={80} 
-                    paddingAngle={5}
-                    dataKey="value" 
-                  >
-                    {categoryData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} cornerRadius={8} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ border: 'none', borderRadius: '12px', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', fontSize: '11px' }} 
-                  />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    iconType="circle"
-                    wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={categoryData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
+                      {categoryData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 5px 20px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 700 }}
+                      formatter={(value: number, name: string) => [value, name]}
+                    />
+                    <Legend iconType="circle" iconSize={8} formatter={(value) => <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748B' }}>{value}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-xs text-slate-300 italic">No production data for today</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Menu Quick View — BBQ & Tandoori */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+          <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
+            <div className="space-y-0.5">
+              <CardTitle className="text-sm font-bold text-slate-800">Tandoori Menu Card</CardTitle>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Current prices for tandoori items</CardDescription>
+            </div>
+            <ChefHat className="h-4 w-4 text-slate-300" />
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {products
+                .filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor'))
+                .slice(0, 6)
+                .map(p => (
+                  <div key={p.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase truncate">{p.name}</p>
+                    <p className="text-sm font-black text-slate-900 mt-1">Rs. {p.price}</p>
+                  </div>
+                ))}
+              {products.filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor')).length === 0 && (
+                <div className="col-span-full py-4 text-center text-[10px] text-slate-400 italic">No tandoori items found</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+          <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
+            <div className="space-y-0.5">
+              <CardTitle className="text-sm font-bold text-slate-800">BBQ Menu Card</CardTitle>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Current prices for BBQ items</CardDescription>
+            </div>
+            <Package className="h-4 w-4 text-slate-300" />
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {products
+                .filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq'))
+                .slice(0, 6)
+                .map(p => (
+                  <div key={p.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase truncate">{p.name}</p>
+                    <p className="text-sm font-black text-slate-900 mt-1">Rs. {p.price}</p>
+                  </div>
+                ))}
+              {products.filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq')).length === 0 && (
+                <div className="col-span-full py-4 text-center text-[10px] text-slate-400 italic">No BBQ items found</div>
+              )}
             </div>
           </CardContent>
         </Card>

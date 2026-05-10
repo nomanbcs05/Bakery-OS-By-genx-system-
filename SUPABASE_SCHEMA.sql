@@ -67,12 +67,29 @@ CREATE TABLE IF NOT EXISTS sales (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL, -- 'branch', 'factory_walkin'
   branch TEXT, -- 'branch_1', 'branch_2'
-  items JSONB NOT NULL, -- Array of {productId, quantity, unitPrice}
+  items JSONB NOT NULL, -- Array of {productId, quantity (DECIMAL), unitPrice (DECIMAL)}
   total DECIMAL NOT NULL,
   payment_method TEXT NOT NULL,
+  customer_name TEXT,
+  customer_phone TEXT,
+  is_credit_paid BOOLEAN DEFAULT true,
   date DATE NOT NULL,
   sync_status TEXT DEFAULT 'synced'
 );
+
+-- Safely add missing columns to sales if the table was created previously without them
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='customer_name') THEN
+    ALTER TABLE sales ADD COLUMN customer_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='customer_phone') THEN
+    ALTER TABLE sales ADD COLUMN customer_phone TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='is_credit_paid') THEN
+    ALTER TABLE sales ADD COLUMN is_credit_paid BOOLEAN DEFAULT true;
+  END IF;
+END $$;
 
 -- 5. Expenses Table
 CREATE TABLE IF NOT EXISTS expenses (

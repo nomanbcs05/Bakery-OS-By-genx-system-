@@ -285,16 +285,21 @@ const toDBSale = (s: Sale): any => {
     id: s.id,
     type: s.type,
     branch: s.branch || null,
-    items: s.items,
-    total: s.total,
+    items: s.items.map(i => ({
+      productId: i.productId,
+      quantity: parseFloat(String(i.quantity)),   // ensure DECIMAL, not integer string
+      unitPrice: parseFloat(String(i.unitPrice)),  // ensure DECIMAL
+    })),
+    total: parseFloat(String(s.total)),
     payment_method: s.paymentMethod,
     customer_name: s.customerName || null,
     customer_phone: s.customerPhone || null,
-    is_credit_paid: s.isCreditPaid ?? false,
+    is_credit_paid: s.isCreditPaid ?? true,
     date: s.date,
     sync_status: s.syncStatus
   };
 };
+
 const toDBExpense = (e: Expense): DBExpense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branch_id: e.branchId, sync_status: e.syncStatus
 });

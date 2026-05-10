@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator, Tag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator, Tag, ChefHat } from 'lucide-react';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -76,6 +76,24 @@ export default function POS({ branch }: POSProps) {
     quantity: ''
   });
 
+  const [quickQtyPrompt, setQuickQtyPrompt] = useState<{ open: boolean; productId: string; quantity: string }>({
+    open: false,
+    productId: '',
+    quantity: ''
+  });
+
+  const handleQuickQtyConfirm = (qty: number) => {
+    const product = getProductById(quickQtyPrompt.productId);
+    if (!product) return;
+    
+    setCart(prev => {
+      const existing = prev.find(i => i.productId === quickQtyPrompt.productId);
+      if (existing) return prev.map(i => i.productId === quickQtyPrompt.productId ? { ...i, quantity: i.quantity + qty } : i);
+      return [...prev, { productId: quickQtyPrompt.productId, quantity: qty, unitPrice: product.price }];
+    });
+    setQuickQtyPrompt({ open: false, productId: '', quantity: '' });
+  };
+
   const handleEggsConfirm = (qty: number) => {
     const product = getProductById(eggsPrompt.productId);
     if (!product) return;
@@ -143,6 +161,16 @@ export default function POS({ branch }: POSProps) {
 
     if (productId === 'p_eggs' || product.name.toLowerCase().includes('egg')) {
       setEggsPrompt({ open: true, productId, quantity: '' });
+      return;
+    }
+
+    if (
+      product.category.toLowerCase().includes('bbq') || 
+      product.name.toLowerCase().includes('bbq') || 
+      product.category.toLowerCase().includes('tandoor') || 
+      product.name.toLowerCase().includes('tandoor')
+    ) {
+      setQuickQtyPrompt({ open: true, productId, quantity: '' });
       return;
     }
 
@@ -259,6 +287,54 @@ export default function POS({ branch }: POSProps) {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              <ChefHat className="h-4 w-4" /> Tandoori Menu Card
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+              {products
+                .filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor'))
+                .slice(0, 14)
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p.id)}
+                    className="bg-white dark:bg-card border-2 border-primary/10 rounded-xl p-3 text-left hover:border-primary hover:shadow-lg transition-all active:scale-95 group"
+                  >
+                    <p className="font-semibold text-[11px] text-muted-foreground group-hover:text-primary transition-colors">{p.name}</p>
+                    <p className="text-primary font-bold text-lg leading-tight">Rs. {p.price}</p>
+                  </button>
+                ))}
+              {products.filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor')).length === 0 && (
+                <div className="col-span-full text-[10px] text-muted-foreground italic">No tandoori items found in product list</div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+              <Plus className="h-4 w-4" /> BBQ Menu Card
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
+              {products
+                .filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq'))
+                .slice(0, 14)
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p.id)}
+                    className="bg-white dark:bg-card border-2 border-primary/10 rounded-xl p-3 text-left hover:border-primary hover:shadow-lg transition-all active:scale-95 group"
+                  >
+                    <p className="font-semibold text-[11px] text-muted-foreground group-hover:text-primary transition-colors">{p.name}</p>
+                    <p className="text-primary font-bold text-lg leading-tight">Rs. {p.price}</p>
+                  </button>
+                ))}
+              {products.filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq')).length === 0 && (
+                <div className="col-span-full text-[10px] text-muted-foreground italic">No BBQ items found in product list</div>
+              )}
             </div>
           </div>
 
@@ -395,6 +471,55 @@ export default function POS({ branch }: POSProps) {
         customerPhone={receiptData.customerPhone}
         previousBalance={receiptData.previousBalance}
       />
+
+      <Dialog open={quickQtyPrompt.open} onOpenChange={(open) => !open && setQuickQtyPrompt(prev => ({ ...prev, open: false }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Select Quantity (1-10)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <Button 
+                  key={n} 
+                  variant="outline" 
+                  className="h-14 text-lg font-black hover:bg-primary hover:text-white transition-all active:scale-90" 
+                  onClick={() => handleQuickQtyConfirm(n)}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-2 mt-2">
+              <Label htmlFor="quickQty">Or enter manual quantity</Label>
+              <Input 
+                id="quickQty" 
+                type="number" 
+                placeholder="e.g. 15" 
+                value={quickQtyPrompt.quantity}
+                onChange={e => setQuickQtyPrompt(prev => ({ ...prev, quantity: e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const q = parseInt(quickQtyPrompt.quantity);
+                    if (!isNaN(q) && q > 0) handleQuickQtyConfirm(q);
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickQtyPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
+            <Button onClick={() => {
+              const q = parseInt(quickQtyPrompt.quantity);
+              if (!isNaN(q) && q > 0) handleQuickQtyConfirm(q);
+            }}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={eggsPrompt.open} onOpenChange={(open) => !open && setEggsPrompt(prev => ({ ...prev, open: false }))}>
         <DialogContent>
