@@ -290,53 +290,6 @@ export default function POS({ branch }: POSProps) {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-              <ChefHat className="h-4 w-4" /> Tandoori Menu Card
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
-              {products
-                .filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor'))
-                .slice(0, 14)
-                .map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => addToCart(p.id)}
-                    className="bg-white dark:bg-card border-2 border-primary/10 rounded-xl p-3 text-left hover:border-primary hover:shadow-lg transition-all active:scale-95 group"
-                  >
-                    <p className="font-semibold text-[11px] text-muted-foreground group-hover:text-primary transition-colors">{p.name}</p>
-                    <p className="text-primary font-bold text-lg leading-tight">Rs. {p.price}</p>
-                  </button>
-                ))}
-              {products.filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor')).length === 0 && (
-                <div className="col-span-full text-[10px] text-muted-foreground italic">No tandoori items found in product list</div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-              <Plus className="h-4 w-4" /> BBQ Menu Card
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
-              {products
-                .filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq'))
-                .slice(0, 14)
-                .map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => addToCart(p.id)}
-                    className="bg-white dark:bg-card border-2 border-primary/10 rounded-xl p-3 text-left hover:border-primary hover:shadow-lg transition-all active:scale-95 group"
-                  >
-                    <p className="font-semibold text-[11px] text-muted-foreground group-hover:text-primary transition-colors">{p.name}</p>
-                    <p className="text-primary font-bold text-lg leading-tight">Rs. {p.price}</p>
-                  </button>
-                ))}
-              {products.filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq')).length === 0 && (
-                <div className="col-span-full text-[10px] text-muted-foreground italic">No BBQ items found in product list</div>
-              )}
-            </div>
-          </div>
 
           <div className="pos-grid pb-6">
             {availableProducts.map(p => {
