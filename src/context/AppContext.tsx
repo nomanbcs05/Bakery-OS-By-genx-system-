@@ -197,7 +197,7 @@ const STORAGE_KEY = 'bakewise_erp_state';
 const AUTH_STORAGE_KEY = 'bakewise_auth_state';
 
 // Flag to temporarily disable offline database (localStorage) for online-only testing
-const DISABLE_OFFLINE_DB = true;
+const DISABLE_OFFLINE_DB = false;
 
 // Helper to convert DB objects to CamelCase
 const fromDBProduct = (p: DBProduct): Product => ({
@@ -691,6 +691,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Use the same parameters if we expect them to be requested soon to leverage deduplication
       tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
       tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
+      tasks.push(fetchTable('ledger_entries', 'date', 'id,date,account_head,account_type,debit,credit,name,station,account_no,closing_balance,category,sync_status', 500));
     }
 
     const results = await Promise.all(tasks);
@@ -704,8 +705,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isInitial) {
       const initialSales = results[3];
       const initialBatches = results[4];
+      const initialLedger = results[5];
       if (initialSales) setSales(prev => merge(initialSales, prev, fromDBSale));
       if (initialBatches) setBatches(prev => merge(initialBatches, prev, fromDBBatch));
+      if (initialLedger) setLedgerEntries(prev => merge(initialLedger, prev, fromDBLedgerEntry));
     }
 
     setLastSyncTime(new Date().toISOString());
@@ -1373,10 +1376,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addLedgerEntry = async (e: Omit<LedgerEntry, 'id' | 'syncStatus'>) => {
-    const newE: LedgerEntry = { ...e, id: `le${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
+    const id = `le${Date.now()}`;
+    const newE: LedgerEntry = { ...e, id, syncStatus: isOnline ? 'synced' : 'pending' };
     setLedgerEntries(prev => [...prev, newE]);
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('ledger_entries').upsert([toDBLedgerEntry(newE)]); } catch (err) { console.error(err); }
+      try { 
+        const { error } = await supabase.from('ledger_entries').upsert([toDBLedgerEntry(newE)]);
+        if (error) throw error;
+      } catch (err) { 
+        console.error('Ledger entry sync error:', err);
+        setLedgerEntries(prev => prev.map(le => le.id === id ? { ...le, syncStatus: 'pending' } : le));
+      }
     }
   };
 
