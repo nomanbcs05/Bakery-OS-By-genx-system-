@@ -147,8 +147,8 @@ interface AppContextType extends AppState {
   getTodaySales: () => Sale[];
   getBranchStock: (branch: 'branch_1' | 'branch_2') => { productId: string; stock: number }[];
   getProductionStock: () => { productId: string; stock: number }[];
-  clearSales: (range: 'today' | 'weekly' | 'monthly' | 'all') => void;
-  clearAllReportData: () => void;
+  clearSales: (range: 'today' | 'weekly' | 'monthly' | 'all') => Promise<void>;
+  clearAllReportData: () => Promise<void>;
   selectProfile: (profile: User) => void;
   verifyPin: (pin: string) => boolean;
   lockProfile: () => void;
@@ -1522,32 +1522,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
           toDelete = sales.filter(s => s.date && s.date >= monthStr).map(s => s.id);
           setSales(prev => prev.filter(s => !s.date || s.date < monthStr));
         } else if (r === 'all') {
-          toDelete = sales.map(s => s.id);
           setSales([]);
         }
-        // Also delete from Supabase
-        if (toDelete.length > 0 && isOnline && hasSupabaseConfig) {
+        
+        // Delete from Supabase
+        if (isOnline && hasSupabaseConfig) {
           try {
-            for (let i = 0; i < toDelete.length; i += 50) {
-              const batch = toDelete.slice(i, i + 50);
-              await supabase.from('sales').delete().in('id', batch);
+            if (r === 'all') {
+              const { error } = await supabase.from('sales').delete().neq('id', '_placeholder_');
+              if (error) throw error;
+            } else if (toDelete.length > 0) {
+              for (let i = 0; i < toDelete.length; i += 50) {
+                const batch = toDelete.slice(i, i + 50);
+                await supabase.from('sales').delete().in('id', batch);
+              }
             }
-          } catch (err) { console.error('Failed to delete sales from cloud:', err); }
+          } catch (err) { 
+            console.error('Failed to delete sales from cloud:', err);
+            throw err;
+          }
         }
       },
       clearAllReportData: async () => {
-        const saleIds = sales.map(s => s.id);
-        const expenseIds = expenses.map(e => e.id);
-        const batchIds = batches.map(b => b.id);
-        const dispatchIds = dispatches.map(d => d.id);
         setSales([]); setExpenses([]); setBatches([]); setDispatches([]);
         if (isOnline && hasSupabaseConfig) {
           try {
-            if (saleIds.length) await supabase.from('sales').delete().in('id', saleIds);
-            if (expenseIds.length) await supabase.from('expenses').delete().in('id', expenseIds);
-            if (batchIds.length) await supabase.from('production_batches').delete().in('id', batchIds);
-            if (dispatchIds.length) await supabase.from('dispatches').delete().in('id', dispatchIds);
-          } catch (err) { console.error('Failed to clear cloud data:', err); }
+            await Promise.all([
+              supabase.from('sales').delete().neq('id', '_placeholder_'),
+              supabase.from('expenses').delete().neq('id', '_placeholder_'),
+              supabase.from('production_batches').delete().neq('id', '_placeholder_'),
+              supabase.from('dispatches').delete().neq('id', '_placeholder_')
+            ]);
+          } catch (err) { 
+            console.error('Failed to clear cloud data:', err);
+            throw err;
+          }
         }
       },
       selectProfile, verifyPin, lockProfile, switchUser,

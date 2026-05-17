@@ -18,6 +18,7 @@ export default function SettingsPage() {
     allUsers, 
     updateUserPin,
     clearAllReportData, 
+    clearSales,
     isOnline, 
     lastSyncTime, 
     forceSync, 
@@ -375,14 +376,145 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2"><Database className="h-4 w-4" /> Data Management</CardTitle>
-                <CardDescription>Reset or clear system data</CardDescription>
+            <Card className="border border-red-100 shadow-md">
+              <CardHeader className="bg-red-50/10 border-b border-slate-100">
+                <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                  <Database className="h-4.5 w-4.5 text-red-500 animate-pulse" /> Admin Data Management
+                </CardTitle>
+                <CardDescription>
+                  Destructive operations. Reset, purge or clear specific modules. All backend deletions are permanent.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full justify-start gap-2" onClick={seedDatabase}><Database className="h-4 w-4 text-blue-500" /> Reset to Defaults (Seed)</Button>
-                <Button variant="outline" className="w-full justify-start gap-2 text-destructive" onClick={() => confirm('Clear all reports?') && clearAllReportData()}><Trash2 className="h-4 w-4" /> Clear All Sales & Reports</Button>
+              <CardContent className="p-6 space-y-6">
+                
+                {/* Reset Section */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border rounded-xl bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <Database className="h-3.5 w-3.5 text-blue-500" /> Reset System
+                    </h4>
+                    <p className="text-[10.5px] text-muted-foreground leading-normal">
+                      Reset all local cache databases and reload products to defaults.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-4 shrink-0 text-xs font-bold uppercase tracking-wider text-slate-700 bg-white hover:bg-slate-100 transition-all border-slate-200" 
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to reset database to defaults?')) {
+                        toast.loading('Resetting database...');
+                        try {
+                          await seedDatabase();
+                          toast.dismiss();
+                          toast.success('Database reset successful!');
+                        } catch (err: any) {
+                          toast.dismiss();
+                          toast.error(`Reset failed: ${err.message}`);
+                        }
+                      }
+                    }}
+                  >
+                    Reset to Defaults
+                  </Button>
+                </div>
+
+                {/* Clear Sales History Section */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-rose-100 rounded-xl bg-rose-50/10 hover:bg-rose-50/20 transition-all">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-2">
+                      <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Clear Sales History
+                    </h4>
+                    <p className="text-[10.5px] text-muted-foreground leading-normal">
+                      Permanently delete all sales history transactions from both the local client state and the Supabase backend.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-9 px-4 shrink-0 text-xs font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-700 transition-all shadow-sm"
+                    onClick={async () => {
+                      if (confirm('⚠️ WARNING: This will permanently delete ALL sales history from the backend database and local cache. This action CANNOT be undone.\n\nAre you sure you want to purge all sales history?')) {
+                        toast.loading('Clearing sales history...');
+                        try {
+                          await clearSales('all');
+                          toast.dismiss();
+                          toast.success('Sales history successfully purged!');
+                        } catch (err: any) {
+                          toast.dismiss();
+                          toast.error(`Purge failed: ${err.message}`);
+                        }
+                      }
+                    }}
+                  >
+                    Clear Sales History
+                  </Button>
+                </div>
+
+                {/* Clear Sales Details Section */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-rose-100 rounded-xl bg-rose-50/10 hover:bg-rose-50/20 transition-all">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-2">
+                      <Trash2 className="h-3.5 w-3.5 text-rose-600" /> Clear Sales Details
+                    </h4>
+                    <p className="text-[10.5px] text-muted-foreground leading-normal">
+                      Permanently delete all itemized sales details from both local client state and the Supabase backend.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-9 px-4 shrink-0 text-xs font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-700 transition-all shadow-sm"
+                    onClick={async () => {
+                      if (confirm('⚠️ WARNING: This will permanently delete ALL itemized sales details and orders from the backend database and local cache. This action CANNOT be undone.\n\nAre you sure you want to purge all sales details?')) {
+                        toast.loading('Purging sales details...');
+                        try {
+                          await clearSales('all');
+                          toast.dismiss();
+                          toast.success('Sales details successfully purged!');
+                        } catch (err: any) {
+                          toast.dismiss();
+                          toast.error(`Purge failed: ${err.message}`);
+                        }
+                      }
+                    }}
+                  >
+                    Clear Sales Details
+                  </Button>
+                </div>
+
+                {/* Clear Everything Section */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-red-200 rounded-xl bg-red-50/15 hover:bg-red-50/25 transition-all">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-red-800 flex items-center gap-2">
+                      <Trash2 className="h-3.5 w-3.5 text-red-600" /> Clear All Sales & Reports
+                    </h4>
+                    <p className="text-[10.5px] text-muted-foreground leading-normal">
+                      Destroy all sales, production batches, dispatches, and expenses from the local cache and Supabase backend.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-9 px-4 shrink-0 text-xs font-bold uppercase tracking-wider bg-red-600 hover:bg-red-700 transition-all shadow-md"
+                    onClick={async () => {
+                      if (confirm('🚨 CRITICAL WARNING: This will permanently delete ALL Sales, Expenses, Production Batches, and Dispatches from both local cache and Supabase backend database.\n\nThis is a complete system data purge. Are you absolutely certain?')) {
+                        toast.loading('Purging all report data...');
+                        try {
+                          await clearAllReportData();
+                          toast.dismiss();
+                          toast.success('All reports and transactions purged successfully!');
+                        } catch (err: any) {
+                          toast.dismiss();
+                          toast.error(`Purge failed: ${err.message}`);
+                        }
+                      }
+                    }}
+                  >
+                    Clear All Data
+                  </Button>
+                </div>
+
               </CardContent>
             </Card>
           </div>
