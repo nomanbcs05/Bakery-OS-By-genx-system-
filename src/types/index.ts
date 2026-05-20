@@ -168,6 +168,7 @@ export interface DBRecipe {
 
 export interface DBProductionBatch {
   id: string;
+  batch_id?: string;
   items: any; // Will be stored as JSON/JSONB
   date: string;
   notes?: string;

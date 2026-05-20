@@ -278,7 +278,7 @@ const toDBProduct = (p: Product): DBProduct => ({
   id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, is_active: p.isActive, created_at: p.createdAt
 });
 const toDBBatch = (b: ProductionBatch): DBProductionBatch => ({
-  id: b.id, items: b.items, date: b.date, notes: b.notes, sync_status: b.syncStatus
+  id: b.id, batch_id: b.id, items: b.items, date: b.date, notes: b.notes, sync_status: b.syncStatus
 });
 const toDBSale = (s: Sale): any => {
   return {
