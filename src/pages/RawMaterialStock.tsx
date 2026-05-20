@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import type { RawMaterial } from '@/types';
 
 export default function RawMaterialStock() {
   const { 
@@ -39,6 +41,14 @@ export default function RawMaterialStock() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editMaterial, setEditMaterial] = useState<RawMaterial | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('Dry');
+  const [editUnit, setEditUnit] = useState('kg');
+  const [editMinStock, setEditMinStock] = useState(0);
+  const [editCost, setEditCost] = useState(0);
+  const [editSupplier, setEditSupplier] = useState('');
   // Form states
   const [newMaterial, setNewMaterial] = useState({
     name: '',
@@ -68,6 +78,17 @@ export default function RawMaterialStock() {
 
   const lowStockItems = rawMaterials.filter(m => m.isActive && m.currentStock <= m.minStockLevel);
   const categories = Array.from(new Set(rawMaterials.map(m => m.category)));
+
+  const handleEditClick = (material: any) => {
+    setEditMaterial(material);
+    setEditName(material.name);
+    setEditCategory(material.category);
+    setEditUnit(material.unit);
+    setEditMinStock(material.minStockLevel);
+    setEditCost(material.costPerUnit ?? 0);
+    setEditSupplier(material.supplierName ?? '');
+    setIsEditOpen(true);
+  };
 
   const handleAddMaterial = (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,7 +422,7 @@ export default function RawMaterialStock() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleEditClick(m)}>
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button 
@@ -423,6 +444,47 @@ export default function RawMaterialStock() {
               </div>
             </CardContent>
           </Card>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Raw Material</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); if (editMaterial) { updateRawMaterial(editMaterial.id, { name: editName, category: editCategory, unit: editUnit, minStockLevel: editMinStock, costPerUnit: editCost, supplierName: editSupplier }); setIsEditOpen(false); toast.success('Material updated'); } }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Input id="edit-category" value={editCategory} onChange={e => setEditCategory(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-unit">Unit</Label>
+                <Input id="edit-unit" value={editUnit} onChange={e => setEditUnit(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-minstock">Min Stock Level</Label>
+                <Input id="edit-minstock" type="number" value={editMinStock} onChange={e => setEditMinStock(parseFloat(e.target.value))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost Per Unit</Label>
+                <Input id="edit-cost" type="number" value={editCost} onChange={e => setEditCost(parseFloat(e.target.value))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-supplier">Supplier Name</Label>
+              <Input id="edit-supplier" value={editSupplier} onChange={e => setEditSupplier(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button type="submit" className="w-full">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
           {/* Recent History Log Snippet */}
           <Card className="border-border/50 shadow-sm opacity-80 backdrop-blur-sm">
