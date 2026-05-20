@@ -136,7 +136,7 @@ interface AppContextType extends AppState {
   addMultiProduction: (items: { productId: string; quantity: number }[], notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
-  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string) => Promise<string | boolean>;
+  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => Promise<string | boolean>;
   createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => Promise<string | boolean>;
   refundSale: (id: string) => Promise<boolean>;
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>;
@@ -941,8 +941,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasLoaded.current || DISABLE_OFFLINE_DB) return;
-    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    // Exclude auditLogs from localStorage to save space — they're already persisted in Supabase
+    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs: [], stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      // QuotaExceededError — try saving with trimmed sales history (keep last 500)
+      console.warn('localStorage quota exceeded, trimming data...');
+      try {
+        const trimmed = { ...data, sales: data.sales.slice(-500), dispatches: data.dispatches.slice(-500), batches: data.batches.slice(-200) };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (e2) {
+        console.error('localStorage still full after trimming. Clearing offline cache.');
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
   }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries]);
 
   useEffect(() => {
@@ -1153,7 +1166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string) => {
+  const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => {
     const id = `d${Date.now()}`;
     const today = new Date().toISOString().slice(0, 10);
     const todayDispatches = dispatches.filter(d => d.date === today);
@@ -1188,6 +1201,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
         }
       }
+
+      if (saleName) {
+        const existingCust = ledgerEntriesRef.current.find(e => e.category === 'customer' && e.name === saleName);
+        const station = customerStation || existingCust?.station || 'Factory Gate';
+        const finalCredit = paymentMethod === 'cash' ? total : (amountPaid || 0);
+        const accountHead = paymentMethod === 'cash' ? 'Dispatch Cash Sale' : (finalCredit > 0 ? 'Dispatch Split Sale' : 'Dispatch Credit Sale');
+        
+        await addLedgerEntry({
+          date: today,
+          accountHead,
+          accountType: 'Asset',
+          debit: total,
+          credit: finalCredit,
+          name: saleName,
+          station: station,
+          accountNo: walkinSale.id,
+          closingBalance: 0,
+          category: 'customer'
+        });
+      }
+
       return walkinSale.id;
     }
     return true;
@@ -1196,7 +1230,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => {
     const total = manualTotal !== undefined ? manualTotal : items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
     const id = `s${Date.now()}`;
-    const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: new Date().toISOString().slice(0, 10), syncStatus: isOnline ? 'synced' : 'pending' };
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: todayStr, syncStatus: isOnline ? 'synced' : 'pending' };
     setSales(prev => [...prev, newSale]);
     if (isOnline && hasSupabaseConfig) {
       try {
@@ -1209,6 +1244,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     addLog('create', 'sale', id, `Sale Rs. ${total}`);
+
+    if (paymentMethod === 'credit' && customerName) {
+      const existingCust = ledgerEntriesRef.current.find(e => e.category === 'customer' && e.name === customerName);
+      const station = existingCust?.station || (branch === 'branch_1' ? 'Branch 1' : branch === 'branch_2' ? 'Branch 2' : 'Walk-in');
+      
+      await addLedgerEntry({
+        date: todayStr,
+        accountHead: 'POS Credit Sale',
+        accountType: 'Asset',
+        debit: total,
+        credit: 0,
+        name: customerName,
+        station: station,
+        accountNo: id,
+        closingBalance: 0,
+        category: 'customer'
+      });
+    }
+
     return id;
   }, [addLog, isOnline]);
 
@@ -1357,9 +1411,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const payCreditSale = async (id: string) => {
+    const sale = salesRef.current.find(s => s.id === id);
     setSales(prev => prev.map(s => s.id === id ? { ...s, isCreditPaid: true } : s));
     if (isOnline && hasSupabaseConfig) {
       try { await supabase.from('sales').update({ is_credit_paid: true }).eq('id', id); } catch (err) { console.error('Credit payment sync error'); }
+    }
+
+    if (sale && sale.paymentMethod === 'credit' && sale.customerName) {
+      const existingCust = ledgerEntriesRef.current.find(e => e.category === 'customer' && e.name === sale.customerName);
+      const station = existingCust?.station || 'Factory';
+      
+      await addLedgerEntry({
+        date: new Date().toISOString().slice(0, 10),
+        accountHead: 'Credit Payment',
+        accountType: 'Asset',
+        debit: 0,
+        credit: sale.total,
+        name: sale.customerName,
+        station: station,
+        accountNo: id,
+        closingBalance: 0,
+        category: 'customer'
+      });
     }
   };
 

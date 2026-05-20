@@ -16,6 +16,7 @@ import GOTDialog from '@/components/GOTDialog';
 import ReceiptDialog from '@/components/ReceiptDialog';
 import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 export default function DispatchPage() {
   const { currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries } = useApp();
@@ -31,6 +32,8 @@ export default function DispatchPage() {
   const [paymentMode, setPaymentMode] = useState<PaymentMethod>('cash');
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
+  const [custStation, setCustStation] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
   
   const [receiptData, setReceiptData] = useState<{
     open: boolean;
@@ -65,13 +68,12 @@ export default function DispatchPage() {
   const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
     
-    if (paymentMeth === 'credit' && (!custName || !custPhone)) {
-      toast.error('Name and Phone number are required for credit sales');
+    if (!custName) {
+      toast.error('Customer name is required');
       return;
     }
 
-    // Prepare receipt data if walk-in
-    let currentSaleId = `SL-${Date.now().toString(36).toUpperCase()}`;
+    // Prepare receipt data
     let receiptItems = items.map(i => ({
       name: getProductById(i.productId)?.name || 'Unknown',
       quantity: i.quantity,
@@ -79,23 +81,35 @@ export default function DispatchPage() {
     }));
     let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    const success = await createDispatch(destination, items, paymentMeth, custName, custPhone);
+    const numericAmountPaid = parseFloat(amountPaid) || 0;
+
+    const success = await createDispatch(
+      destination, 
+      items, 
+      paymentMeth, 
+      custName, 
+      custPhone || undefined, 
+      numericAmountPaid, 
+      custStation || undefined
+    );
+    
     if (success) {
-      if (destination === 'walkin' && typeof success === 'string') {
-        setReceiptData({
-          open: true,
-          items: receiptItems,
-          total,
-          paymentMethod: paymentMeth,
-          saleId: success,
-          date: new Date().toISOString()
-        });
-      }
+      setReceiptData({
+        open: true,
+        items: receiptItems,
+        total,
+        paymentMethod: paymentMeth,
+        saleId: typeof success === 'string' ? success : `SL-${Date.now().toString(36).toUpperCase()}`,
+        date: new Date().toISOString()
+      });
       setItems([]);
       setDestination('');
       setIsPaymentOpen(false);
       setCustName('');
       setCustPhone('');
+      setCustStation('');
+      setAmountPaid('');
+      toast.success('Sale completed successfully!');
     }
   };
 
@@ -103,6 +117,15 @@ export default function DispatchPage() {
     if (!destination || items.length === 0) return;
     const isSale = !['branch_1', 'branch_2'].includes(destination);
     if (isSale) {
+      if (destination !== 'walkin') {
+        setCustName(destination);
+        const existingCust = ledgerEntries.find(e => e.category === 'customer' && e.name === destination);
+        setCustStation(existingCust?.station || 'Factory Gate');
+      } else {
+        setCustName('');
+        setCustStation('');
+      }
+      setAmountPaid('');
       setIsPaymentOpen(true);
     } else {
       handleDispatch();
@@ -226,52 +249,133 @@ export default function DispatchPage() {
 
       {/* Payment Selection Dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Complete Factory Sale</DialogTitle>
-            <DialogDescription>Select payment method for this walk-in dispatch</DialogDescription>
+        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-4 text-white">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-white">
+              <Banknote className="h-5 w-5 text-indigo-200" />
+              Complete Factory Sale
+            </DialogTitle>
+            <DialogDescription className="text-indigo-200 text-xs">
+              Select payment method and enter customer details
+            </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <Button 
-                variant={paymentMode === 'cash' ? "default" : "outline"} 
-                className="h-20 flex flex-col gap-1 border-2" 
-                onClick={() => setPaymentMode('cash')}
-              >
-                <Banknote className="h-6 w-6" />
-                <span className="text-xs">Cash</span>
-              </Button>
-              <Button 
-                variant={paymentMode === 'credit' ? "default" : "outline"} 
-                className="h-20 flex flex-col gap-1 border-2" 
-                onClick={() => setPaymentMode('credit')}
-              >
-                <CreditCard className="h-6 w-6" />
-                <span className="text-xs">Credit</span>
-              </Button>
+          <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
+            {/* Total Payable */}
+            <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg px-4 py-3 flex justify-between items-center">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Payable</span>
+              <span className="text-xl font-black text-indigo-700 dark:text-indigo-300 font-mono">
+                Rs. {items.reduce((sum, item) => sum + item.quantity * (getProductById(item.productId)?.price || 0), 0).toLocaleString()}
+              </span>
             </div>
 
-            {paymentMode === 'credit' && (
-              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            {/* Payment Mode Toggle */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Payment Mode</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  type="button"
+                  className={cn(
+                    "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all duration-200 font-semibold text-sm relative",
+                    paymentMode === 'cash' 
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm" 
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-300"
+                  )}
+                  onClick={() => setPaymentMode('cash')}
+                >
+                  <Banknote className="h-4 w-4" />
+                  Full Cash
+                  {paymentMode === 'cash' && <span className="absolute -top-1 -right-1 h-4 w-4 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[9px]">✓</span>}
+                </button>
+                <button 
+                  type="button"
+                  className={cn(
+                    "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all duration-200 font-semibold text-sm relative",
+                    paymentMode === 'credit' 
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm" 
+                      : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-300"
+                  )}
+                  onClick={() => setPaymentMode('credit')}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Credit / Split
+                  {paymentMode === 'credit' && <span className="absolute -top-1 -right-1 h-4 w-4 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[9px]">✓</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Customer Details */}
+            <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Customer Details</Label>
+              
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-600 font-medium">Customer Name <span className="text-rose-500">*</span></Label>
+                <Input 
+                  value={custName} 
+                  onChange={e => setCustName(e.target.value)} 
+                  placeholder="e.g. Ahmed Ali"
+                  className="h-9 rounded-lg"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label>Customer Name</Label>
-                  <Input value={custName} onChange={e => setCustName(e.target.value)} placeholder="Enter name" />
+                  <Label className="text-xs text-slate-600 font-medium">Station / City</Label>
+                  <Input 
+                    value={custStation} 
+                    onChange={e => setCustStation(e.target.value)} 
+                    placeholder="e.g. Sanghar"
+                    className="h-9 rounded-lg"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <Label>Phone Number</Label>
-                  <Input value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="03xx-xxxxxxx" />
+                  <Label className="text-xs text-slate-600 font-medium">Phone</Label>
+                  <Input 
+                    value={custPhone} 
+                    onChange={e => setCustPhone(e.target.value)} 
+                    placeholder="03xx-xxxxxxx"
+                    className="h-9 rounded-lg"
+                  />
                 </div>
               </div>
-            )}
+
+              {/* Split payment - Cash received now */}
+              {paymentMode === 'credit' && (
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 p-3 rounded-lg space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <Label className="text-xs font-bold text-amber-700 dark:text-amber-400">Cash Received Now (Optional)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-xs font-bold text-amber-600">Rs.</span>
+                    <Input 
+                      type="number"
+                      value={amountPaid} 
+                      onChange={e => setAmountPaid(e.target.value)} 
+                      placeholder="0"
+                      className="pl-10 h-9 border-amber-200 dark:border-amber-800 rounded-lg text-amber-900 dark:text-amber-200 font-mono"
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-600/70 leading-tight">
+                    Leave empty or 0 for full credit. Enter partial amount if customer paid some cash now.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button className="w-full" onClick={() => handleDispatch(paymentMode)}>
+          {/* Footer - always visible */}
+          <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-5 py-3 flex gap-2 justify-end">
+            <Button variant="outline" size="sm" onClick={() => setIsPaymentOpen(false)} className="rounded-lg px-4 text-xs">
+              Cancel
+            </Button>
+            <Button 
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 text-xs font-bold gap-1.5" 
+              onClick={() => handleDispatch(paymentMode)}
+              disabled={!custName}
+            >
+              <Banknote className="h-3.5 w-3.5" />
               Confirm & Print Bill
             </Button>
-            <Button variant="ghost" onClick={() => setIsPaymentOpen(false)} className="w-full text-xs">Cancel</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
