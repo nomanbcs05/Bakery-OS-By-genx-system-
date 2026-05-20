@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export default function DispatchPage() {
-  const { currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries } = useApp();
+  const { currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries, sales } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [destination, setDestination] = useState<DispatchDestination | ''>('');
@@ -454,7 +454,7 @@ export default function DispatchPage() {
                     >
                       <Printer className="h-4 w-4" />
                     </Button>
-                    {d.destination === 'walkin' && (
+                    {!['branch_1', 'branch_2'].includes(d.destination) && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -465,13 +465,28 @@ export default function DispatchPage() {
                             unitPrice: getProductById(i.productId)?.price || 0
                           }));
                           const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+                          
+                          // Find associated sale to get accurate payment method and sale ID
+                          const associatedSale = sales.find(s => {
+                            if (s.date !== d.date) return false;
+                            if (d.destination === 'walkin') {
+                              if (s.type !== 'factory_walkin') return false;
+                            } else {
+                              if (s.customerName !== d.destination) return false;
+                            }
+                            if (s.items.length !== d.items.length) return false;
+                            return s.items.every(si => 
+                              d.items.some(di => di.productId === si.productId && di.quantity === si.quantity)
+                            );
+                          });
+
                           setReceiptData({
                             open: true,
                             items,
                             total,
-                            paymentMethod: 'cash', // assume cash for reprint if not stored
-                            saleId: d.id,
-                            date: d.date
+                            paymentMethod: associatedSale?.paymentMethod || 'cash',
+                            saleId: associatedSale?.id || d.id,
+                            date: associatedSale?.date || d.date
                           });
                         }}
                         className="h-8 w-8 p-0 text-primary"
