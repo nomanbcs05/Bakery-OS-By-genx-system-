@@ -46,6 +46,7 @@ export default function RawMaterialStock() {
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('Dry');
   const [editUnit, setEditUnit] = useState('kg');
+  const [editCurrentStock, setEditCurrentStock] = useState(0);
   const [editMinStock, setEditMinStock] = useState(0);
   const [editCost, setEditCost] = useState(0);
   const [editSupplier, setEditSupplier] = useState('');
@@ -84,6 +85,7 @@ export default function RawMaterialStock() {
     setEditName(material.name);
     setEditCategory(material.category);
     setEditUnit(material.unit);
+    setEditCurrentStock(material.currentStock);
     setEditMinStock(material.minStockLevel);
     setEditCost(material.costPerUnit ?? 0);
     setEditSupplier(material.supplierName ?? '');
@@ -450,7 +452,29 @@ export default function RawMaterialStock() {
           <DialogHeader>
             <DialogTitle>Edit Raw Material</DialogTitle>
           </DialogHeader>
-          <form onSubmit={e => { e.preventDefault(); if (editMaterial) { updateRawMaterial(editMaterial.id, { name: editName, category: editCategory, unit: editUnit, minStockLevel: editMinStock, costPerUnit: editCost, supplierName: editSupplier }); setIsEditOpen(false); toast.success('Material updated'); } }} className="space-y-4">
+          <form onSubmit={async (e) => { 
+            e.preventDefault(); 
+            if (editMaterial) { 
+              // Log the stock adjustment if current stock changed
+              if (editCurrentStock !== editMaterial.currentStock) {
+                const diff = Math.abs(editCurrentStock - editMaterial.currentStock);
+                const type = editCurrentStock > editMaterial.currentStock ? 'in' : 'out';
+                await adjustRawMaterialStock(editMaterial.id, type, diff, 'Stock correction via Edit Dialog');
+              }
+              // Update general details and the explicit current stock
+              await updateRawMaterial(editMaterial.id, { 
+                name: editName, 
+                category: editCategory, 
+                unit: editUnit, 
+                currentStock: editCurrentStock,
+                minStockLevel: editMinStock, 
+                costPerUnit: editCost, 
+                supplierName: editSupplier 
+              }); 
+              setIsEditOpen(false); 
+              toast.success('Material updated'); 
+            } 
+          }} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name</Label>
               <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} />
@@ -467,17 +491,23 @@ export default function RawMaterialStock() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-minstock">Min Stock Level</Label>
-                <Input id="edit-minstock" type="number" value={editMinStock} onChange={e => setEditMinStock(parseFloat(e.target.value))} />
+                <Label htmlFor="edit-currentstock">Current Stock</Label>
+                <Input id="edit-currentstock" type="number" value={editCurrentStock} onChange={e => setEditCurrentStock(parseFloat(e.target.value) || 0)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-cost">Cost Per Unit</Label>
-                <Input id="edit-cost" type="number" value={editCost} onChange={e => setEditCost(parseFloat(e.target.value))} />
+                <Label htmlFor="edit-minstock">Min Stock Level</Label>
+                <Input id="edit-minstock" type="number" value={editMinStock} onChange={e => setEditMinStock(parseFloat(e.target.value) || 0)} />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-supplier">Supplier Name</Label>
-              <Input id="edit-supplier" value={editSupplier} onChange={e => setEditSupplier(e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost Per Unit</Label>
+                <Input id="edit-cost" type="number" value={editCost} onChange={e => setEditCost(parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-supplier">Supplier Name</Label>
+                <Input id="edit-supplier" value={editSupplier} onChange={e => setEditSupplier(e.target.value)} />
+              </div>
             </div>
             <DialogFooter>
               <Button type="submit" className="w-full">Save Changes</Button>
