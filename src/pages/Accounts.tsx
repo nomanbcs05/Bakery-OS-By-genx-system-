@@ -67,6 +67,8 @@ export default function Accounts() {
   const [filterStation, setFilterStation] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [searchCustomer, setSearchCustomer] = useState('');
+  const [searchVendor, setSearchVendor] = useState('');
+  const [searchGeneral, setSearchGeneral] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -1119,6 +1121,24 @@ export default function Accounts() {
         </div>
       </div>
     )}
+    {ledgerType === 'vendor' && (
+      <div className="flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase text-muted-foreground">Search Vendor:</Label>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input placeholder="Vendor name..." value={searchVendor} onChange={e => setSearchVendor(e.target.value)} className="pl-7 h-8 text-xs w-40 bg-background" />
+        </div>
+      </div>
+    )}
+    {ledgerType === 'general' && (
+      <div className="flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase text-muted-foreground">Search Account:</Label>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input placeholder="Account head..." value={searchGeneral} onChange={e => setSearchGeneral(e.target.value)} className="pl-7 h-8 text-xs w-44 bg-background" />
+        </div>
+      </div>
+    )}
   </div>
 
   {/* Row 2: Date range and actions */}
@@ -1151,8 +1171,8 @@ export default function Accounts() {
         />
       </div>
     </div>
-    {(startDate || endDate || searchCustomer) && (
-      <Button variant="ghost" size="sm" onClick={() => { setStartDate(''); setEndDate(''); setSearchCustomer(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
+    {(startDate || endDate || searchCustomer || searchVendor || searchGeneral) && (
+      <Button variant="ghost" size="sm" onClick={() => { setStartDate(''); setEndDate(''); setSearchCustomer(''); setSearchVendor(''); setSearchGeneral(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
         Clear
       </Button>
     )}
@@ -1181,7 +1201,7 @@ export default function Accounts() {
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      const filterData = <T extends { date: string }>(items: T[]) => {
+                      const filterData = <T extends { date: string, name?: string }>(items: T[]) => {
                         return items.filter(item => {
                           const date = new Date(item.date);
                           const yearMatch = date.getFullYear().toString() === filterYear;
@@ -1197,7 +1217,9 @@ export default function Accounts() {
                         ...filterData(ledgerEntries.filter(e => e.category === 'vendor')).map(e => ({
                           id: e.id, date: e.date, name: e.name, debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
                         }))
-                      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                      ]
+                      .filter(rec => !searchVendor || rec.name?.toLowerCase().includes(searchVendor.toLowerCase()))
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                       if (allVendorRecords.length === 0) return <TableRow><TableCell colSpan={6} className="text-center py-8">No vendor data found</TableCell></TableRow>;
                       
@@ -1386,7 +1408,8 @@ export default function Accounts() {
                           .map(e => ({
                           id: e.id, name: e.accountHead, accountNo: e.accountNo, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive', isManual: true
                         }))
-                      ].filter(h => h.isManual || h.debit !== 0 || h.credit !== 0);
+                      ].filter(h => h.isManual || h.debit !== 0 || h.credit !== 0)
+                       .filter(h => !searchGeneral || h.name.toLowerCase().includes(searchGeneral.toLowerCase()));
 
                       return heads.map((head, idx) => (
                         <TableRow key={`${head.name}-${idx}`}>
