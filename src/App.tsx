@@ -7,6 +7,7 @@ import { AppProvider, useApp } from "@/context/AppContext";
 import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Production from "./pages/Production";
+import ProductionHistory from "./pages/ProductionHistory";
 import Purchases from "./pages/Purchases";
 import DispatchPage from "./pages/Dispatch";
 import POS from "./pages/POS";
@@ -83,6 +84,11 @@ const AppRoutes = () => {
         <Route path="/production" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
             <Production />
+          </ProtectedRoute>
+        } />
+        <Route path="/production-history" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
+            <ProductionHistory />
           </ProtectedRoute>
         } />
         <Route path="/raw-materials" element={

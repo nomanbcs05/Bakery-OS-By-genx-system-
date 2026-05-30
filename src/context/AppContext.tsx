@@ -1112,9 +1112,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addProduction = async (productId: string, quantity: number, notes?: string) => {
     const id = `b${Date.now()}`;
+    const p = products.find(prod => prod.id === productId);
     const newBatch: ProductionBatch = { 
       id, 
-      items: [{ productId, quantity }], 
+      items: [{ productId, quantity, unit: p?.unit || 'pcs' }], 
       date: new Date().toISOString().slice(0, 10), 
       notes, 
       syncStatus: isOnline ? 'synced' : 'pending' 
@@ -1134,9 +1135,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addMultiProduction = async (items: { productId: string; quantity: number }[], notes?: string) => {
     if (items.length === 0) return false;
     const id = `b${Date.now()}`;
+    const itemsWithUnits = items.map(item => {
+      const p = products.find(prod => prod.id === item.productId);
+      return {
+        ...item,
+        unit: p?.unit || 'pcs'
+      };
+    });
     const newBatch: ProductionBatch = { 
       id, 
-      items, 
+      items: itemsWithUnits, 
       date: new Date().toISOString().slice(0, 10), 
       notes, 
       syncStatus: isOnline ? 'synced' : 'pending' 

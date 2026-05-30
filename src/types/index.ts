@@ -61,7 +61,7 @@ export interface RawMaterialAdjustment {
 
 export interface ProductionBatch {
   id: string;
-  items: { productId: string; quantity: number }[];
+  items: { productId: string; quantity: number; unit?: string }[];
   date: string;
   notes?: string;
   syncStatus: 'synced' | 'pending';

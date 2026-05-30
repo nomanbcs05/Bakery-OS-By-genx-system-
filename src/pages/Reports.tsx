@@ -90,7 +90,13 @@ export default function Reports() {
   if (viewMode === 'product') {
     comparisonData = products.map(p => ({
       name: p.name,
-      produced: filteredBatches.filter(b => b.productId === p.id).reduce((sum, b) => sum + b.quantity, 0),
+      produced: filteredBatches.reduce((sum, b) => {
+        if (Array.isArray(b.items)) {
+          const item = b.items.find(i => i.productId === p.id);
+          return sum + (item?.quantity || 0);
+        }
+        return sum + ((b as any).productId === p.id ? (b as any).quantity || 0 : 0);
+      }, 0),
       sold: filteredSales
         .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
         .flatMap(s => s.items)
@@ -101,7 +107,13 @@ export default function Reports() {
     const categories = Array.from(new Set(products.map(p => p.category)));
     comparisonData = categories.map(cat => {
       const catProducts = products.filter(p => p.category === cat);
-      const prod = (filteredBatches || []).filter(b => (catProducts || []).some(p => p.id === b.productId)).reduce((sum, b) => sum + b.quantity, 0);
+      const prod = (filteredBatches || []).reduce((sum, b) => {
+        if (Array.isArray(b.items)) {
+          const matches = b.items.filter(i => (catProducts || []).some(p => p.id === i.productId));
+          return sum + matches.reduce((s, i) => s + i.quantity, 0);
+        }
+        return sum + ((catProducts || []).some(p => p.id === (b as any).productId) ? (b as any).quantity || 0 : 0);
+      }, 0);
       const sold = (filteredSales || [])
         .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
         .flatMap(s => (s.items || []))
