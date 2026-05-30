@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Factory, Save, Search, RefreshCcw, X, ListRestart, Edit, Trash2 } from 'lucide-react';
+import { Plus, Factory, Save, Search, RefreshCcw, X, ListRestart, Edit, Trash2, CalendarDays, FileDown } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 
 const MEASURES = ['pcs', 'kg', 'box', 'dozen', 'tray', 'pkt', 'pound'];
 
@@ -34,6 +35,56 @@ export default function Production() {
   const [hiddenProducts, setHiddenProducts] = useState<string[]>([]);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingProductName, setEditingProductName] = useState('');
+
+  // Production history date filter
+  const [histStartDate, setHistStartDate] = useState('');
+  const [histEndDate, setHistEndDate] = useState('');
+
+  // Export production summary
+  const handleExportProduction = (format: 'pdf' | 'excel') => {
+    const filtered = batches.filter(b => {
+      const d = b.date?.split('T')[0] || b.date || '';
+      if (histStartDate && d < histStartDate) return false;
+      if (histEndDate && d > histEndDate) return false;
+      return true;
+    });
+
+    // Build per-product summary
+    const summaryMap: Record<string, { name: string; category: string; unit: string; total: number }> = {};
+    filtered.forEach(b => {
+      b.items?.forEach(item => {
+        const p = getProductById(item.productId);
+        if (!summaryMap[item.productId]) {
+          summaryMap[item.productId] = { name: p?.name || 'Unknown', category: p?.category || '—', unit: p?.unit || 'pcs', total: 0 };
+        }
+        summaryMap[item.productId].total += item.quantity;
+      });
+    });
+    const rows = Object.values(summaryMap).sort((a, b) => a.category.localeCompare(b.category));
+
+    const dateLabel = histStartDate || histEndDate
+      ? `${histStartDate || 'Start'} to ${histEndDate || 'End'}`
+      : 'All Time';
+    const title = `Production Summary — ${dateLabel}`;
+    const fileName = `production_summary_${histStartDate || 'all'}_${histEndDate || 'all'}`;
+
+    if (format === 'pdf') {
+      exportToPDF(
+        title,
+        ['Product', 'Category', 'Total Produced', 'Unit'],
+        rows.map(r => [r.name, r.category, r.total.toString(), r.unit]),
+        fileName
+      );
+      toast.success('PDF exported!');
+    } else {
+      exportToExcel(
+        rows.map(r => ({ Product: r.name, Category: r.category, 'Total Produced': r.total, Unit: r.unit })),
+        fileName,
+        'Production Summary'
+      );
+      toast.success('Excel exported!');
+    }
+  };
 
   // Filter active products
   const activeProducts = useMemo(() => {
@@ -364,7 +415,64 @@ export default function Production() {
       {/* Production History */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Recent Production Batches</CardTitle>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle className="text-base">Production History</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium" onClick={() => handleExportProduction('pdf')}>
+                  <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium" onClick={() => handleExportProduction('excel')}>
+                  <FileDown className="h-3.5 w-3.5 text-primary" /> Export Excel
+                </Button>
+              </div>
+            </div>
+            {/* Date range filter */}
+            <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-2 rounded-md border">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase text-muted-foreground">From:</span>
+                <div className="relative flex items-center">
+                  <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+                  <input
+                    type="date"
+                    value={histStartDate}
+                    onChange={e => setHistStartDate(e.target.value)}
+                    className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    style={{ colorScheme: 'light' }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase text-muted-foreground">To:</span>
+                <div className="relative flex items-center">
+                  <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+                  <input
+                    type="date"
+                    value={histEndDate}
+                    onChange={e => setHistEndDate(e.target.value)}
+                    className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    style={{ colorScheme: 'light' }}
+                  />
+                </div>
+              </div>
+              {(histStartDate || histEndDate) && (
+                <Button variant="ghost" size="sm" onClick={() => { setHistStartDate(''); setHistEndDate(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
+                  Clear
+                </Button>
+              )}
+              <span className="ml-auto text-xs text-muted-foreground">
+                {(() => {
+                  const count = batches.filter(b => {
+                    const d = b.date?.split('T')[0] || b.date || '';
+                    if (histStartDate && d < histStartDate) return false;
+                    if (histEndDate && d > histEndDate) return false;
+                    return true;
+                  }).length;
+                  return `${count} batch${count !== 1 ? 'es' : ''} found`;
+                })()}
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -386,28 +494,36 @@ export default function Production() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  [...batches].reverse().slice(0, 10).map(b => {
-                    const itemDetails = b.items?.map(item => {
-                      const product = getProductById(item.productId);
-                      return `${product?.name || 'Unknown'} (${item.quantity})`;
-                    }).join(', ') || '—';
-                    
-                    const totalQty = b.items?.reduce((sum, i) => sum + i.quantity, 0) || 0;
-
-                    return (
-                      <TableRow key={b.id}>
-                        <TableCell><Badge variant="outline" className="font-mono">{b.id.slice(-6).toUpperCase()}</Badge></TableCell>
-                        <TableCell className="max-w-[400px]">
-                          <div className="truncate text-xs" title={itemDetails}>
-                            {itemDetails}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold">{totalQty}</TableCell>
-                        <TableCell>{b.date}</TableCell>
-                        <TableCell className="text-muted-foreground italic text-xs">{b.notes || '—'}</TableCell>
-                      </TableRow>
+                  (() => {
+                    const filtered = [...batches].reverse().filter(b => {
+                      const d = b.date?.split('T')[0] || b.date || '';
+                      if (histStartDate && d < histStartDate) return false;
+                      if (histEndDate && d > histEndDate) return false;
+                      return true;
+                    });
+                    const visible = (histStartDate || histEndDate) ? filtered : filtered.slice(0, 30);
+                    if (visible.length === 0) return (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No batches found in selected date range.</TableCell></TableRow>
                     );
-                  })
+                    return visible.map(b => {
+                      const itemDetails = b.items?.map(item => {
+                        const product = getProductById(item.productId);
+                        return `${product?.name || 'Unknown'} (${item.quantity})`;
+                      }).join(', ') || '—';
+                      const totalQty = b.items?.reduce((sum, i) => sum + i.quantity, 0) || 0;
+                      return (
+                        <TableRow key={b.id}>
+                          <TableCell><Badge variant="outline" className="font-mono">{b.id.slice(-6).toUpperCase()}</Badge></TableCell>
+                          <TableCell className="max-w-[400px]">
+                            <div className="truncate text-xs" title={itemDetails}>{itemDetails}</div>
+                          </TableCell>
+                          <TableCell className="font-semibold">{totalQty}</TableCell>
+                          <TableCell>{b.date}</TableCell>
+                          <TableCell className="text-muted-foreground italic text-xs">{b.notes || '—'}</TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()
                 )}
               </TableBody>
             </Table>
