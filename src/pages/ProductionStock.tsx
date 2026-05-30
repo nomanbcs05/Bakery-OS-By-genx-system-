@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Settings2, Save, X, Search } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const MEASURES = ['pcs', 'kg', 'box', 'dozen', 'tray', 'pkt', 'pound'];
 
 export default function ProductionStock() {
   const { currentUser, selectedProfile, products, getProductionStock, updateProduct, addProduction } = useApp();
@@ -23,6 +26,7 @@ export default function ProductionStock() {
   // Form state
   const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
+  const [editUnit, setEditUnit] = useState('');
   const [adjustReason, setAdjustReason] = useState('Stock Correction');
 
   // Verify access privileges
@@ -56,10 +60,11 @@ export default function ProductionStock() {
     return groups;
   }, [products, productionStockItems, searchTerm]);
 
-  const openAdjustmentDialog = (productId: string, currentPrice: number, currentStock: number) => {
+  const openAdjustmentDialog = (productId: string, currentPrice: number, currentStock: number, currentUnit: string) => {
     setSelectedProductId(productId);
     setEditPrice(currentPrice.toString());
     setEditStock(currentStock.toString());
+    setEditUnit(currentUnit);
     setAdjustReason('Stock Correction');
     setIsDialogOpen(true);
   };
@@ -82,10 +87,15 @@ export default function ProductionStock() {
       await updateProduct(selectedProductId, { price: newPrice });
     }
 
-    // 2. Update Stock (By adding a positive or negative adjustment)
+    // 2. Update Unit
+    if (editUnit !== product?.unit) {
+      await updateProduct(selectedProductId, { unit: editUnit });
+    }
+
+    // 3. Update Stock (By adding a positive or negative adjustment)
     if (newStock !== currentStock) {
       const difference = newStock - currentStock;
-      addProduction(selectedProductId, difference, adjustReason || 'Inventory Adjustment');
+      await addProduction(selectedProductId, difference, adjustReason || 'Inventory Adjustment');
     }
 
     setIsDialogOpen(false);
@@ -165,7 +175,7 @@ export default function ProductionStock() {
                         size="sm" 
                         variant="slate" 
                         className="w-full text-xs font-semibold"
-                        onClick={() => openAdjustmentDialog(item.id, item.price, item.currentStock)}
+                        onClick={() => openAdjustmentDialog(item.id, item.price, item.currentStock, item.unit)}
                       >
                         <Settings2 className="w-3 h-3 mr-2" />
                         Manage Product
@@ -199,6 +209,18 @@ export default function ProductionStock() {
                 value={editPrice}
                 onChange={(e) => setEditPrice(e.target.value)}
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Unit / Measure</Label>
+              <Select value={editUnit} onValueChange={setEditUnit}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEASURES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="space-y-2">

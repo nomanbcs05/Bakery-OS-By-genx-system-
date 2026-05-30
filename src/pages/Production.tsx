@@ -8,14 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Factory, Save, Search, RefreshCcw, X, ListRestart } from 'lucide-react';
+import { Plus, Factory, Save, Search, RefreshCcw, X, ListRestart, Edit, Trash2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const MEASURES = ['pcs', 'kg', 'box', 'dozen', 'tray', 'pkt', 'pound'];
 
 export default function Production() {
-  const { currentUser, products, batches, addMultiProduction, addProduct, getProductById, stock, loadModuleData } = useApp();
+  const { currentUser, products, batches, addMultiProduction, addProduct, updateProduct, deleteProduct, getProductById, stock, loadModuleData } = useApp();
 
   useEffect(() => {
     loadModuleData('inventory');
@@ -32,6 +32,8 @@ export default function Production() {
 
   const [newProduct, setNewProduct] = useState({ name: '', category: 'Bread', price: '', unit: 'pc' });
   const [hiddenProducts, setHiddenProducts] = useState<string[]>([]);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductName, setEditingProductName] = useState('');
 
   // Filter active products
   const activeProducts = useMemo(() => {
@@ -46,8 +48,14 @@ export default function Production() {
     setQuantities(prev => ({ ...prev, [productId]: value }));
   };
 
-  const handleMeasureChange = (productId: string, value: string) => {
+  const handleMeasureChange = async (productId: string, value: string) => {
     setMeasures(prev => ({ ...prev, [productId]: value }));
+    try {
+      await updateProduct(productId, { unit: value });
+      toast.success(`Unit updated to ${value}`);
+    } catch (err) {
+      toast.error("Failed to update product unit");
+    }
   };
 
   const resetForm = () => {
@@ -224,12 +232,70 @@ export default function Production() {
                   activeProducts.map(product => (
                     <TableRow key={product.id} className="hover:bg-muted/10 transition-colors">
                       <TableCell className="font-medium">
-                        <div>
-                          {product.name}
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
-                            Current Stock: {stock[product.id]?.production || 0} {product.unit}s
+                        {editingProductId === product.id ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Input 
+                                value={editingProductName}
+                                onChange={(e) => setEditingProductName(e.target.value)}
+                                className="h-8 py-1 max-w-[200px]"
+                                autoFocus
+                              />
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-success hover:bg-success/10"
+                                onClick={async () => {
+                                  if (!editingProductName.trim()) {
+                                    toast.error("Name cannot be empty");
+                                    return;
+                                  }
+                                  try {
+                                    await updateProduct(product.id, { name: editingProductName.trim() });
+                                    setEditingProductId(null);
+                                    toast.success("Product name updated");
+                                  } catch (err) {
+                                    toast.error("Failed to update product name");
+                                  }
+                                }}
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                                onClick={() => setEditingProductId(null)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                              Current Stock: {stock[product.id]?.production || 0} {product.unit}s
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-center gap-2 group">
+                              <span className="truncate max-w-[220px]">{product.name}</span>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingProductId(product.id);
+                                  setEditingProductName(product.name);
+                                }}
+                                title="Edit product name"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                              Current Stock: {stock[product.id]?.production || 0} {product.unit}s
+                            </div>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-normal">{product.category}</Badge>
@@ -265,6 +331,24 @@ export default function Production() {
                             title="Remove from today's list"
                           >
                             <X className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              if (confirm(`Are you sure you want to delete "${product.name}" from the database? This cannot be undone.`)) {
+                                try {
+                                  await deleteProduct(product.id);
+                                  toast.success(`Product "${product.name}" deleted successfully`);
+                                } catch (err) {
+                                  toast.error("Failed to delete product");
+                                }
+                              }
+                            }}
+                            title="Delete product permanently"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

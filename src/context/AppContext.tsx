@@ -171,6 +171,8 @@ interface AppContextType extends AppState {
   deleteSalaryVoucher: (id: string) => Promise<void>;
   payCreditSale: (id: string) => Promise<void>;
   addPurchase: (p: Omit<Purchase, 'id' | 'syncStatus'>) => Promise<void>;
+  deletePurchase: (id: string) => Promise<void>;
+  updatePurchase: (id: string, updates: Partial<Purchase>) => Promise<void>;
   clearPurchases: () => Promise<void>;
   clearExpenses: () => Promise<void>;
   clearSalaryVouchers: () => Promise<void>;
@@ -1542,6 +1544,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deletePurchase = async (id: string) => {
+    setPurchases(prev => prev.filter(p => p.id !== id));
+    if (isOnline && hasSupabaseConfig) {
+      try { await supabase.from('purchases').delete().eq('id', id); } catch (err) { console.error(err); }
+    }
+  };
+
+  const updatePurchase = async (id: string, updates: Partial<Purchase>) => {
+    setPurchases(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        const existing = purchasesRef.current.find(p => p.id === id);
+        if (existing) await supabase.from('purchases').update(toDBPurchase({ ...existing, ...updates })).eq('id', id);
+      } catch (err) { console.error(err); }
+    }
+  };
+
   const addAdvanceOrder = async (order: Omit<AdvanceOrder, 'id' | 'syncStatus' | 'createdAt' | 'status'>): Promise<string> => {
     const id = `ao${Date.now()}`;
     const newOrder: AdvanceOrder = { ...order, id, createdAt: new Date().toISOString(), status: 'pending', syncStatus: isOnline ? 'synced' : 'pending' };
@@ -1644,7 +1663,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addStaffDeduction, updateStaffDeduction, deleteStaffDeduction,
       createSalaryVoucher, deleteSalaryVoucher,
       payCreditSale,
-      purchases, addPurchase,
+      purchases, addPurchase, deletePurchase, updatePurchase,
       clearPurchases: async () => {
         const ids = purchases.map(p => p.id);
         setPurchases([]);

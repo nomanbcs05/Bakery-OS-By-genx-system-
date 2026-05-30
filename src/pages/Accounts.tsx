@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History, Edit } from 'lucide-react';
+import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History, Edit, Search, FileDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
@@ -30,6 +30,7 @@ export default function Accounts() {
     sales, purchases, expenses, rawMaterials, ledgerEntries,
     addPurchase, createSale, clearSales, clearPurchases, clearExpenses, clearSalaryVouchers, clearStaffDeductions, addLedgerEntry, clearLedgerEntries,
     deleteCustomer, updateCustomer, deleteVendor, updateVendor, deleteLedgerEntry, updateLedgerEntry,
+    deletePurchase, updatePurchase,
     loadModuleData
   } = useApp();
 
@@ -65,6 +66,9 @@ export default function Accounts() {
   const [filterMonth, setFilterMonth] = useState('all');
   const [filterStation, setFilterStation] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', department: '', baseSalary: '' });
@@ -80,6 +84,9 @@ export default function Accounts() {
 
   const [isEditEntryOpen, setIsEditEntryOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Partial<LedgerEntry>>({});
+
+  const [isEditPurchaseOpen, setIsEditPurchaseOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<{ id: string; date: string; vendorName: string; amountPaid: number; totalCost: number }>({ id: '', date: '', vendorName: '', amountPaid: 0, totalCost: 0 });
 
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.department || !newStaff.baseSalary) {
@@ -384,6 +391,96 @@ export default function Accounts() {
     toast.success(`Exported ${title} to ${type.toUpperCase()}`);
   };
 
+  const handleExportCustomerLedger = (format: 'pdf' | 'excel') => {
+    const filterData = <T extends { date: string, station?: string, name?: string }>(items: T[]) => {
+      return items.filter(item => {
+        const date = new Date(item.date);
+        
+        let dateMatch = true;
+        if (startDate || endDate) {
+          const dateStr = item.date.split('T')[0];
+          if (startDate && dateStr < startDate) dateMatch = false;
+          if (endDate && dateStr > endDate) dateMatch = false;
+        } else {
+          const yearMatch = date.getFullYear().toString() === filterYear;
+          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+          dateMatch = yearMatch && monthMatch;
+        }
+
+        const stationMatch = filterStation === 'all' || item.station === filterStation;
+        
+        let customerMatch = true;
+        if (searchCustomer) {
+          customerMatch = !!item.name?.toLowerCase().includes(searchCustomer.toLowerCase());
+        }
+
+        return dateMatch && stationMatch && customerMatch;
+      });
+    };
+
+    const filteredRecords = [
+      ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
+        id: e.id, date: e.date, name: e.name, station: e.station || 'NWS', debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+      }))
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const totalDebit = filteredRecords.reduce((sum, r) => sum + r.debit, 0);
+    const totalCredit = filteredRecords.reduce((sum, r) => sum + r.credit, 0);
+    const currentBalance = totalDebit - totalCredit;
+
+    const targetCustomerName = searchCustomer || "All Customers";
+    const reportTitle = `Customer Ledger Statement - ${targetCustomerName}`;
+    const fileBaseName = `customer_ledger_${targetCustomerName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+    if (format === 'pdf') {
+      const headers = ['Date', 'Customer Name', 'Station', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
+      let runningBalance = 0;
+      const pdfData = filteredRecords.map(r => {
+        runningBalance += (r.debit - r.credit);
+        return [
+          new Date(r.date).toLocaleDateString(),
+          r.name || 'Unknown',
+          r.station || 'NWS',
+          `Rs. ${r.debit.toLocaleString()}`,
+          `Rs. ${r.credit.toLocaleString()}`,
+          `Rs. ${runningBalance.toLocaleString()}`
+        ];
+      });
+
+      pdfData.push([]);
+      pdfData.push(['', '', 'TOTAL DEBIT (SALES):', `Rs. ${totalDebit.toLocaleString()}`, '', '']);
+      pdfData.push(['', '', 'TOTAL CREDIT (PAID):', `Rs. ${totalCredit.toLocaleString()}`, '', '']);
+      pdfData.push(['', '', 'CLOSING BALANCE:', `Rs. ${currentBalance.toLocaleString()}`, '', '']);
+
+      exportToPDF(reportTitle, headers, pdfData, fileBaseName);
+    } else {
+      let runningBalance = 0;
+      const excelData = filteredRecords.map(r => {
+        runningBalance += (r.debit - r.credit);
+        return {
+          'Date': new Date(r.date).toLocaleDateString(),
+          'Customer Name': r.name || 'Unknown',
+          'Station/City': r.station || 'NWS',
+          'Debit (Sales) (Rs.)': r.debit,
+          'Credit (Paid) (Rs.)': r.credit,
+          'Running Balance (Rs.)': runningBalance
+        };
+      });
+
+      excelData.push({
+        'Date': 'TOTAL DEBIT:',
+        'Customer Name': totalDebit,
+        'Station/City': 'TOTAL CREDIT:',
+        'Debit (Sales) (Rs.)': totalCredit,
+        'Credit (Paid) (Rs.)': 'CLOSING BALANCE:',
+        'Running Balance (Rs.)': currentBalance
+      } as any);
+
+      exportToExcel(excelData, fileBaseName, 'Customer Ledger');
+    }
+    toast.success(`Exported ${targetCustomerName} ledger statement successfully`);
+  };
+
   const activeStaff = staff.filter(s => s.isActive);
 
   return (
@@ -612,6 +709,48 @@ export default function Accounts() {
                 if (editingEntry.id) {
                   await updateLedgerEntry(editingEntry.id, editingEntry);
                   setIsEditEntryOpen(false);
+                }
+              }}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Purchase Edit Dialog */}
+        <Dialog open={isEditPurchaseOpen} onOpenChange={setIsEditPurchaseOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Purchase Record</DialogTitle>
+              <DialogDescription>Update the details for this purchase transaction.</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Date</Label>
+                <Input type="date" value={editingPurchase.date?.split('T')[0]} onChange={e => setEditingPurchase({...editingPurchase, date: e.target.value})} />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Vendor Name</Label>
+                <Input value={editingPurchase.vendorName} onChange={e => setEditingPurchase({...editingPurchase, vendorName: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-success font-bold">Debit (Paid)</Label>
+                <Input type="number" value={editingPurchase.amountPaid} onChange={e => setEditingPurchase({...editingPurchase, amountPaid: Number(e.target.value)})} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-destructive font-bold">Credit (Purchases)</Label>
+                <Input type="number" value={editingPurchase.totalCost} onChange={e => setEditingPurchase({...editingPurchase, totalCost: Number(e.target.value)})} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditPurchaseOpen(false)}>Cancel</Button>
+              <Button onClick={async () => {
+                if (editingPurchase.id) {
+                  await updatePurchase(editingPurchase.id, {
+                    date: editingPurchase.date,
+                    vendorName: editingPurchase.vendorName,
+                    amountPaid: editingPurchase.amountPaid,
+                    totalCost: editingPurchase.totalCost
+                  });
+                  setIsEditPurchaseOpen(false);
                 }
               }}>Save Changes</Button>
             </DialogFooter>
@@ -922,54 +1061,91 @@ export default function Accounts() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-muted/30 rounded-lg border">
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Year:</Label>
-                  <Select value={filterYear} onValueChange={setFilterYear}>
-                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['2023', '2024', '2025', '2026', '2027'].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Month:</Label>
-                  <Select value={filterMonth} onValueChange={setFilterMonth}>
-                    <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Months</SelectItem>
-                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {ledgerType === 'customer' && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground">City/Station:</Label>
-                    <Select value={filterStation} onValueChange={setFilterStation}>
-                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Cities</SelectItem>
-                        {Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer').map(e => e.station).filter(Boolean))).map(s => <SelectItem key={s} value={s as string}>{s}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {ledgerType === 'general' && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground">Type:</Label>
-                    <Select value={filterType} onValueChange={setFilterType}>
-                      <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="Income">Income</SelectItem>
-                        <SelectItem value="Expense">Expense</SelectItem>
-                        <SelectItem value="Asset">Asset</SelectItem>
-                        <SelectItem value="Liability">Liability</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+              <div className="space-y-4 mb-6 p-4 bg-muted/30 rounded-lg border">
+  {/* Row 1: Core dropdowns and search */}
+  <div className="flex flex-wrap items-center gap-4">
+    <div className="flex items-center gap-2">
+      <Label className="text-xs font-bold uppercase text-muted-foreground">Year:</Label>
+      <Select value={filterYear} onValueChange={setFilterYear}>
+        <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {['2023', '2024', '2025', '2026', '2027'].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="flex items-center gap-2">
+      <Label className="text-xs font-bold uppercase text-muted-foreground">Month:</Label>
+      <Select value={filterMonth} onValueChange={setFilterMonth}>
+        <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Months</SelectItem>
+          {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+    {ledgerType === 'customer' && (
+      <div className="flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase text-muted-foreground">City/Station:</Label>
+        <Select value={filterStation} onValueChange={setFilterStation}>
+          <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Cities</SelectItem>
+            {Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer').map(e => e.station).filter(Boolean))).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    )}
+    {ledgerType === 'general' && (
+      <div className="flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase text-muted-foreground">Type:</Label>
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="Income">Income</SelectItem>
+            <SelectItem value="Expense">Expense</SelectItem>
+            <SelectItem value="Asset">Asset</SelectItem>
+            <SelectItem value="Liability">Liability</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    )}
+    {ledgerType === 'customer' && (
+      <div className="flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase text-muted-foreground">Search Customer:</Label>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input placeholder="Customer name..." value={searchCustomer} onChange={e => setSearchCustomer(e.target.value)} className="pl-7 h-8 text-xs w-40 bg-background" />
+        </div>
+      </div>
+    )}
+  </div>
+
+  {/* Row 2: Date range and actions */}
+  <div className="flex items-center gap-4 bg-muted/20 p-2 rounded-md border">
+    <div className="flex items-center gap-2">
+      <Label className="text-xs font-bold uppercase text-muted-foreground">From:</Label>
+      <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 text-xs w-32 bg-background" />
+    </div>
+    <div className="flex items-center gap-2">
+      <Label className="text-xs font-bold uppercase text-muted-foreground">To:</Label>
+      <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 text-xs w-32 bg-background" />
+    </div>
+    {(startDate || endDate || searchCustomer) && (
+      <Button variant="ghost" size="sm" onClick={() => { setStartDate(''); setEndDate(''); setSearchCustomer(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
+        Clear
+      </Button>
+    )}
+    <div className="flex items-center gap-2 ml-auto">
+      <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium shadow-sm transition-colors" onClick={() => handleExportCustomerLedger('pdf')}>
+        <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
+      </Button>
+      <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium shadow-sm transition-colors" onClick={() => handleExportCustomerLedger('excel')}>
+        <FileDown className="h-3.5 w-3.5 text-primary" /> Export Excel
+      </Button>
+    </div>
+  </div>
+</div>
 
               {ledgerType === 'vendor' && (
                 <Table>
@@ -1018,24 +1194,30 @@ export default function Accounts() {
                           <TableCell className="text-right font-mono text-destructive">Rs. {rec.credit.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-mono font-bold">Rs. {(rec.credit - rec.debit).toLocaleString()}</TableCell>
                           <TableCell className="text-right">
-                            {rec.isManual && (
-                              <div className="flex justify-end gap-2">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                            <div className="flex justify-end gap-2">
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                                if (rec.isManual) {
                                   const entry = ledgerEntries.find(e => e.id === rec.id);
-                                  if (entry) {
-                                    setEditingEntry(entry);
-                                    setIsEditEntryOpen(true);
+                                  if (entry) { setEditingEntry(entry); setIsEditEntryOpen(true); }
+                                } else {
+                                  const purchase = purchases.find(p => p.id === rec.id);
+                                  if (purchase) {
+                                    setEditingPurchase({ id: purchase.id, date: purchase.date, vendorName: purchase.vendorName, amountPaid: purchase.amountPaid, totalCost: purchase.totalCost });
+                                    setIsEditPurchaseOpen(true);
                                   }
-                                }}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
-                                  if (confirm(`Delete this ledger record?`)) deleteLedgerEntry(rec.id!);
-                                }}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
+                                }
+                              }}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
+                                if (confirm(`Delete this ${rec.isManual ? 'ledger record' : 'purchase record'}?`)) {
+                                  if (rec.isManual) deleteLedgerEntry(rec.id!);
+                                  else deletePurchase(rec.id!);
+                                }
+                              }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ));
@@ -1059,13 +1241,29 @@ export default function Accounts() {
                   </TableHeader>
                   <TableBody>
                     {(() => {
-                      const filterData = <T extends { date: string, station?: string }>(items: T[]) => {
+                      const filterData = <T extends { date: string, station?: string, name?: string }>(items: T[]) => {
                         return items.filter(item => {
                           const date = new Date(item.date);
-                          const yearMatch = date.getFullYear().toString() === filterYear;
-                          const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                          
+                          let dateMatch = true;
+                          if (startDate || endDate) {
+                            const dateStr = item.date.split('T')[0];
+                            if (startDate && dateStr < startDate) dateMatch = false;
+                            if (endDate && dateStr > endDate) dateMatch = false;
+                          } else {
+                            const yearMatch = date.getFullYear().toString() === filterYear;
+                            const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+                            dateMatch = yearMatch && monthMatch;
+                          }
+
                           const stationMatch = filterStation === 'all' || item.station === filterStation;
-                          return yearMatch && monthMatch && stationMatch;
+                          
+                          let customerMatch = true;
+                          if (searchCustomer) {
+                            customerMatch = !!item.name?.toLowerCase().includes(searchCustomer.toLowerCase());
+                          }
+
+                          return dateMatch && stationMatch && customerMatch;
                         });
                       };
 
