@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History, Edit, Search, FileDown } from 'lucide-react';
+import { Plus, Users, Wallet, Receipt, Trash2, CheckCircle2, DollarSign, History, Edit, Search, FileDown, CalendarDays } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
@@ -1122,14 +1122,34 @@ export default function Accounts() {
   </div>
 
   {/* Row 2: Date range and actions */}
-  <div className="flex items-center gap-4 bg-muted/20 p-2 rounded-md border">
-    <div className="flex items-center gap-2">
-      <Label className="text-xs font-bold uppercase text-muted-foreground">From:</Label>
-      <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 text-xs w-32 bg-background" />
+  <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-2 rounded-md border">
+    {/* FROM date */}
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-bold uppercase text-muted-foreground">From:</span>
+      <div className="relative flex items-center">
+        <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:light] dark:[color-scheme:dark]"
+          style={{ colorScheme: 'light' }}
+        />
+      </div>
     </div>
-    <div className="flex items-center gap-2">
-      <Label className="text-xs font-bold uppercase text-muted-foreground">To:</Label>
-      <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 text-xs w-32 bg-background" />
+    {/* TO date */}
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-bold uppercase text-muted-foreground">To:</span>
+      <div className="relative flex items-center">
+        <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+        <input
+          type="date"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+          className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:light] dark:[color-scheme:dark]"
+          style={{ colorScheme: 'light' }}
+        />
+      </div>
     </div>
     {(startDate || endDate || searchCustomer) && (
       <Button variant="ghost" size="sm" onClick={() => { setStartDate(''); setEndDate(''); setSearchCustomer(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
