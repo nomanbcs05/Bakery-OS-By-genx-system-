@@ -131,7 +131,7 @@ interface AppContextType extends AppState {
   deleteRecipe: (id: string) => Promise<void>;
   
   branchStockAdjustments: BranchStockAdjustment[];
-  adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => Promise<void>;
+  adjustBranchStock: (productId: string, branch: 'branch_1' | 'branch_2' | 'factory', quantity: number, reason: string) => Promise<void>;
   addProduction: (productId: string, quantity: number, notes?: string) => Promise<boolean | void>;
   addMultiProduction: (items: { productId: string; quantity: number }[], notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
@@ -782,7 +782,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
     });
-    branchStockAdjustments.forEach(adj => { if (map[adj.productId]) map[adj.productId][adj.branch] -= adj.quantity; });
+    branchStockAdjustments.forEach(adj => { if (map[adj.productId]) { const key = adj.branch === 'factory' ? 'production' : adj.branch; map[adj.productId][key] -= adj.quantity; } });
     return map;
   }, [products, batches, dispatches, sales, branchStockAdjustments]);
 
@@ -1102,7 +1102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const adjustBranchStock = async (productId: string, branch: 'branch_1' | 'branch_2', quantity: number, reason: string) => {
+  const adjustBranchStock = async (productId: string, branch: 'branch_1' | 'branch_2' | 'factory', quantity: number, reason: string) => {
     const adj: BranchStockAdjustment = { id: `bsa${Date.now()}`, productId, branch, quantity, reason, date: new Date().toISOString(), userId: currentUser?.id || 'system' };
     setBranchStockAdjustments(prev => [...prev, adj]);
     if (isOnline && hasSupabaseConfig) {

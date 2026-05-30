@@ -130,8 +130,8 @@ export interface InventorySnapshot {
 export interface BranchStockAdjustment {
   id: string;
   productId: string;
-  branch: 'branch_1' | 'branch_2';
-  quantity: number; // always positive, represents items removed
+  branch: 'branch_1' | 'branch_2' | 'factory';
+  quantity: number; // positive = reduction, negative = increase
   reason: string;
   date: string;
   userId: string;
@@ -246,7 +246,7 @@ export interface DBRawMaterialAdjustment {
 export interface DBBranchStockAdjustment {
   id: string;
   product_id: string;
-  branch: 'branch_1' | 'branch_2';
+  branch: 'branch_1' | 'branch_2' | 'factory';
   quantity: number;
   reason: string;
   date: string;

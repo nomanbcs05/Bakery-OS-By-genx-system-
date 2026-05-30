@@ -1,21 +1,83 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Package, Pencil } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function Inventory() {
-  const { currentUser, getInventorySnapshots, getProductById, loadModuleData } = useApp();
+  const { currentUser, getInventorySnapshots, getProductById, loadModuleData, adjustBranchStock, stock } = useApp();
 
   useEffect(() => {
     loadModuleData('inventory');
     loadModuleData('sales');
   }, [loadModuleData]);
 
+  // Dialog state
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [factoryVal, setFactoryVal] = useState('');
+  const [branch1Val, setBranch1Val] = useState('');
+  const [branch2Val, setBranch2Val] = useState('');
+  const [reason, setReason] = useState('Manual Inventory Adjustment');
+
   if (!currentUser) return <Navigate to="/login" replace />;
   const snapshots = getInventorySnapshots();
+
+  const openEditDialog = (productId: string) => {
+    const s = stock[productId];
+    if (!s) return;
+    setEditProductId(productId);
+    setFactoryVal(String(s.production));
+    setBranch1Val(String(s.branch_1));
+    setBranch2Val(String(s.branch_2));
+    setReason('Manual Inventory Adjustment');
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!editProductId) return;
+    const s = stock[editProductId];
+    if (!s) return;
+
+    const newFactory = parseFloat(factoryVal);
+    const newBranch1 = parseFloat(branch1Val);
+    const newBranch2 = parseFloat(branch2Val);
+
+    // Delta = current - target (positive delta = reduction, negative delta = increase)
+    // Because stock computation does: stock -= adjustment.quantity
+    const factoryDelta = s.production - newFactory;
+    const branch1Delta = s.branch_1 - newBranch1;
+    const branch2Delta = s.branch_2 - newBranch2;
+
+    const adjustmentReason = reason || 'Manual Inventory Adjustment';
+    const timestamp = Date.now();
+
+    if (factoryDelta !== 0 && !isNaN(newFactory)) {
+      adjustBranchStock(editProductId, 'factory', factoryDelta, adjustmentReason);
+    }
+    // Slight delay to ensure unique IDs
+    setTimeout(() => {
+      if (branch1Delta !== 0 && !isNaN(newBranch1)) {
+        adjustBranchStock(editProductId!, 'branch_1', branch1Delta, adjustmentReason);
+      }
+    }, 10);
+    setTimeout(() => {
+      if (branch2Delta !== 0 && !isNaN(newBranch2)) {
+        adjustBranchStock(editProductId!, 'branch_2', branch2Delta, adjustmentReason);
+      }
+    }, 20);
+
+    setIsDialogOpen(false);
+    setEditProductId(null);
+  };
+
+  const editProduct = editProductId ? getProductById(editProductId) : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -41,6 +103,7 @@ export default function Inventory() {
                   <TableHead className="text-right">Branch 1</TableHead>
                   <TableHead className="text-right">Branch 2</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -65,6 +128,17 @@ export default function Inventory() {
                           <Badge className="bg-success text-success-foreground">OK</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => openEditDialog(s.productId)}
+                          className="gap-1"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -73,6 +147,65 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Stock Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Edit Stock — {editProduct?.name}</DialogTitle>
+            <CardDescription>
+              Set the correct stock values. Changes are recorded as adjustments.
+            </CardDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Factory Stock</Label>
+              <Input
+                type="number"
+                step="1"
+                value={factoryVal}
+                onChange={(e) => setFactoryVal(e.target.value)}
+                placeholder="Factory stock quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Branch 1 Stock</Label>
+              <Input
+                type="number"
+                step="1"
+                value={branch1Val}
+                onChange={(e) => setBranch1Val(e.target.value)}
+                placeholder="Branch 1 stock quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Branch 2 Stock</Label>
+              <Input
+                type="number"
+                step="1"
+                value={branch2Val}
+                onChange={(e) => setBranch2Val(e.target.value)}
+                placeholder="Branch 2 stock quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Input
+                placeholder="Reason for adjustment"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full mt-4"
+              onClick={handleSave}
+              disabled={factoryVal === '' && branch1Val === '' && branch2Val === ''}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
