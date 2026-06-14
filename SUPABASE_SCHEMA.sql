@@ -397,6 +397,29 @@ VALUES ('receipt_config', '{"brandName": "M.A BAKER''S", "tagline": "Quality You
 ON CONFLICT (id) DO NOTHING;
 
 -- Add to Realtime
+-- 19. Departments Table (Editable list of departments)
+CREATE TABLE IF NOT EXISTS departments (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 20. Department Material Transfers & Verification Table
+CREATE TABLE IF NOT EXISTS department_transfers (
+  id TEXT PRIMARY KEY,
+  department_id TEXT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+  material_id TEXT NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+  quantity_sent DECIMAL NOT NULL,
+  cost_per_unit DECIMAL NOT NULL DEFAULT 0,
+  quantity_leftover DECIMAL,
+  is_verified BOOLEAN DEFAULT false,
+  leftover_returned BOOLEAN DEFAULT false,
+  date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  sync_status TEXT DEFAULT 'synced'
+);
+
 -- Enable Realtime for all tables
 DO $$ 
 BEGIN
@@ -420,7 +443,9 @@ BEGIN
     purchases, 
     app_settings,
     advance_orders,
-    ledger_entries;
+    ledger_entries,
+    departments,
+    department_transfers;
 END $$;
 
 -- Disable RLS for all tables to ensure seamless synchronization across all devices
@@ -442,6 +467,9 @@ ALTER TABLE purchases DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE advance_orders DISABLE ROW LEVEL SECURITY;
 ALTER TABLE ledger_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE departments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE department_transfers DISABLE ROW LEVEL SECURITY;
 
 -- Final schema cache refresh to fix "column not found" errors
 NOTIFY pgrst, 'reload schema';
+

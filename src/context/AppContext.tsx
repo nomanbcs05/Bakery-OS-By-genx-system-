@@ -5,7 +5,8 @@ import type {
   RawMaterial, RawMaterialAdjustment, StockAdjustmentType, BranchStockAdjustment, ReceiptSettings, Recipe, DBRecipe,
   StaffMember, StaffDeduction, SalaryVoucher, AdvanceOrder, DBAdvanceOrder,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
-  DBStaffMember, DBStaffDeduction, DBSalaryVoucher, Purchase, DBPurchase
+  DBStaffMember, DBStaffDeduction, DBSalaryVoucher, Purchase, DBPurchase,
+  Department, DepartmentTransfer, DBDepartment, DBDepartmentTransfer
 } from '@/types';
 import { toast } from 'sonner';
 import { supabase, hasSupabaseConfig } from '@/lib/supabase';
@@ -75,6 +76,14 @@ const sampleRawMaterials: RawMaterial[] = [
   { id: 'rm4', name: 'Milk', category: 'Liquid', unit: 'liters', currentStock: 5, minStockLevel: 20, isActive: true, lastUpdated: '2026-04-01' }, // Low stock example
 ];
 
+const sampleDepartments: Department[] = [
+  { id: 'dept-kitchen', name: 'Kitchen & Baking', isActive: true, createdAt: '2026-04-01' },
+  { id: 'dept-pastry', name: 'Pastry & Cakes', isActive: true, createdAt: '2026-04-01' },
+  { id: 'dept-decoration', name: 'Decoration & Creaming', isActive: true, createdAt: '2026-04-01' },
+  { id: 'dept-bread', name: 'Bread & Rusk', isActive: true, createdAt: '2026-04-01' },
+  { id: 'dept-packaging', name: 'Packaging', isActive: true, createdAt: '2026-04-01' },
+];
+
 const sampleBatches: ProductionBatch[] = [
   { id: 'b1', items: [{ productId: 'p1', quantity: 500 }], date: '2026-04-05', syncStatus: 'synced' },
   { id: 'b2', items: [{ productId: 'p3', quantity: 300 }], date: '2026-04-05', syncStatus: 'synced' },
@@ -115,6 +124,8 @@ interface AppState {
   recipes: Recipe[];
   purchases: Purchase[];
   loadedModules: string[];
+  departments: Department[];
+  departmentTransfers: DepartmentTransfer[];
 }
 
 interface AppContextType extends AppState {
@@ -125,6 +136,13 @@ interface AppContextType extends AppState {
   updateRawMaterial: (id: string, updates: Partial<RawMaterial>) => Promise<void>;
   deleteRawMaterial: (id: string) => Promise<void>;
   adjustRawMaterialStock: (materialId: string, type: StockAdjustmentType, quantity: number, reason?: string) => Promise<boolean>;
+  
+  addDepartment: (name: string) => Promise<void>;
+  updateDepartment: (id: string, name: string) => Promise<void>;
+  deleteDepartment: (id: string) => Promise<void>;
+  sendMaterialToDepartment: (departmentId: string, materialId: string, quantity: number, date?: string) => Promise<boolean>;
+  verifyDepartmentLeftover: (transferId: string, leftoverQuantity: number) => Promise<boolean>;
+  returnLeftoverToMainStore: (transferId: string) => Promise<boolean>;
   
   addRecipe: (r: Omit<Recipe, 'id' | 'syncStatus'>) => Promise<void>;
   updateRecipe: (id: string, updates: Partial<Recipe>) => Promise<void>;
@@ -338,6 +356,49 @@ const toDBRecipe = (r: Recipe): DBRecipe => ({
   id: r.id, product_id: r.productId, ingredients: r.ingredients, is_active: r.isActive, sync_status: r.syncStatus
 });
 
+const fromDBDepartment = (d: DBDepartment): Department => ({
+  id: d.id,
+  name: d.name,
+  isActive: d.is_active,
+  createdAt: d.created_at,
+  syncStatus: 'synced'
+});
+
+const fromDBDepartmentTransfer = (t: DBDepartmentTransfer): DepartmentTransfer => ({
+  id: t.id,
+  departmentId: t.department_id,
+  materialId: t.material_id,
+  quantitySent: Number(t.quantity_sent),
+  costPerUnit: Number(t.cost_per_unit),
+  quantityLeftover: t.quantity_leftover !== null && t.quantity_leftover !== undefined ? Number(t.quantity_leftover) : undefined,
+  isVerified: t.is_verified,
+  leftoverReturned: !!t.leftover_returned,
+  date: t.date,
+  createdAt: t.created_at,
+  syncStatus: t.sync_status || 'synced'
+});
+
+const toDBDepartment = (d: Department): DBDepartment => ({
+  id: d.id,
+  name: d.name,
+  is_active: d.isActive,
+  created_at: d.createdAt
+});
+
+const toDBDepartmentTransfer = (t: DepartmentTransfer): DBDepartmentTransfer => ({
+  id: t.id,
+  department_id: t.departmentId,
+  material_id: t.materialId,
+  quantity_sent: t.quantitySent,
+  cost_per_unit: t.costPerUnit,
+  quantity_leftover: t.quantityLeftover,
+  is_verified: t.isVerified,
+  leftover_returned: t.leftoverReturned || false,
+  date: t.date,
+  created_at: t.createdAt,
+  sync_status: t.syncStatus
+});
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   
@@ -483,6 +544,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const advanceOrdersRef = React.useRef(advanceOrders);
   useEffect(() => { advanceOrdersRef.current = advanceOrders; }, [advanceOrders]);
 
+  const [departments, setDepartments] = useState<Department[]>(() => {
+    if (initialState.departments && initialState.departments.length > 0) {
+      return initialState.departments;
+    }
+    return sampleDepartments;
+  });
+  const departmentsRef = React.useRef(departments);
+  useEffect(() => { departmentsRef.current = departments; }, [departments]);
+
+  const [departmentTransfers, setDepartmentTransfers] = useState<DepartmentTransfer[]>(initialState.departmentTransfers || []);
+  const departmentTransfersRef = React.useRef(departmentTransfers);
+  useEffect(() => { departmentTransfersRef.current = departmentTransfers; }, [departmentTransfers]);
+
+
   const syncOfflineData = useCallback(async () => {
     if (!hasSupabaseConfig || !navigator.onLine) return;
     
@@ -518,7 +593,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       syncTable('recipes', recipesRef.current, toDBRecipe, setRecipes),
       syncTable('raw_material_adjustments', rawMaterialAdjustmentsRef.current, toDBRawAdjustment, setRawMaterialAdjustments),
       syncTable('ledger_entries', ledgerEntriesRef.current, toDBLedgerEntry, setLedgerEntries),
-      syncTable('advance_orders', advanceOrdersRef.current, toDBAdvanceOrder, setAdvanceOrders)
+      syncTable('advance_orders', advanceOrdersRef.current, toDBAdvanceOrder, setAdvanceOrders),
+      syncTable('departments', departmentsRef.current, toDBDepartment, setDepartments),
+      syncTable('department_transfers', departmentTransfersRef.current, toDBDepartmentTransfer, setDepartmentTransfers)
     ]);
 
     if (syncCount > 0) {
@@ -716,6 +793,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (initialSales) setSales(prev => merge(initialSales, prev, fromDBSale));
       if (initialBatches) setBatches(prev => merge(initialBatches, prev, fromDBBatch));
       if (initialLedger) setLedgerEntries(prev => merge(initialLedger, prev, fromDBLedgerEntry));
+    }
+
+    try {
+      const { data: deptData } = await supabase.from('departments').select('*');
+      if (deptData) setDepartments(prev => merge(deptData, prev, fromDBDepartment));
+      
+      const { data: trsfData } = await supabase.from('department_transfers').select('*');
+      if (trsfData) setDepartmentTransfers(prev => merge(trsfData, prev, fromDBDepartmentTransfer));
+    } catch (err) {
+      console.warn('Failed to load departments or transfers from Supabase:', err);
     }
 
     setLastSyncTime(new Date().toISOString());
@@ -927,6 +1014,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setAdvanceOrders(prev => prev.filter(o => o.id !== (p.old as any).id));
           }
         })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const d = fromDBDepartment(p.new as DBDepartment);
+            setDepartments(prev => {
+              const idx = prev.findIndex(x => x.id === d.id);
+              if (idx === -1) return [...prev, d];
+              const next = [...prev]; next[idx] = d; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setDepartments(prev => prev.filter(d => d.id !== (p.old as any).id));
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'department_transfers' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const t = fromDBDepartmentTransfer(p.new as DBDepartmentTransfer);
+            setDepartmentTransfers(prev => {
+              const idx = prev.findIndex(x => x.id === t.id);
+              if (idx === -1) return [...prev, t];
+              const next = [...prev]; next[idx] = t; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setDepartmentTransfers(prev => prev.filter(t => t.id !== (p.old as any).id));
+          }
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('Realtime subscribed successfully');
@@ -944,7 +1055,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasLoaded.current || DISABLE_OFFLINE_DB) return;
     // Exclude auditLogs from localStorage to save space — they're already persisted in Supabase
-    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs: [], stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries };
+    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs: [], stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -958,7 +1069,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers]);
 
   useEffect(() => {
     if (!hasLoaded.current) return;
@@ -1071,6 +1182,138 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+    return true;
+  };
+
+  const addDepartment = async (name: string) => {
+    const newDept: Department = {
+      id: `dept-${Date.now()}`,
+      name,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      syncStatus: isOnline ? 'synced' : 'pending'
+    };
+    setDepartments(prev => [...prev, newDept]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('departments').insert([toDBDepartment(newDept)]);
+      } catch (err) {
+        setDepartments(prev => prev.map(d => d.id === newDept.id ? { ...d, syncStatus: 'pending' } : d));
+      }
+    }
+    addLog('create', 'department', newDept.id, `Created department ${name}`);
+  };
+
+  const updateDepartment = async (id: string, name: string) => {
+    setDepartments(prev => prev.map(d => d.id === id ? { ...d, name, syncStatus: isOnline ? 'synced' : 'pending' } : d));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('departments').update({ name }).eq('id', id);
+      } catch (err) {
+        setDepartments(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
+      }
+    }
+    addLog('update', 'department', id, `Updated department name to ${name}`);
+  };
+
+  const deleteDepartment = async (id: string) => {
+    setDepartments(prev => prev.map(d => d.id === id ? { ...d, isActive: false, syncStatus: isOnline ? 'synced' : 'pending' } : d));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('departments').update({ is_active: false }).eq('id', id);
+      } catch (err) {
+        setDepartments(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
+      }
+    }
+    addLog('delete', 'department', id, `Soft deleted department`);
+  };
+
+  const sendMaterialToDepartment = async (departmentId: string, materialId: string, quantity: number, dateStr?: string) => {
+    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    const mat = rawMaterials.find(m => m.id === materialId);
+    const dept = departments.find(d => d.id === departmentId);
+    if (!mat) {
+      toast.error("Material not found");
+      return false;
+    }
+    const deptName = dept ? dept.name : departmentId;
+    
+    // Deduct from main stock
+    await adjustRawMaterialStock(materialId, 'out', quantity, `Sent to department: ${deptName}`);
+    
+    const newTransfer: DepartmentTransfer = {
+      id: `trsf-${Date.now()}`,
+      departmentId,
+      materialId,
+      quantitySent: quantity,
+      costPerUnit: mat.costPerUnit || 0,
+      isVerified: false,
+      leftoverReturned: false,
+      date: targetDate,
+      createdAt: new Date().toISOString(),
+      syncStatus: isOnline ? 'synced' : 'pending'
+    };
+    
+    setDepartmentTransfers(prev => [...prev, newTransfer]);
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('department_transfers').insert([toDBDepartmentTransfer(newTransfer)]);
+      } catch (err) {
+        setDepartmentTransfers(prev => prev.map(t => t.id === newTransfer.id ? { ...t, syncStatus: 'pending' } : t));
+      }
+    }
+    addLog('create', 'department_transfer', newTransfer.id, `Sent ${quantity} ${mat.unit} of ${mat.name} to ${deptName}`);
+    return true;
+  };
+
+  const verifyDepartmentLeftover = async (transferId: string, leftoverQuantity: number) => {
+    setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, quantityLeftover: leftoverQuantity, isVerified: true, syncStatus: isOnline ? 'synced' : 'pending' } : t));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('department_transfers').update({ quantity_leftover: leftoverQuantity, is_verified: true }).eq('id', transferId);
+      } catch (err) {
+        setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, syncStatus: 'pending' } : t));
+      }
+    }
+    addLog('update', 'department_transfer', transferId, `Verified leftover stock: ${leftoverQuantity}`);
+    return true;
+  };
+
+  const returnLeftoverToMainStore = async (transferId: string) => {
+    const trsf = departmentTransfers.find(t => t.id === transferId);
+    if (!trsf) {
+      toast.error("Transfer log not found");
+      return false;
+    }
+    if (!trsf.isVerified) {
+      toast.error("Please verify leftover quantity first");
+      return false;
+    }
+    const leftover = trsf.quantityLeftover || 0;
+    if (leftover <= 0) {
+      toast.error("Leftover quantity is 0, nothing to return");
+      return false;
+    }
+    const mat = rawMaterials.find(m => m.id === trsf.materialId);
+    const dept = departments.find(d => d.id === trsf.departmentId);
+    const matName = mat ? mat.name : 'material';
+    const deptName = dept ? dept.name : trsf.departmentId;
+
+    // Add back to main warehouse stock
+    await adjustRawMaterialStock(trsf.materialId, 'in', leftover, `Returned leftover from department: ${deptName}`);
+
+    // Update transfer to mark leftover as returned
+    setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, leftoverReturned: true, syncStatus: isOnline ? 'synced' : 'pending' } : t));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('department_transfers').update({ leftover_returned: true }).eq('id', transferId);
+      } catch (err) {
+        setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, syncStatus: 'pending' } : t));
+      }
+    }
+    
+    toast.success(`Returned ${leftover} ${mat?.unit || ''} of ${matName} to main store`);
+    addLog('update', 'department_transfer', transferId, `Returned leftover ${leftover} of ${matName} to store`);
     return true;
   };
 
@@ -1704,6 +1947,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteCustomer, updateCustomer, deleteVendor, updateVendor,
       deleteLedgerEntry, updateLedgerEntry,
       advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
+      departments, departmentTransfers, addDepartment, updateDepartment, deleteDepartment, sendMaterialToDepartment, verifyDepartmentLeftover, returnLeftoverToMainStore,
       hasSupabaseConfig, loadModuleData, loadedModules
     }}>
       {children}

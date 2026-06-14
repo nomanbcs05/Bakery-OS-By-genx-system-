@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 const mainNav = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Raw Materials', url: '/raw-materials', icon: Layers },
+  { title: 'Departments', url: '/departments', icon: ChefHat },
   { title: 'Purchases', url: '/purchases', icon: ShoppingBag },
   { title: 'Production', url: '/production', icon: Factory },
   { title: 'Production History', url: '/production-history', icon: History },
@@ -59,8 +60,8 @@ export function AppSidebar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Dispatch History', 'Advance Orders'].includes(item.title);
-    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Purchases'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Departments', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Dispatch History', 'Advance Orders'].includes(item.title);
+    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Departments', 'Purchases'].includes(item.title);
     if (isRole(['branch_staff'])) return false; // No main nav items for branch staff
     return false;
   });

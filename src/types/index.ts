@@ -418,3 +418,47 @@ export interface DBAdvanceOrder {
   notes?: string;
   sync_status: 'synced' | 'pending';
 }
+
+export interface Department {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface DBDepartment {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DepartmentTransfer {
+  id: string;
+  departmentId: string;
+  materialId: string;
+  quantitySent: number;
+  costPerUnit: number;
+  quantityLeftover?: number;
+  isVerified: boolean;
+  leftoverReturned?: boolean;
+  date: string;
+  createdAt: string;
+  syncStatus: 'synced' | 'pending';
+}
+
+export interface DBDepartmentTransfer {
+  id: string;
+  department_id: string;
+  material_id: string;
+  quantity_sent: number;
+  cost_per_unit: number;
+  quantity_leftover?: number;
+  is_verified: boolean;
+  leftover_returned?: boolean;
+  date: string;
+  created_at: string;
+  sync_status: 'synced' | 'pending';
+}
+

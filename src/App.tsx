@@ -30,6 +30,7 @@ import RawMaterialStock from "./pages/RawMaterialStock";
 import ProfileSelection from "./pages/ProfileSelection";
 import AdvanceOrders from "./pages/AdvanceOrders";
 import AdvanceOrdersProduction from "./pages/AdvanceOrdersProduction";
+import Departments from "./pages/Departments";
 import NotFound from "./pages/NotFound";
 import type { UserRole } from "@/types";
 
@@ -94,6 +95,11 @@ const AppRoutes = () => {
         <Route path="/raw-materials" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
             <RawMaterialStock />
+          </ProtectedRoute>
+        } />
+        <Route path="/departments" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
+            <Departments />
           </ProtectedRoute>
         } />
         <Route path="/purchases" element={
