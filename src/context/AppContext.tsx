@@ -143,6 +143,7 @@ interface AppContextType extends AppState {
   sendMaterialToDepartment: (departmentId: string, materialId: string, quantity: number, date?: string) => Promise<boolean>;
   verifyDepartmentLeftover: (transferId: string, leftoverQuantity: number) => Promise<boolean>;
   returnLeftoverToMainStore: (transferId: string) => Promise<boolean>;
+  deleteDepartmentTransfer: (transferIds: string[]) => Promise<void>;
   
   addRecipe: (r: Omit<Recipe, 'id' | 'syncStatus'>) => Promise<void>;
   updateRecipe: (id: string, updates: Partial<Recipe>) => Promise<void>;
@@ -1317,6 +1318,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  const deleteDepartmentTransfer = async (transferIds: string[]) => {
+    if (!transferIds.length) return;
+    setDepartmentTransfers(prev => prev.filter(t => !transferIds.includes(t.id)));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('department_transfers').delete().in('id', transferIds);
+      } catch (err) {
+        console.error('Failed to delete department transfers from DB:', err);
+      }
+    }
+    addLog('delete', 'department_transfer', transferIds.join(','), `Deleted ${transferIds.length} department transfer log(s)`);
+  };
+
   const addRecipe = async (r: Omit<Recipe, 'id' | 'syncStatus'>) => {
     const newR: Recipe = { ...r, id: `rcp${Date.now()}`, syncStatus: isOnline ? 'synced' : 'pending' };
     setRecipes(prev => [...prev, newR]);
@@ -1947,7 +1961,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteCustomer, updateCustomer, deleteVendor, updateVendor,
       deleteLedgerEntry, updateLedgerEntry,
       advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
-      departments, departmentTransfers, addDepartment, updateDepartment, deleteDepartment, sendMaterialToDepartment, verifyDepartmentLeftover, returnLeftoverToMainStore,
+      departments, departmentTransfers, addDepartment, updateDepartment, deleteDepartment, sendMaterialToDepartment, verifyDepartmentLeftover, returnLeftoverToMainStore, deleteDepartmentTransfer,
       hasSupabaseConfig, loadModuleData, loadedModules
     }}>
       {children}

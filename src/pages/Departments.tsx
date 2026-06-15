@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { 
   ChefHat, 
@@ -41,7 +42,8 @@ export default function Departments() {
     deleteDepartment, 
     sendMaterialToDepartment, 
     verifyDepartmentLeftover, 
-    returnLeftoverToMainStore 
+    returnLeftoverToMainStore,
+    deleteDepartmentTransfer 
   } = useApp();
 
   // Selected Tab
@@ -65,6 +67,9 @@ export default function Departments() {
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyingTransferId, setVerifyingTransferId] = useState('');
   const [verifyQty, setVerifyQty] = useState('');
+
+  // Selection state for deleting transfer logs
+  const [selectedTransferIds, setSelectedTransferIds] = useState<Set<string>>(new Set());
 
   if (!currentUser) return <Navigate to="/login" replace />;
 
@@ -223,6 +228,38 @@ export default function Departments() {
       if (success) {
         // notification is already handled in Context helper
       }
+    }
+  };
+
+  // Transfer Selection & Delete Actions
+  const toggleSelectTransfer = (id: string) => {
+    setSelectedTransferIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTransferIds.size === filteredTransfers.length && filteredTransfers.length > 0) {
+      setSelectedTransferIds(new Set());
+    } else {
+      setSelectedTransferIds(new Set(filteredTransfers.map(t => t.id)));
+    }
+  };
+
+  const handleDeleteSelectedTransfers = async () => {
+    if (selectedTransferIds.size === 0) {
+      return toast.error('Please select at least one transfer log to delete');
+    }
+    if (confirm(`Are you sure you want to permanently delete ${selectedTransferIds.size} selected transfer log(s)? This action cannot be undone.`)) {
+      await deleteDepartmentTransfer(Array.from(selectedTransferIds));
+      toast.success(`${selectedTransferIds.size} transfer log(s) deleted successfully`);
+      setSelectedTransferIds(new Set());
     }
   };
 
@@ -473,6 +510,17 @@ export default function Departments() {
                       Clear
                     </Button>
                   )}
+
+                  {selectedTransferIds.size > 0 && (
+                    <Button 
+                      variant="outline"
+                      onClick={handleDeleteSelectedTransfers}
+                      className="rounded-xl border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete Selected ({selectedTransferIds.size})
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -483,6 +531,14 @@ export default function Departments() {
                   <Table>
                     <TableHeader className="bg-slate-55/50">
                       <TableRow className="border-b border-slate-100">
+                        <TableHead className="font-bold text-slate-800 py-4 px-3 w-[40px]">
+                          <Checkbox
+                            checked={filteredTransfers.length > 0 && selectedTransferIds.size === filteredTransfers.length}
+                            onCheckedChange={toggleSelectAll}
+                            aria-label="Select all transfers"
+                            className="border-slate-300 data-[state=checked]:bg-slate-900 data-[state=checked]:border-slate-900"
+                          />
+                        </TableHead>
                         <TableHead className="font-bold text-slate-800 py-4 px-6 text-xs uppercase tracking-wider">Date</TableHead>
                         <TableHead className="font-bold text-slate-800 py-4 px-6 text-xs uppercase tracking-wider">Department</TableHead>
                         <TableHead className="font-bold text-slate-800 py-4 px-6 text-xs uppercase tracking-wider">Material</TableHead>
@@ -500,7 +556,15 @@ export default function Departments() {
                         const totalCost = t.quantitySent * t.costPerUnit;
 
                         return (
-                          <TableRow key={t.id} className="border-b border-slate-100 hover:bg-slate-50/30 transition-colors">
+                          <TableRow key={t.id} className={`border-b border-slate-100 hover:bg-slate-50/30 transition-colors ${selectedTransferIds.has(t.id) ? 'bg-slate-50/60' : ''}`}>
+                            <TableCell className="py-4 px-3 w-[40px]">
+                              <Checkbox
+                                checked={selectedTransferIds.has(t.id)}
+                                onCheckedChange={() => toggleSelectTransfer(t.id)}
+                                aria-label={`Select transfer ${t.id}`}
+                                className="border-slate-300 data-[state=checked]:bg-slate-900 data-[state=checked]:border-slate-900"
+                              />
+                            </TableCell>
                             <TableCell className="py-4 px-6 font-medium text-slate-900 text-xs">
                               {new Date(t.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </TableCell>
