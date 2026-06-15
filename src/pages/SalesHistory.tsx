@@ -11,7 +11,7 @@ import { Search, Download, Printer, CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, safeLower } from "@/lib/utils";
 import { Navigate } from 'react-router-dom';
 
 type BranchFilter = 'all' | 'branch_1' | 'branch_2' | 'factory_walkin';

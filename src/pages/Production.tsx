@@ -1,3 +1,4 @@
+import { safeLower } from "../lib/utils";
 import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
