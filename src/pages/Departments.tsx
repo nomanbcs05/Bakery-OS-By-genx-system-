@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { 
   ChefHat, 
@@ -261,6 +263,48 @@ export default function Departments() {
       toast.success(`${selectedTransferIds.size} transfer log(s) deleted successfully`);
       setSelectedTransferIds(new Set());
     }
+  };
+
+  // Export PDF function for Daily Transfers Log
+  const exportTransfersPDF = () => {
+    const doc = new jsPDF();
+    const title = 'Daily Transfers Log';
+    doc.setFontSize(18);
+    doc.text(title, 14, 22);
+    const headers = [
+      'Date',
+      'Department',
+      'Material',
+      'Qty Sent',
+      'Cost Value',
+      'Leftover',
+      'Status'
+    ];
+    const rows = filteredTransfers.map(t => {
+      const mat = rawMaterials.find(m => m.id === t.materialId);
+      const dept = departments.find(d => d.id === t.departmentId);
+      const totalCost = t.quantitySent * t.costPerUnit;
+      const leftover = t.isVerified ? `${t.quantityLeftover || 0} ${mat?.unit || ''}` : '-';
+      const status = t.leftoverReturned ? 'Returned' : t.isVerified ? 'Verified' : 'Pending';
+      return [
+        new Date(t.date).toLocaleDateString(),
+        dept?.name || 'Unknown',
+        mat?.name || 'Raw Material',
+        `${t.quantitySent} ${mat?.unit || ''}`,
+        `Rs. ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        leftover,
+        status
+      ];
+    });
+    // @ts-ignore autoTable usage
+    autoTable(doc, {
+      startY: 30,
+      head: [headers],
+      body: rows,
+      theme: 'grid',
+      headStyles: { fillColor: [48, 48, 48] },
+    });
+    doc.save('daily_transfers_log.pdf');
   };
 
   return (
@@ -521,6 +565,14 @@ export default function Departments() {
                       Delete Selected ({selectedTransferIds.size})
                     </Button>
                   )}
+                  {/* Export PDF Button */}
+                  <Button
+                    variant="outline"
+                    onClick={exportTransfersPDF}
+                    className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  >
+                    Export PDF
+                  </Button>
                 </div>
               </div>
             </CardHeader>
