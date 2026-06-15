@@ -43,8 +43,8 @@ export default function AdvanceOrders() {
 
   const activeProducts = products.filter(p => p.isActive);
   const filteredProducts = activeProducts.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    safeLower(p.name).includes(safeLower(searchTerm)) || 
+    safeLower(p.category).includes(safeLower(searchTerm))
   );
 
   const branchOrders = advanceOrders.filter(o => o.branch === branch);

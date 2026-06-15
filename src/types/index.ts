@@ -441,6 +441,7 @@ export interface DepartmentTransfer {
   quantitySent: number;
   costPerUnit: number;
   quantityLeftover?: number;
+  quantityReturned?: number;
   isVerified: boolean;
   leftoverReturned?: boolean;
   date: string;

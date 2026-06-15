@@ -142,7 +142,8 @@ interface AppContextType extends AppState {
   deleteDepartment: (id: string) => Promise<void>;
   sendMaterialToDepartment: (departmentId: string, materialId: string, quantity: number, date?: string) => Promise<boolean>;
   verifyDepartmentLeftover: (transferId: string, leftoverQuantity: number) => Promise<boolean>;
-  returnLeftoverToMainStore: (transferId: string) => Promise<boolean>;
+  returnLeftoverToMainStore: (transferId: string, qtyToReturn?: number) => Promise<boolean>;
+  adjustDepartmentLeftover: (transferId: string, newLeftoverQty: number) => Promise<boolean>;
   deleteDepartmentTransfer: (transferIds: string[]) => Promise<void>;
   
   addRecipe: (r: Omit<Recipe, 'id' | 'syncStatus'>) => Promise<void>;
@@ -222,27 +223,27 @@ const DISABLE_OFFLINE_DB = false;
 
 // Helper to convert DB objects to CamelCase
 const fromDBProduct = (p: DBProduct): Product => ({
-  id: p.id, name: p.name, category: p.category, price: p.price, unit: p.unit, isActive: p.is_active, createdAt: p.created_at
+  id: p.id, name: String(p.name || ''), category: String(p.category || ''), price: p.price, unit: String(p.unit || ''), isActive: p.is_active, createdAt: p.created_at
 });
 const fromDBBatch = (b: DBProductionBatch): ProductionBatch => ({
   id: b.id, items: b.items || [], date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
 });
 const fromDBSale = (s: DBSale): Sale => ({
-  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: s.payment_method, 
-  customerName: s.customer_name, customerPhone: s.customer_phone, isCreditPaid: s.is_credit_paid,
+  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: String(s.payment_method || 'cash'), 
+  customerName: s.customer_name ? String(s.customer_name) : undefined, customerPhone: s.customer_phone ? String(s.customer_phone) : undefined, isCreditPaid: s.is_credit_paid,
   date: s.date, syncStatus: s.sync_status || 'synced'
 });
 const fromDBExpense = (e: DBExpense): Expense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branchId: e.branch_id, syncStatus: e.sync_status || 'synced'
 });
 const fromDBDispatch = (d: DBDispatch): Dispatch => ({
-  id: d.id, destination: d.destination, date: d.date, status: d.status, items: d.items, tokenNumber: d.token_number, syncStatus: d.sync_status || 'synced'
+  id: d.id, destination: String(d.destination || ''), date: d.date, status: d.status, items: d.items, tokenNumber: d.token_number, syncStatus: d.sync_status || 'synced'
 });
 const fromDBLog = (l: DBAuditLog): AuditLog => ({
   id: l.id, action: l.action, entity: l.entity, entityId: l.entity_id, details: l.details, userId: l.user_id, timestamp: l.timestamp
 });
 const fromDBRawMaterial = (m: DBRawMaterial): RawMaterial => ({
-  id: m.id, name: m.name, category: m.category, unit: m.unit, currentStock: m.current_stock, minStockLevel: m.min_stock_level, costPerUnit: m.cost_per_unit, supplierName: m.supplier_name, isActive: m.is_active, lastUpdated: m.last_updated
+  id: m.id, name: String(m.name || ''), category: String(m.category || ''), unit: String(m.unit || ''), currentStock: m.current_stock, minStockLevel: m.min_stock_level, costPerUnit: m.cost_per_unit, supplierName: m.supplier_name ? String(m.supplier_name) : undefined, isActive: m.is_active, lastUpdated: m.last_updated
 });
 const fromDBRawAdjustment = (a: DBRawMaterialAdjustment): RawMaterialAdjustment => ({
   id: a.id, materialId: a.material_id, type: a.type, quantity: a.quantity, reason: a.reason, date: a.date, userId: a.user_id, syncStatus: a.sync_status || 'synced'
@@ -269,9 +270,9 @@ const fromDBRecipe = (r: DBRecipe): Recipe => ({
 });
 
 const fromDBLedgerEntry = (l: DBLedgerEntry): LedgerEntry => ({
-  id: l.id, date: l.date, accountHead: l.account_head, accountType: l.account_type as any, 
-  debit: l.debit, credit: l.credit, name: l.name, station: l.station, 
-  accountNo: l.account_no, closingBalance: l.closing_balance,
+  id: l.id, date: l.date, accountHead: String(l.account_head || ''), accountType: l.account_type as any, 
+  debit: l.debit, credit: l.credit, name: l.name ? String(l.name) : undefined, station: l.station ? String(l.station) : undefined, 
+  accountNo: l.account_no ? String(l.account_no) : undefined, closingBalance: l.closing_balance,
   category: l.category as any, syncStatus: l.sync_status || 'synced'
 });
 
@@ -283,9 +284,9 @@ const toDBLedgerEntry = (l: LedgerEntry): DBLedgerEntry => ({
 });
 
 const fromDBAdvanceOrder = (o: DBAdvanceOrder): AdvanceOrder => ({
-  id: o.id, branch: o.branch as any, customerName: o.customer_name, customerPhone: o.customer_phone,
-  items: o.items || [], total: o.total, deliveryDate: o.delivery_date, createdAt: o.created_at,
-  status: o.status as any, notes: o.notes, syncStatus: o.sync_status || 'synced'
+  id: o.id, branch: o.branch as any, customerName: String(o.customer_name || ''), customerPhone: String(o.customer_phone || ''),
+  items: o.items || [], total: o.total, deliveryDate: o.delivery_date, createdAt: o.createdAt || o.created_at,
+  status: o.status as any, notes: o.notes ? String(o.notes) : undefined, syncStatus: o.sync_status || 'synced'
 });
 
 const toDBAdvanceOrder = (o: AdvanceOrder): DBAdvanceOrder => ({
@@ -372,6 +373,7 @@ const fromDBDepartmentTransfer = (t: DBDepartmentTransfer): DepartmentTransfer =
   quantitySent: Number(t.quantity_sent),
   costPerUnit: Number(t.cost_per_unit),
   quantityLeftover: t.quantity_leftover !== null && t.quantity_leftover !== undefined ? Number(t.quantity_leftover) : undefined,
+  quantityReturned: (t as any).quantity_returned !== undefined ? Number((t as any).quantity_returned) : (t.leftover_returned ? (Number(t.quantity_sent) - (t.quantity_leftover !== null ? Number(t.quantity_leftover) : 0)) : 0),
   isVerified: t.is_verified,
   leftoverReturned: !!t.leftover_returned,
   date: t.date,
@@ -1280,7 +1282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
-  const returnLeftoverToMainStore = async (transferId: string) => {
+  const returnLeftoverToMainStore = async (transferId: string, qtyToReturn?: number) => {
     const trsf = departmentTransfers.find(t => t.id === transferId);
     if (!trsf) {
       toast.error("Transfer log not found");
@@ -1295,26 +1297,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast.error("Leftover quantity is 0, nothing to return");
       return false;
     }
+    // Use partial qty if provided, otherwise return all
+    const actualReturn = (qtyToReturn !== undefined && qtyToReturn >= 0) ? Math.min(qtyToReturn, leftover) : leftover;
+    const keepInDept = leftover - actualReturn;
+
     const mat = rawMaterials.find(m => m.id === trsf.materialId);
     const dept = departments.find(d => d.id === trsf.departmentId);
     const matName = mat ? mat.name : 'material';
     const deptName = dept ? dept.name : trsf.departmentId;
 
-    // Add back to main warehouse stock
-    await adjustRawMaterialStock(trsf.materialId, 'in', leftover, `Returned leftover from department: ${deptName}`);
+    // Add returned amount back to main warehouse stock
+    if (actualReturn > 0) {
+      await adjustRawMaterialStock(trsf.materialId, 'in', actualReturn, `Returned leftover from department: ${deptName}`);
+    }
 
-    // Update transfer to mark leftover as returned
-    setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, leftoverReturned: true, syncStatus: isOnline ? 'synced' : 'pending' } : t));
+    const prevReturned = trsf.quantityReturned || 0;
+    const newReturned = prevReturned + actualReturn;
+
+    // If everything returned, mark as leftoverReturned=true; if partial, update quantityLeftover with remainder
+    const updates = keepInDept > 0
+      ? { quantityLeftover: keepInDept, quantityReturned: newReturned, leftoverReturned: false, syncStatus: isOnline ? 'synced' : 'pending' as 'synced' | 'pending' }
+      : { quantityLeftover: 0, quantityReturned: newReturned, leftoverReturned: true, syncStatus: isOnline ? 'synced' : 'pending' as 'synced' | 'pending' };
+
+    setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, ...updates } : t));
     if (isOnline && hasSupabaseConfig) {
       try {
-        await supabase.from('department_transfers').update({ leftover_returned: true }).eq('id', transferId);
+        await supabase.from('department_transfers').update({
+          quantity_leftover: updates.quantityLeftover,
+          leftover_returned: updates.leftoverReturned,
+        }).eq('id', transferId);
       } catch (err) {
         setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, syncStatus: 'pending' } : t));
       }
     }
-    
-    toast.success(`Returned ${leftover} ${mat?.unit || ''} of ${matName} to main store`);
-    addLog('update', 'department_transfer', transferId, `Returned leftover ${leftover} of ${matName} to store`);
+
+    if (actualReturn > 0) {
+      toast.success(`Returned ${actualReturn} ${mat?.unit || ''} of ${matName} to main store${keepInDept > 0 ? `. ${keepInDept} ${mat?.unit || ''} kept in ${deptName}.` : '.'}`);
+    } else {
+      toast.info(`No quantity returned — ${keepInDept} ${mat?.unit || ''} kept in ${deptName}.`);
+    }
+    addLog('update', 'department_transfer', transferId, `Returned ${actualReturn} of ${matName} to store, kept ${keepInDept}`);
+    return true;
+  };
+
+  const adjustDepartmentLeftover = async (transferId: string, newLeftoverQty: number) => {
+    const trsf = departmentTransfers.find(t => t.id === transferId);
+    if (!trsf) {
+      toast.error('Transfer log not found');
+      return false;
+    }
+    if (!trsf.isVerified) {
+      toast.error('Transfer must be verified before adjusting leftover');
+      return false;
+    }
+    if (newLeftoverQty < 0 || newLeftoverQty > trsf.quantitySent) {
+      toast.error(`Leftover must be between 0 and ${trsf.quantitySent}`);
+      return false;
+    }
+    setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, quantityLeftover: newLeftoverQty, syncStatus: isOnline ? 'synced' : 'pending' } : t));
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        await supabase.from('department_transfers').update({ quantity_leftover: newLeftoverQty }).eq('id', transferId);
+      } catch (err) {
+        setDepartmentTransfers(prev => prev.map(t => t.id === transferId ? { ...t, syncStatus: 'pending' } : t));
+      }
+    }
+    const mat = rawMaterials.find(m => m.id === trsf.materialId);
+    toast.success(`Leftover updated to ${newLeftoverQty} ${mat?.unit || ''}`);
+    addLog('update', 'department_transfer', transferId, `Adjusted leftover to ${newLeftoverQty}`);
     return true;
   };
 
@@ -1961,7 +2011,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteCustomer, updateCustomer, deleteVendor, updateVendor,
       deleteLedgerEntry, updateLedgerEntry,
       advanceOrders, addAdvanceOrder, updateAdvanceOrderStatus,
-      departments, departmentTransfers, addDepartment, updateDepartment, deleteDepartment, sendMaterialToDepartment, verifyDepartmentLeftover, returnLeftoverToMainStore, deleteDepartmentTransfer,
+      departments, departmentTransfers, addDepartment, updateDepartment, deleteDepartment, sendMaterialToDepartment, verifyDepartmentLeftover, returnLeftoverToMainStore, adjustDepartmentLeftover, deleteDepartmentTransfer,
       hasSupabaseConfig, loadModuleData, loadedModules
     }}>
       {children}

@@ -356,7 +356,7 @@ export default function Dashboard() {
           <CardContent className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {products
-                .filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor'))
+                .filter(p => safeLower(p.category).includes('tandoor') || safeLower(p.name).includes('tandoor'))
                 .slice(0, 6)
                 .map(p => (
                   <div key={p.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
@@ -364,7 +364,7 @@ export default function Dashboard() {
                     <p className="text-sm font-black text-slate-900 mt-1">Rs. {p.price}</p>
                   </div>
                 ))}
-              {products.filter(p => p.category.toLowerCase().includes('tandoor') || p.name.toLowerCase().includes('tandoor')).length === 0 && (
+              {products.filter(p => safeLower(p.category).includes('tandoor') || safeLower(p.name).includes('tandoor')).length === 0 && (
                 <div className="col-span-full py-4 text-center text-[10px] text-slate-400 italic">No tandoori items found</div>
               )}
             </div>
@@ -382,7 +382,7 @@ export default function Dashboard() {
           <CardContent className="p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {products
-                .filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq'))
+                .filter(p => safeLower(p.category).includes('bbq') || safeLower(p.name).includes('bbq'))
                 .slice(0, 6)
                 .map(p => (
                   <div key={p.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
@@ -390,7 +390,7 @@ export default function Dashboard() {
                     <p className="text-sm font-black text-slate-900 mt-1">Rs. {p.price}</p>
                   </div>
                 ))}
-              {products.filter(p => p.category.toLowerCase().includes('bbq') || p.name.toLowerCase().includes('bbq')).length === 0 && (
+              {products.filter(p => safeLower(p.category).includes('bbq') || safeLower(p.name).includes('bbq')).length === 0 && (
                 <div className="col-span-full py-4 text-center text-[10px] text-slate-400 italic">No BBQ items found</div>
               )}
             </div>

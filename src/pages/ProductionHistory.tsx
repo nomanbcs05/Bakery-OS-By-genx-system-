@@ -55,11 +55,11 @@ export default function ProductionHistory() {
       
       // Search term filter (on notes or product names inside the batch)
       const matchesSearch = 
-        (b.notes?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-        (b.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (safeLower(b.notes).includes(safeLower(searchTerm)) || false) ||
+        (safeLower(b.id).includes(safeLower(searchTerm))) ||
         (b.items?.some(item => {
           const p = getProductById(item.productId);
-          return p?.name.toLowerCase().includes(searchTerm.toLowerCase());
+          return p ? safeLower(p.name).includes(safeLower(searchTerm)) : false;
         }) || false);
         
       if (!matchesSearch) return false;

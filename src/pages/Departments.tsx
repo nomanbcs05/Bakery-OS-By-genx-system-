@@ -45,6 +45,7 @@ export default function Departments() {
     sendMaterialToDepartment, 
     verifyDepartmentLeftover, 
     returnLeftoverToMainStore,
+    adjustDepartmentLeftover,
     deleteDepartmentTransfer 
   } = useApp();
 
@@ -83,6 +84,17 @@ export default function Departments() {
   // Selection state for deleting transfer logs
   const [selectedTransferIds, setSelectedTransferIds] = useState<Set<string>>(new Set());
 
+  // Return to store modal state
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returningTransferId, setReturningTransferId] = useState('');
+  const [returnQty, setReturnQty] = useState('');
+  const [keepQty, setKeepQty] = useState('');
+
+  // Adjust leftover modal state
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [adjustingTransferId, setAdjustingTransferId] = useState('');
+  const [adjustQty, setAdjustQty] = useState('');
+
   if (!currentUser) return <Navigate to="/login" replace />;
 
   const activeDepartments = departments.filter(d => d.isActive);
@@ -106,7 +118,7 @@ export default function Departments() {
   const filteredTransfers = departmentTransfers.filter(t => {
     const material = rawMaterials.find(m => m.id === t.materialId);
     
-    const matchesSearch = material?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+    const matchesSearch = material ? safeLower(material.name).includes(safeLower(searchTerm)) : false;
     const matchesDept = deptFilter === 'all' || t.departmentId === deptFilter;
     const matchesDate = !dateFilter || t.date === dateFilter;
 
@@ -230,16 +242,44 @@ export default function Departments() {
     }
   };
 
-  // Return Leftover Action
-  const handleReturnLeftover = async (transferId: string) => {
+  // Open Return Modal
+  const openReturnModal = (transferId: string) => {
     const trsf = departmentTransfers.find(t => t.id === transferId);
     if (!trsf) return;
-    
-    if (confirm(`Do you want to return ${trsf.quantityLeftover} remaining of this material to the main store warehouse?`)) {
-      const success = await returnLeftoverToMainStore(transferId);
-      if (success) {
-        // notification is already handled in Context helper
-      }
+    setReturningTransferId(transferId);
+    setReturnQty(String(trsf.quantityLeftover || 0));
+    setKeepQty('0');
+    setIsReturnModalOpen(true);
+  };
+
+  // Handle Return Submit
+  const handleReturnSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const rQty = parseFloat(returnQty);
+    if (isNaN(rQty) || rQty < 0) return toast.error('Please enter a valid return quantity');
+    const success = await returnLeftoverToMainStore(returningTransferId, rQty);
+    if (success) {
+      setIsReturnModalOpen(false);
+    }
+  };
+
+  // Open Adjust Modal
+  const openAdjustModal = (transferId: string) => {
+    const trsf = departmentTransfers.find(t => t.id === transferId);
+    if (!trsf) return;
+    setAdjustingTransferId(transferId);
+    setAdjustQty(String(trsf.quantityLeftover || 0));
+    setIsAdjustModalOpen(true);
+  };
+
+  // Handle Adjust Submit
+  const handleAdjustSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const aQty = parseFloat(adjustQty);
+    if (isNaN(aQty) || aQty < 0) return toast.error('Please enter a valid quantity');
+    const success = await adjustDepartmentLeftover(adjustingTransferId, aQty);
+    if (success) {
+      setIsAdjustModalOpen(false);
     }
   };
 
@@ -671,19 +711,31 @@ export default function Departments() {
                               {t.isVerified ? `${t.quantityLeftover} ${mat?.unit}` : '-'}
                             </TableCell>
                             <TableCell className="py-4 px-6 text-center">
-                              {t.leftoverReturned ? (
-                                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-100 rounded-lg text-[10px] py-1 px-2.5 font-bold">
-                                  Returned to Store
-                                </Badge>
-                              ) : t.isVerified ? (
-                                <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-100 rounded-lg text-[10px] py-1 px-2.5 font-bold">
-                                  Verified Leftover
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-100 rounded-lg text-[10px] py-1 px-2.5 font-bold animate-pulse">
-                                  Pending Verification
-                                </Badge>
-                              )}
+                              <div className="flex flex-col items-center justify-center gap-1">
+                                {(t.quantityReturned || 0) > 0 && (
+                                  <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-100 rounded-lg text-[10px] py-1 px-2.5 font-bold">
+                                    ✅ Returned {t.quantityReturned} {mat?.unit} to Store
+                                  </Badge>
+                                )}
+                                
+                                {t.isVerified ? (
+                                  (t.quantityLeftover || 0) > 0 ? (
+                                    <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-100 rounded-lg text-[10px] py-1 px-2.5 font-bold">
+                                      📦 In Dept: {t.quantityLeftover} {mat?.unit}
+                                    </Badge>
+                                  ) : (
+                                    !(t.quantityReturned && t.quantityReturned > 0) && (
+                                      <Badge className="bg-slate-50 text-slate-500 hover:bg-slate-50 border-slate-200 rounded-lg text-[10px] py-1 px-2.5 font-bold">
+                                        ✅ Fully Used
+                                      </Badge>
+                                    )
+                                  )
+                                ) : (
+                                  <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-amber-100 rounded-lg text-[10px] py-1 px-2.5 font-bold animate-pulse">
+                                    ⏳ Pending Verification
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="py-4 px-6 text-center">
                               <div className="flex items-center justify-center gap-1.5">
@@ -698,15 +750,26 @@ export default function Departments() {
                                     Verify
                                   </Button>
                                 ) : !t.leftoverReturned && (t.quantityLeftover || 0) > 0 ? (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handleReturnLeftover(t.id)}
-                                    className="h-8 rounded-xl text-xs font-semibold px-2.5 border-slate-200 hover:bg-slate-50 flex items-center gap-1"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5 text-emerald-500" />
-                                    Return Stock
-                                  </Button>
+                                  <>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => openReturnModal(t.id)}
+                                      className="h-8 rounded-xl text-xs font-semibold px-2.5 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center gap-1"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                      Return Stock
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => openAdjustModal(t.id)}
+                                      className="h-8 rounded-xl text-xs font-semibold px-2.5 border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 flex items-center gap-1"
+                                    >
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                      Adjust
+                                    </Button>
+                                  </>
                                 ) : (
                                   <span className="text-slate-400 text-xs">-</span>
                                 )}
@@ -965,6 +1028,177 @@ export default function Departments() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* DIALOG 4: RETURN TO STORE */}
+      <Dialog open={isReturnModalOpen} onOpenChange={setIsReturnModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 bg-white border-0 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-emerald-600" />
+              Return Stock to Store
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Specify how much to return to the main warehouse and how much stays in the department for next-day use.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const trsf = departmentTransfers.find(t => t.id === returningTransferId);
+            const mat = trsf ? rawMaterials.find(m => m.id === trsf.materialId) : null;
+            const totalLeftover = trsf?.quantityLeftover || 0;
+            const dept = trsf ? departments.find(d => d.id === trsf.departmentId) : null;
+            return (
+              <form onSubmit={handleReturnSubmit} className="space-y-4 pt-3">
+                {/* Summary banner */}
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-xs space-y-1.5">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Material</span>
+                    <span className="font-bold text-slate-900">{mat?.name}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Department</span>
+                    <span className="font-bold text-slate-900">{dept?.name}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 pt-1 border-t border-slate-200">
+                    <span>Total Leftover in Dept</span>
+                    <span className="font-black text-blue-700">{totalLeftover} {mat?.unit}</span>
+                  </div>
+                </div>
+
+                {/* Return qty input */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Return to Main Store ({mat?.unit})</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={totalLeftover}
+                      placeholder="0"
+                      value={returnQty}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setReturnQty(val);
+                        const parsed = parseFloat(val);
+                        if (!isNaN(parsed)) {
+                          setKeepQty(String(Math.max(0, totalLeftover - parsed)));
+                        }
+                      }}
+                      className="rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-emerald-500 pr-12"
+                    />
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600">{mat?.unit}</div>
+                  </div>
+                </div>
+
+                {/* Keep qty (auto-calculated) */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Keep in Department for Next Day ({mat?.unit})</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={totalLeftover}
+                      placeholder="0"
+                      value={keepQty}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setKeepQty(val);
+                        const parsed = parseFloat(val);
+                        if (!isNaN(parsed)) {
+                          setReturnQty(String(Math.max(0, totalLeftover - parsed)));
+                        }
+                      }}
+                      className="rounded-xl bg-blue-50 border-blue-200 focus-visible:ring-blue-500 pr-12"
+                    />
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-600">{mat?.unit}</div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Return + Keep must equal {totalLeftover} {mat?.unit}</p>
+                </div>
+
+                <DialogFooter className="pt-2">
+                  <Button type="button" variant="outline" onClick={() => setIsReturnModalOpen(false)} className="rounded-xl text-xs font-semibold">
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Confirm Return
+                  </Button>
+                </DialogFooter>
+              </form>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG 5: ADJUST LEFTOVER */}
+      <Dialog open={isAdjustModalOpen} onOpenChange={setIsAdjustModalOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 bg-white border-0 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-blue-600" />
+              Adjust Leftover Quantity
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Update the leftover quantity recorded in this department. Use this to correct any entry errors or account for additional consumption.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const trsf = departmentTransfers.find(t => t.id === adjustingTransferId);
+            const mat = trsf ? rawMaterials.find(m => m.id === trsf.materialId) : null;
+            const dept = trsf ? departments.find(d => d.id === trsf.departmentId) : null;
+            return (
+              <form onSubmit={handleAdjustSubmit} className="space-y-4 pt-3">
+                {/* Summary */}
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-xs space-y-1.5">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Material</span>
+                    <span className="font-bold text-slate-900">{mat?.name}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Department</span>
+                    <span className="font-bold text-slate-900">{dept?.name}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Qty Sent</span>
+                    <span className="font-bold text-slate-900">{trsf?.quantitySent} {mat?.unit}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500 pt-1 border-t border-slate-200">
+                    <span>Current Leftover</span>
+                    <span className="font-black text-blue-700">{trsf?.quantityLeftover} {mat?.unit}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">New Leftover Quantity ({mat?.unit})</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={trsf?.quantitySent}
+                      placeholder="Enter new leftover amount..."
+                      value={adjustQty}
+                      onChange={e => setAdjustQty(e.target.value)}
+                      className="rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-blue-500 pr-12"
+                    />
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-600">{mat?.unit}</div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Must be between 0 and {trsf?.quantitySent} {mat?.unit}</p>
+                </div>
+
+                <DialogFooter className="pt-2">
+                  <Button type="button" variant="outline" onClick={() => setIsAdjustModalOpen(false)} className="rounded-xl text-xs font-semibold">
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                    <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                    Save Adjustment
+                  </Button>
+                </DialogFooter>
+              </form>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

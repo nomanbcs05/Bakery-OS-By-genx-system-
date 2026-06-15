@@ -18,7 +18,7 @@ export default function CreditsPage() {
   const creditSales = sales.filter(s => 
     s.paymentMethod === 'credit' && 
     !s.isCreditPaid &&
-    (s.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (safeLower(s.customerName).includes(safeLower(searchTerm)) || 
      s.customerPhone?.includes(searchTerm))
   );
 

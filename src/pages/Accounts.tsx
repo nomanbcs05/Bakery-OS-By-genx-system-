@@ -413,7 +413,7 @@ export default function Accounts() {
         
         let customerMatch = true;
         if (searchCustomer) {
-          customerMatch = !!item.name?.toLowerCase().includes(searchCustomer.toLowerCase());
+          customerMatch = !!safeLower(item.name).includes(safeLower(searchCustomer));
         }
 
         return dateMatch && stationMatch && customerMatch;
@@ -432,7 +432,7 @@ export default function Accounts() {
 
     const targetCustomerName = searchCustomer || "All Customers";
     const reportTitle = `Customer Ledger Statement - ${targetCustomerName}`;
-    const fileBaseName = `customer_ledger_${targetCustomerName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    const fileBaseName = `customer_ledger_${safeLower(targetCustomerName).replace(/[^a-z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
       const headers = ['Date', 'Customer Name', 'Station', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
@@ -1218,7 +1218,7 @@ export default function Accounts() {
                           id: e.id, date: e.date, name: e.name, debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
                         }))
                       ]
-                      .filter(rec => !searchVendor || rec.name?.toLowerCase().includes(searchVendor.toLowerCase()))
+                      .filter(rec => !searchVendor || safeLower(rec.name).includes(safeLower(searchVendor)))
                       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                       if (allVendorRecords.length === 0) return <TableRow><TableCell colSpan={6} className="text-center py-8">No vendor data found</TableCell></TableRow>;
@@ -1302,7 +1302,7 @@ export default function Accounts() {
                           
                           let customerMatch = true;
                           if (searchCustomer) {
-                            customerMatch = !!item.name?.toLowerCase().includes(searchCustomer.toLowerCase());
+                            customerMatch = !!safeLower(item.name).includes(safeLower(searchCustomer));
                           }
 
                           return dateMatch && stationMatch && customerMatch;
@@ -1409,7 +1409,7 @@ export default function Accounts() {
                           id: e.id, name: e.accountHead, accountNo: e.accountNo, type: e.accountType, debit: e.debit, credit: e.credit, bal: Math.abs(e.debit - e.credit), color: e.accountType === 'Income' ? 'text-success' : 'text-destructive', isManual: true
                         }))
                       ].filter(h => h.isManual || h.debit !== 0 || h.credit !== 0)
-                       .filter(h => !searchGeneral || h.name.toLowerCase().includes(searchGeneral.toLowerCase()));
+                       .filter(h => !searchGeneral || safeLower(h.name).includes(safeLower(searchGeneral)));
 
                       return heads.map((head, idx) => (
                         <TableRow key={`${head.name}-${idx}`}>

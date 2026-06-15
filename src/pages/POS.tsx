@@ -99,7 +99,7 @@ export default function POS({ branch }: POSProps) {
     if (!product) return;
     
     // If unit is dozen, treat the quantity as pieces and convert to dozen
-    const finalQty = product.unit.toLowerCase() === 'dozen' ? qty / 12 : qty;
+    const finalQty = safeLower(product.unit) === 'dozen' ? qty / 12 : qty;
     
     setCart(prev => {
       const existing = prev.find(i => i.productId === eggsPrompt.productId);
@@ -148,7 +148,7 @@ export default function POS({ branch }: POSProps) {
   const availableProducts = products
     .filter(p => p.isActive)
     .filter(p => selectedCategory === 'All' || p.category === selectedCategory)
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(p => safeLower(p.name).includes(safeLower(searchQuery)))
     .map(p => {
       const s = stock[p.id]?.[branch] || 0;
       return { ...p, stock: s };
@@ -159,16 +159,16 @@ export default function POS({ branch }: POSProps) {
     if (!product) return;
     // Removed strict stock check to ensure products are always available for selling
 
-    if (productId === 'p_eggs' || product.name.toLowerCase().includes('egg')) {
+    if (productId === 'p_eggs' || safeLower(product.name).includes('egg')) {
       setEggsPrompt({ open: true, productId, quantity: '' });
       return;
     }
 
     if (
-      product.category.toLowerCase().includes('bbq') || 
-      product.name.toLowerCase().includes('bbq') || 
-      product.category.toLowerCase().includes('tandoor') || 
-      product.name.toLowerCase().includes('tandoor')
+      safeLower(product.category).includes('bbq') || 
+      safeLower(product.name).includes('bbq') || 
+      safeLower(product.category).includes('tandoor') || 
+      safeLower(product.name).includes('tandoor')
     ) {
       setQuickQtyPrompt({ open: true, productId, quantity: '' });
       return;
@@ -364,7 +364,7 @@ export default function POS({ branch }: POSProps) {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {product?.unit?.toLowerCase() === 'kg' && (
+                        {product ? safeLower(product.unit) : '' === 'kg' && (
                           <Button 
                             variant="secondary" 
                             size="icon" 

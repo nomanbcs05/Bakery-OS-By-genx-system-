@@ -40,7 +40,7 @@ export default function Production() {
     return products.filter(p => 
       p.isActive && 
       !hiddenProducts.includes(p.id) &&
-      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      safeLower(p.name).includes(safeLower(searchTerm))
     ).sort((a, b) => a.category.localeCompare(b.category));
   }, [products, searchTerm, hiddenProducts]);
 

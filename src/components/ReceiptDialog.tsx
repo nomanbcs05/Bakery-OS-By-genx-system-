@@ -205,7 +205,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
   }, [open]);
 
   // Normalize branch name for logic comparisons (e.g. "Branch 1" -> "branch_1")
-  const branchId = branch.toLowerCase().replace(' ', '_');
+  const branchId = safeLower(branch).replace(' ', '_');
   const cashierName = branchId === 'branch_1' ? receiptSettings?.branch1Cashier : 
                      branchId === 'branch_2' ? receiptSettings?.branch2Cashier : 
                      receiptSettings?.branch1Cashier;
@@ -296,7 +296,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
             </div>
             <div className="flex-row">
               <span>Type:</span>
-              <span className="font-bold uppercase">{branchId === 'factory' || branch.toLowerCase().includes('factory') ? 'WALK IN' : (branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2')}</span>
+              <span className="font-bold uppercase">{branchId === 'factory' || safeLower(branch).includes('factory') ? 'WALK IN' : (branchId === 'branch_1' ? 'BRANCH 1' : 'BRANCH 2')}</span>
             </div>
             <div className="flex-row">
               <span>Payment:</span>
@@ -359,7 +359,7 @@ export default function ReceiptDialog({ open, onClose, items, total, paymentMeth
               </div>
             )}
             
-            {(paymentMethod.toLowerCase() === 'credit' || (previousBalance !== undefined && previousBalance > 0)) && (
+            {(safeLower(paymentMethod) === 'credit' || (previousBalance !== undefined && previousBalance > 0)) && (
               <div className="flex-row border-t-2 border-black mt-1 pt-1 font-bold text-[12pt]">
                 <span>Total Balance:</span>
                 <span>{((previousBalance || 0) + total).toFixed(2)}</span>

@@ -112,9 +112,9 @@ export default function DispatchHistory() {
     const dateStr = entry.date.split('T')[0];
     
     const matchesSearch = 
-      (entry.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (entry.station?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (entry.accountHead?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+      (safeLower(entry.name).includes(safeLower(searchTerm)) || false) ||
+      (safeLower(entry.station).includes(safeLower(searchTerm)) || false) ||
+      (safeLower(entry.accountHead).includes(safeLower(searchTerm)) || false);
       
     const matchesStation = filterStation === 'all' || entry.station === filterStation;
     const matchesCustomer = filterCustomer === 'all' || entry.name === filterCustomer;
@@ -136,7 +136,7 @@ export default function DispatchHistory() {
     
     return { name, station, totalDebit, totalCredit, balance };
   }).filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.station.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = safeLower(c.name).includes(safeLower(searchTerm)) || safeLower(c.station).includes(safeLower(searchTerm));
     const matchesStation = filterStation === 'all' || c.station === filterStation;
     return matchesSearch && matchesStation;
   });

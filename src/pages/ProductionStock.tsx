@@ -42,7 +42,7 @@ export default function ProductionStock() {
     
     // Filter by search
     const filteredProducts = products.filter(p => 
-      p.isActive && p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      p.isActive && safeLower(p.name).includes(safeLower(searchTerm))
     );
 
     filteredProducts.forEach(product => {

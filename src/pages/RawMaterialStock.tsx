@@ -72,7 +72,7 @@ export default function RawMaterialStock() {
   if (!currentUser) return <Navigate to="/login" replace />;
 
   const filteredMaterials = rawMaterials.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = safeLower(m.name).includes(safeLower(searchTerm));
     const matchesCategory = categoryFilter === 'all' || m.category === categoryFilter;
     return matchesSearch && matchesCategory && m.isActive;
   });

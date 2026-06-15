@@ -40,7 +40,7 @@ export default function BranchProducts() {
     products.forEach(product => {
       if (!showHidden && !product.isActive) return;
       if (selectedCategory !== 'All' && product.category !== selectedCategory) return;
-      if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase())) return;
+      if (searchQuery && !safeLower(product.name).includes(safeLower(searchQuery))) return;
 
       const category = product.category || 'Uncategorized';
       if (!groups[category]) groups[category] = [];

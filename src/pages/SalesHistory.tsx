@@ -41,11 +41,11 @@ export default function SalesHistory() {
       if (dateTo && sale.date > format(dateTo, 'yyyy-MM-dd')) return false;
       // Search
       if (search) {
-        const q = search.toLowerCase();
-        const matchesId = sale.id.toLowerCase().includes(q);
+        const q = safeLower(search);
+        const matchesId = safeLower(sale.id).includes(q);
         const matchesProduct = sale.items.some(i => {
           const p = getProductById(i.productId);
-          return p?.name.toLowerCase().includes(q);
+          return p ? safeLower(p.name).includes(q) : false;
         });
         if (!matchesId && !matchesProduct) return false;
       }

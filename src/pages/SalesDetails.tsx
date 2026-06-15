@@ -104,10 +104,10 @@ export default function SalesDetails() {
 
       // Search
       if (search) {
-        const q = search.toLowerCase();
+        const q = safeLower(search);
         const product = getProductById(item.productId);
-        const matchesProduct = product?.name.toLowerCase().includes(q);
-        const matchesId = item.saleId.toLowerCase().includes(q);
+        const matchesProduct = product ? safeLower(product.name).includes(q) : false;
+        const matchesId = safeLower(item.saleId).includes(q);
         if (!matchesProduct && !matchesId) return false;
       }
 

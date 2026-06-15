@@ -96,9 +96,9 @@ export default function Purchases() {
   };
 
   const filteredPurchases = purchases.filter(p => 
-    p.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.vendorCity.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (rawMaterials.find(m => m.id === p.materialId)?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+    safeLower(p.vendorName).includes(safeLower(searchTerm)) ||
+    safeLower(p.vendorCity).includes(safeLower(searchTerm)) ||
+    (rawMaterials.find(m => m.id === p.materialId)?.name || '').toLowerCase().includes(safeLower(searchTerm))
   ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const totalSpent = purchases.reduce((sum, p) => sum + p.totalCost, 0);
