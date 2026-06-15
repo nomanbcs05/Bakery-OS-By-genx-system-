@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -50,6 +50,16 @@ export default function Departments() {
 
   // Selected Tab
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Clear filters and selections when navigating to Dashboard
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      setSearchTerm('');
+      setDeptFilter('all');
+      setDateFilter('');
+      setSelectedTransferIds(new Set());
+    }
+  }, [activeTab]);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
