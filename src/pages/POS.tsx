@@ -451,12 +451,13 @@ export default function POS({ branch }: POSProps) {
               <Input 
                 id="quickQty" 
                 type="number" 
+                step="any"
                 placeholder="e.g. 15" 
                 value={quickQtyPrompt.quantity}
                 onChange={e => setQuickQtyPrompt(prev => ({ ...prev, quantity: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
-                    const q = parseInt(quickQtyPrompt.quantity);
+                    const q = parseFloat(quickQtyPrompt.quantity);
                     if (!isNaN(q) && q > 0) handleQuickQtyConfirm(q);
                   }
                 }}
@@ -467,7 +468,7 @@ export default function POS({ branch }: POSProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setQuickQtyPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
             <Button onClick={() => {
-              const q = parseInt(quickQtyPrompt.quantity);
+              const q = parseFloat(quickQtyPrompt.quantity);
               if (!isNaN(q) && q > 0) handleQuickQtyConfirm(q);
             }}>Confirm</Button>
           </DialogFooter>
@@ -499,12 +500,13 @@ export default function POS({ branch }: POSProps) {
               <Input 
                 id="eggQty" 
                 type="number" 
+                step="any"
                 placeholder="e.g. 5" 
                 value={eggsPrompt.quantity}
                 onChange={e => setEggsPrompt(prev => ({ ...prev, quantity: e.target.value }))}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
-                    const q = parseInt(eggsPrompt.quantity);
+                    const q = parseFloat(eggsPrompt.quantity);
                     if (!isNaN(q) && q > 0) handleEggsConfirm(q);
                   }
                 }}
@@ -515,7 +517,7 @@ export default function POS({ branch }: POSProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEggsPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
             <Button onClick={() => {
-              const q = parseInt(eggsPrompt.quantity);
+              const q = parseFloat(eggsPrompt.quantity);
               if (!isNaN(q) && q > 0) handleEggsConfirm(q);
             }}>Confirm</Button>
           </DialogFooter>

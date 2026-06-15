@@ -52,12 +52,12 @@ export default function DispatchPage() {
   });
 
   const addItem = () => {
-    if (!selectedProduct || !qty || parseInt(qty) <= 0) return;
+    if (!selectedProduct || !qty || parseFloat(qty) <= 0) return;
     const existing = items.find(i => i.productId === selectedProduct);
     if (existing) {
-      setItems(items.map(i => i.productId === selectedProduct ? { ...i, quantity: i.quantity + parseInt(qty) } : i));
+      setItems(items.map(i => i.productId === selectedProduct ? { ...i, quantity: i.quantity + parseFloat(qty) } : i));
     } else {
-      setItems([...items, { productId: selectedProduct, quantity: parseInt(qty) }]);
+      setItems([...items, { productId: selectedProduct, quantity: parseFloat(qty) }]);
     }
     setSelectedProduct('');
     setQty('');
@@ -68,7 +68,8 @@ export default function DispatchPage() {
   const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
     
-    if (!custName) {
+    const isSale = !['branch_1', 'branch_2'].includes(destination);
+    if (isSale && !custName) {
       toast.error('Customer name is required');
       return;
     }
@@ -192,7 +193,7 @@ export default function DispatchPage() {
             </div>
             <div>
               <Label>Quantity</Label>
-              <Input type="number" min="1" max={stock[selectedProduct]?.production || 999} value={qty} onChange={e => setQty(e.target.value)} />
+              <Input type="number" min="0.01" step="any" max={stock[selectedProduct]?.production || 999} value={qty} onChange={e => setQty(e.target.value)} />
             </div>
             <div className="flex items-end">
               <Button variant="outline" onClick={addItem} disabled={!selectedProduct || !qty}><Plus className="h-4 w-4 mr-1" /> Add</Button>

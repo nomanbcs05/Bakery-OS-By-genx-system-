@@ -556,7 +556,7 @@ export default function Departments() {
                   )}
 
                   {selectedTransferIds.size > 0 && (
-                    <Button 
+                    <Button
                       variant="outline"
                       onClick={handleDeleteSelectedTransfers}
                       className="rounded-xl border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
@@ -565,14 +565,38 @@ export default function Departments() {
                       Delete Selected ({selectedTransferIds.size})
                     </Button>
                   )}
-                  {/* Export PDF Button */}
+
+                  {/* Clear Filters Button */}
                   <Button
                     variant="outline"
-                    onClick={exportTransfersPDF}
-                    className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setDeptFilter('all');
+                      setDateFilter('');
+                      setSelectedTransferIds(new Set());
+                    }}
+                    className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ml-2"
                   >
-                    Export PDF
+                    Clear Filters
                   </Button>
+
+                  {/* Export PDF Button */}
+                  {/* Export Options Dropdown */}
+                  <Select value="" onValueChange={(value) => {
+                    if (value === 'pdf') {
+                      exportTransfersPDF();
+                    } else if (value === 'csv') {
+                      exportTransfersCSV();
+                    }
+                  }}>
+                    <SelectTrigger className="w-[150px] rounded-xl text-xs bg-slate-50 border-slate-200">
+                      <SelectValue placeholder="Export" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pdf">Export PDF</SelectItem>
+                      <SelectItem value="csv">Export CSV</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>
