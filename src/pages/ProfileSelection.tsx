@@ -65,6 +65,85 @@ export default function ProfileSelection() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [selectedProfileLocal, setSelectedProfileLocal] = useState<any>(null);
 
+  // Define standard slots to make sure they are always present on the login screen
+  const defaultSlots = [
+    {
+      id: 'default-branch-1-pos',
+      defaultName: 'Branch 1 POS',
+      role: 'branch_staff' as UserRole,
+      branchId: 'branch_1',
+      defaultPin: '0000',
+    },
+    {
+      id: 'default-branch-2-pos',
+      defaultName: 'Branch 2 POS',
+      role: 'branch_staff' as UserRole,
+      branchId: 'branch_2',
+      defaultPin: '0000',
+    },
+    {
+      id: 'default-admin',
+      defaultName: 'Admin',
+      role: 'admin' as UserRole,
+      branchId: undefined,
+      defaultPin: '1234',
+    },
+    {
+      id: 'default-production-manager',
+      defaultName: 'Production Manager',
+      role: 'production_manager' as UserRole,
+      branchId: undefined,
+      defaultPin: '0000',
+    }
+  ];
+
+  const usedUserIds = new Set<string>();
+  const renderedProfiles: User[] = [];
+
+  // Match default slots to real database users if they exist, otherwise use fallbacks
+  defaultSlots.forEach(slot => {
+    const dbUser = allUsers.find(u => 
+      u.role === slot.role && 
+      (slot.branchId ? u.branchId === slot.branchId : true) &&
+      !usedUserIds.has(u.id)
+    );
+
+    if (dbUser) {
+      usedUserIds.add(dbUser.id);
+      renderedProfiles.push({
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email || '',
+        role: dbUser.role,
+        branchId: dbUser.branchId,
+        pinCode: dbUser.pinCode || slot.defaultPin
+      });
+    } else {
+      renderedProfiles.push({
+        id: slot.id,
+        name: slot.defaultName,
+        email: '',
+        role: slot.role,
+        branchId: slot.branchId,
+        pinCode: slot.defaultPin
+      });
+    }
+  });
+
+  // Add any other user profiles found in the database that are not one of the default core slots
+  allUsers.forEach(u => {
+    if (!usedUserIds.has(u.id)) {
+      renderedProfiles.push({
+        id: u.id,
+        name: u.name,
+        email: u.email || '',
+        role: u.role,
+        branchId: u.branchId,
+        pinCode: u.pinCode || '0000'
+      });
+    }
+  });
+
   const handleProfileClick = (user: User) => {
     const style = getProfileStyle(user.role, user.branchId);
     const shortName = getShortName(user.name, user.role, user.branchId);
@@ -575,7 +654,7 @@ export default function ProfileSelection() {
 
         {/* Profile Grid */}
         <div className="ps-grid">
-          {allUsers.map((user, index) => {
+          {renderedProfiles.map((user, index) => {
             const style = getProfileStyle(user.role, user.branchId);
             const shortName = getShortName(user.name, user.role, user.branchId);
             const Icon = style.icon;
@@ -619,7 +698,7 @@ export default function ProfileSelection() {
               </button>
             );
           })}
-          {allUsers.length === 0 && (
+          {renderedProfiles.length === 0 && (
             <div className="col-span-full py-8 text-center text-slate-400 italic">
               No profiles initialized. Contact system administrator.
             </div>
