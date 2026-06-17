@@ -9,12 +9,56 @@ import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
+const getLocalDateString = (offsetDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getFirstDayOfCurrentMonthLocalString = () => {
+  const d = new Date();
+  d.setDate(1); // Set to 1st of the month
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().slice(0, 10);
+};
+
 export default function Dashboard() {
   const { currentUser, products, batches, sales, dispatches, stock, getInventorySnapshots, getProductById, clearSales } = useApp();
 
   const [showClearMenu, setShowClearMenu] = useState(false);
   const [confirmRange, setConfirmRange] = useState<'today' | 'weekly' | 'monthly' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const [startDate, setStartDate] = useState(() => {
+    return localStorage.getItem('bakewise_dashboard_start_date') || getLocalDateString(0);
+  });
+  const [endDate, setEndDate] = useState(() => {
+    return localStorage.getItem('bakewise_dashboard_end_date') || getLocalDateString(0);
+  });
+  const [activePreset, setActivePreset] = useState<string>(() => {
+    return localStorage.getItem('bakewise_dashboard_active_preset') || 'Today';
+  });
+
+  const presets = [
+    { label: 'Today', getValue: () => ({ start: getLocalDateString(0), end: getLocalDateString(0) }) },
+    { label: 'Yesterday', getValue: () => ({ start: getLocalDateString(1), end: getLocalDateString(1) }) },
+    { label: 'Last 7 Days', getValue: () => ({ start: getLocalDateString(6), end: getLocalDateString(0) }) },
+    { label: 'Last 30 Days', getValue: () => ({ start: getLocalDateString(29), end: getLocalDateString(0) }) },
+    { label: 'This Month', getValue: () => ({ start: getFirstDayOfCurrentMonthLocalString(), end: getLocalDateString(0) }) },
+    { label: 'All Time', getValue: () => ({ start: '2025-01-01', end: getLocalDateString(0) }) },
+  ];
+
+  const handleDateChange = (start: string, end: string, presetName = 'Custom') => {
+    setStartDate(start);
+    setEndDate(end);
+    setActivePreset(presetName);
+    localStorage.setItem('bakewise_dashboard_start_date', start);
+    localStorage.setItem('bakewise_dashboard_end_date', end);
+    localStorage.setItem('bakewise_dashboard_active_preset', presetName);
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -31,32 +75,43 @@ export default function Dashboard() {
 
   const isAdmin = currentUser.role === 'admin';
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todaySales = sales.filter(s => s.date && s.date.split('T')[0] === today);
-  const todayBatches = batches.filter(b => b.date && b.date.split('T')[0] === today);
-  const todayDispatches = dispatches.filter(d => d.date && d.date.split('T')[0] === today);
+  const filteredSales = sales.filter(s => {
+    if (!s.date) return false;
+    const sDate = s.date.split('T')[0];
+    return sDate >= startDate && sDate <= endDate;
+  });
+  const filteredBatches = batches.filter(b => {
+    if (!b.date) return false;
+    const bDate = b.date.split('T')[0];
+    return bDate >= startDate && bDate <= endDate;
+  });
+  const filteredDispatches = dispatches.filter(d => {
+    if (!d.date) return false;
+    const dDate = d.date.split('T')[0];
+    return dDate >= startDate && dDate <= endDate;
+  });
   const snapshots = getInventorySnapshots();
   
-  const totalRevenue = todaySales
+  const totalRevenue = filteredSales
     .filter(s => s.paymentMethod !== 'credit' || s.isCreditPaid)
     .reduce((sum, s) => sum + s.total, 0);
-  const totalProduced = todayBatches.reduce((sum, b) => sum + (Array.isArray(b.items) ? b.items.reduce((s: number, i: any) => s + (i.quantity || 0), 0) : (b as any).quantity || 0), 0);
-  const totalDispatched = todayDispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
-  const totalSold = todaySales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0);
+  const totalProduced = filteredBatches.reduce((sum, b) => sum + (Array.isArray(b.items) ? b.items.reduce((s: number, i: any) => s + (i.quantity || 0), 0) : (b as any).quantity || 0), 0);
+  const totalDispatched = filteredDispatches.flatMap(d => d.items).reduce((sum, i) => sum + i.quantity, 0);
+  const totalSold = filteredSales.flatMap(s => s.items).reduce((sum, i) => sum + i.quantity, 0);
 
   const pendingSyncCount = sales.filter(s => s.syncStatus === 'pending').length;
 
   const lowStock = snapshots.filter(s => s.productionStock < 20 && s.productionStock > 0);
 
   const branchSalesData = [
-    { name: 'Branch 1', sales: todaySales.filter(s => s.branch === 'branch_1' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Branch 2', sales: todaySales.filter(s => s.branch === 'branch_2' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
-    { name: 'Walk-in', sales: todaySales.filter(s => s.type === 'factory_walkin' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 1', sales: filteredSales.filter(s => s.branch === 'branch_1' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Branch 2', sales: filteredSales.filter(s => s.branch === 'branch_2' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
+    { name: 'Walk-in', sales: filteredSales.filter(s => s.type === 'factory_walkin' && (s.paymentMethod !== 'credit' || s.isCreditPaid)).reduce((sum, s) => sum + s.total, 0) },
   ];
 
   const categoryData = products.reduce((acc, p) => {
     const existing = acc.find(a => a.name === p.category);
-    const produced = batches.reduce((sum, b) => {
+    const produced = filteredBatches.reduce((sum, b) => {
       if (Array.isArray(b.items)) {
         return sum + b.items.filter((i: any) => i.productId === p.id).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
       }
@@ -110,7 +165,9 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
         <div className="space-y-0.5">
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm font-medium">Bakewise operational overview for today</p>
+          <p className="text-slate-500 text-sm font-medium">
+            Bakewise operational overview {activePreset === 'Today' ? 'for today' : `from ${startDate} to ${endDate}`}
+          </p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -196,6 +253,52 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Date Range Picker Bar */}
+      <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        {/* Presets */}
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map(p => (
+            <button
+              key={p.label}
+              onClick={() => {
+                const { start, end } = p.getValue();
+                handleDateChange(start, end, p.label);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+                activePreset === p.label
+                  ? 'bg-primary text-white shadow-md shadow-orange-100'
+                  : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom Inputs */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-500">
+            <span className="text-[10px] text-slate-400">FROM</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => handleDateChange(e.target.value, endDate, 'Custom')}
+              className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer"
+            />
+          </div>
+          <span className="text-slate-300 font-bold text-xs">—</span>
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-500">
+            <span className="text-[10px] text-slate-400">TO</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => handleDateChange(startDate, e.target.value, 'Custom')}
+              className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Stat Cards */}
       <motion.div 
         variants={container}
@@ -206,7 +309,7 @@ export default function Dashboard() {
         <motion.div variants={item}>
           <div className="bg-primary rounded-[24px] p-5 relative overflow-hidden text-white shadow-lg shadow-orange-200 group hover:scale-[1.02] transition-transform">
              <div className="flex items-center justify-between mb-2">
-               <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Today's Revenue</span>
+               <span className="text-[10px] font-bold opacity-90 uppercase tracking-[0.15em]">Period Revenue</span>
                <div className="h-7 w-7 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-md">
                  <TrendingUp className="h-4 w-4" />
                </div>
@@ -214,7 +317,7 @@ export default function Dashboard() {
              <div className="flex items-end justify-between">
                <h3 className="text-[26px] font-black leading-tight tracking-tight">Rs. {(totalRevenue || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter">
-                  {todaySales.length} TRX
+                  {filteredSales.length} TRX
                </div>
              </div>
           </div>
@@ -231,7 +334,7 @@ export default function Dashboard() {
              <div className="flex items-end justify-between">
                <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalProduced || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-[9px] font-bold tracking-tighter uppercase">
-                 {todayBatches.length} Batches
+                  {filteredBatches.length} Batches
                </div>
              </div>
           </div>
@@ -248,7 +351,7 @@ export default function Dashboard() {
              <div className="flex items-end justify-between">
                <h3 className="text-[26px] font-black leading-tight tracking-tight">{(totalDispatched || 0).toLocaleString()}</h3>
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold tracking-tighter uppercase">
-                 {todayDispatches.length} Trips
+                  {filteredDispatches.length} Trips
                </div>
              </div>
           </div>
@@ -279,7 +382,7 @@ export default function Dashboard() {
           <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
             <div className="space-y-0.5">
               <CardTitle className="text-sm font-bold text-slate-800">Sales by Channel</CardTitle>
-              <CardDescription className="text-[10px] font-medium text-slate-400">Revenue distribution by branch</CardDescription>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Revenue distribution for selected period</CardDescription>
             </div>
             <Layout className="h-4 w-4 text-slate-300" />
           </CardHeader>
@@ -313,7 +416,7 @@ export default function Dashboard() {
           <CardHeader className="p-6 pb-2 border-b border-slate-50 flex flex-row items-center justify-between">
             <div className="space-y-0.5">
               <CardTitle className="text-sm font-bold text-slate-800">Production by Category</CardTitle>
-              <CardDescription className="text-[10px] font-medium text-slate-400">Today's output distribution</CardDescription>
+              <CardDescription className="text-[10px] font-medium text-slate-400">Output distribution for selected period</CardDescription>
             </div>
             <Share2 className="h-4 w-4 text-slate-300" />
           </CardHeader>
@@ -336,7 +439,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-xs text-slate-300 italic">No production data for today</p>
+                  <p className="text-xs text-slate-300 italic">No production data for this period</p>
                 </div>
               )}
             </div>
@@ -404,13 +507,13 @@ export default function Dashboard() {
         <CardHeader className="p-6 border-b border-slate-50 flex flex-row items-center justify-between">
           <div className="space-y-0.5">
             <CardTitle className="text-sm font-bold text-slate-800">Active Transaction Feed</CardTitle>
-            <CardDescription className="text-[10px] font-medium text-slate-400">Live operational data from all branches</CardDescription>
+            <CardDescription className="text-[10px] font-medium text-slate-400">Operational data for selected period</CardDescription>
           </div>
           <History className="h-4 w-4 text-slate-300" />
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-slate-50 max-h-[400px] overflow-y-auto">
-            {todaySales.slice().reverse().map(sale => (
+            {filteredSales.slice().reverse().slice(0, 50).map(sale => (
               <div key={sale.id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${sale.branch === 'branch_1' ? 'bg-orange-50 text-primary' : 'bg-slate-100 text-slate-600'}`}>
@@ -434,9 +537,9 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
-            {todaySales.length === 0 && (
+            {filteredSales.length === 0 && (
               <div className="p-12 text-center">
-                <p className="text-xs font-medium text-slate-300 italic tracking-wide">No transactions recorded today</p>
+                <p className="text-xs font-medium text-slate-300 italic tracking-wide">No transactions recorded in this period</p>
               </div>
             )}
           </div>

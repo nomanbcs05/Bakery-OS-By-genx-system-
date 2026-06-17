@@ -440,7 +440,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     return initialAuth.selectedProfile || null;
   });
-  const [isProfileLocked, setIsProfileLocked] = useState(true);
+  const [isProfileLocked, setIsProfileLocked] = useState(() => {
+    const saved = localStorage.getItem('bakewise_is_profile_locked');
+    return saved ? saved === 'true' : true;
+  });
 
   const [products, setProducts] = useState<Product[]>(() => {
     const defaultMenu = [...sampleProducts];
@@ -481,7 +484,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [recipes, setRecipes] = useState<Recipe[]>(initialState.recipes || []);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialState.auditLogs || []);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>(initialState.allUsers || []);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(initialState.lastSyncTime || null);
   
@@ -1058,7 +1061,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasLoaded.current || DISABLE_OFFLINE_DB) return;
     // Exclude auditLogs from localStorage to save space — they're already persisted in Supabase
-    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs: [], stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers };
+    const data = { products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs: [], stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers, allUsers };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
@@ -1072,7 +1075,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers]);
+  }, [products, rawMaterials, rawMaterialAdjustments, branchStockAdjustments, batches, dispatches, sales, expenses, auditLogs, stock, lastSyncTime, receiptSettings, staff, staffDeductions, salaryVouchers, recipes, purchases, advanceOrders, ledgerEntries, departments, departmentTransfers, allUsers]);
 
   useEffect(() => {
     if (!hasLoaded.current) return;
@@ -1633,11 +1636,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSelectedProfile(profile);
     setIsProfileLocked(true);
     localStorage.setItem('bakewise_selected_profile', JSON.stringify(profile));
+    localStorage.setItem('bakewise_is_profile_locked', 'true');
   };
 
   const verifyPin = (pin: string) => {
     if (selectedProfile && selectedProfile.pinCode === pin) {
       setIsProfileLocked(false);
+      localStorage.setItem('bakewise_is_profile_locked', 'false');
       return true;
     }
     return false;
@@ -1647,6 +1652,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsProfileLocked(true);
     setSelectedProfile(null);
     localStorage.removeItem('bakewise_selected_profile');
+    localStorage.setItem('bakewise_is_profile_locked', 'true');
   };
 
   const switchUser = (role: UserRole, branchId?: 'branch_1' | 'branch_2') => {
@@ -1970,7 +1976,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateUserRole: async (id, r, b) => { if (isOnline) await supabase.from('profiles').update({ role: r, branch_id: b }).eq('id', id); fetchAllUsers(); },
       updateUserPin: async (id, p) => { if (isOnline) await supabase.from('profiles').update({ pin_code: p }).eq('id', id); fetchAllUsers(); },
       createStaffMember: async (n, e, p, r, b, pi) => { if (isOnline) await supabase.from('profiles').insert([{ name: n, email: e, role: r, branch_id: b, pin_code: pi }]); fetchAllUsers(); },
-      logout: async () => { await supabase.auth.signOut(); setCurrentUser(null); setSelectedProfile(null); },
+      logout: async () => {
+        if (hasSupabaseConfig) {
+          await supabase.auth.signOut();
+        }
+        setCurrentUser(null);
+        setSelectedProfile(null);
+        localStorage.removeItem('bakewise_selected_profile');
+        localStorage.removeItem('bakewise_is_profile_locked');
+      },
       forceSync, seedDatabase: async () => { fetchData(); },
       receiptSettings, updateReceiptSettings,
       staff, staffDeductions, salaryVouchers,

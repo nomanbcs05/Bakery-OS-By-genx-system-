@@ -1,61 +1,62 @@
 import { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { ChefHat, ArrowLeft, Loader2, Store, Shield, Factory, LogOut } from 'lucide-react';
+import { ChefHat, ArrowLeft, Loader2, Store, Shield, Factory, LogOut, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import { UserRole } from '@/types';
+import { User, UserRole } from '@/types';
 
-const VIRTUAL_PROFILES = [
-  {
-    id: 'branch-1-pos',
-    name: 'Branch 1 POS',
-    shortName: 'B1',
-    role: 'branch_staff' as UserRole,
-    branchId: 'branch_1' as const,
-    icon: Store,
-    gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-    shadowColor: 'rgba(249,115,22,0.25)',
-    bgTint: 'rgba(249,115,22,0.06)',
-    borderTint: 'rgba(249,115,22,0.22)',
-    dotColor: '#f97316',
-  },
-  {
-    id: 'branch-2-pos',
-    name: 'Branch 2 POS',
-    shortName: 'B2',
-    role: 'branch_staff' as UserRole,
-    branchId: 'branch_2' as const,
-    icon: Store,
-    gradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-    shadowColor: 'rgba(34,197,94,0.25)',
-    bgTint: 'rgba(34,197,94,0.06)',
-    borderTint: 'rgba(34,197,94,0.22)',
-    dotColor: '#22c55e',
-  },
-  {
-    id: 'admin',
-    name: 'Admin',
-    shortName: 'AD',
-    role: 'admin' as UserRole,
-    icon: Shield,
-    gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-    shadowColor: 'rgba(239,68,68,0.25)',
-    bgTint: 'rgba(239,68,68,0.06)',
-    borderTint: 'rgba(239,68,68,0.22)',
-    dotColor: '#ef4444',
-  },
-  {
-    id: 'production-manager',
-    name: 'Production Manager',
-    shortName: 'PM',
-    role: 'production_manager' as UserRole,
-    icon: Factory,
-    gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-    shadowColor: 'rgba(59,130,246,0.25)',
-    bgTint: 'rgba(59,130,246,0.06)',
-    borderTint: 'rgba(59,130,246,0.22)',
-    dotColor: '#3b82f6',
+const getProfileStyle = (role: string, branchId?: string) => {
+  if (role === 'admin') {
+    return {
+      icon: Shield,
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      shadowColor: 'rgba(239,68,68,0.25)',
+      bgTint: 'rgba(239,68,68,0.06)',
+      borderTint: 'rgba(239,68,68,0.22)',
+      dotColor: '#ef4444',
+    };
+  } else if (role === 'production_manager') {
+    return {
+      icon: Factory,
+      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+      shadowColor: 'rgba(59,130,246,0.25)',
+      bgTint: 'rgba(59,130,246,0.06)',
+      borderTint: 'rgba(59,130,246,0.22)',
+      dotColor: '#3b82f6',
+    };
+  } else if (role === 'accountant') {
+    return {
+      icon: Wallet,
+      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      shadowColor: 'rgba(16,185,129,0.25)',
+      bgTint: 'rgba(16,185,129,0.06)',
+      borderTint: 'rgba(16,185,129,0.22)',
+      dotColor: '#10b981',
+    };
+  } else {
+    const isBranch2 = branchId === 'branch_2';
+    return {
+      icon: Store,
+      gradient: isBranch2 
+        ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' 
+        : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+      shadowColor: isBranch2 ? 'rgba(34,197,94,0.25)' : 'rgba(249,115,22,0.25)',
+      bgTint: isBranch2 ? 'rgba(34,197,94,0.06)' : 'rgba(249,115,22,0.06)',
+      borderTint: isBranch2 ? 'rgba(34,197,94,0.22)' : 'rgba(249,115,22,0.22)',
+      dotColor: isBranch2 ? '#22c55e' : '#f97316',
+    };
   }
-];
+};
+
+const getShortName = (name: string, role: string, branchId?: string) => {
+  if (role === 'branch_staff') {
+    return branchId === 'branch_2' ? 'B2' : 'B1';
+  }
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
 
 export default function ProfileSelection() {
   const { selectProfile, verifyPin, selectedProfile, logout, allUsers } = useApp();
@@ -64,23 +65,22 @@ export default function ProfileSelection() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [selectedProfileLocal, setSelectedProfileLocal] = useState<any>(null);
 
-  const handleProfileClick = (profile: any) => {
-    // Find the real user from allUsers to get the correct PIN
-    const realUser = allUsers.find(u => 
-      u.role === profile.role && 
-      (profile.branchId ? u.branchId === profile.branchId : true)
-    );
+  const handleProfileClick = (user: User) => {
+    const style = getProfileStyle(user.role, user.branchId);
+    const shortName = getShortName(user.name, user.role, user.branchId);
     
     const userProfile = {
-      id: profile.id,
-      name: profile.name,
-      email: '',
-      role: profile.role,
-      branchId: profile.branchId,
-      pinCode: realUser?.pinCode || '0000'
+      id: user.id,
+      name: user.name,
+      email: user.email || '',
+      role: user.role,
+      branchId: user.branchId,
+      pinCode: user.pinCode || '0000',
+      shortName,
+      ...style
     };
-    setSelectedProfileLocal({ ...userProfile, ...profile });
-    selectProfile(userProfile);
+    setSelectedProfileLocal(userProfile);
+    selectProfile(user);
     setStep('pin');
     setPin('');
   };
@@ -485,7 +485,7 @@ export default function ProfileSelection() {
   `;
 
   if (step === 'pin') {
-    const profile = VIRTUAL_PROFILES.find(p => p.id === selectedProfileLocal?.id);
+    const profile = selectedProfileLocal;
     return (
       <div className="ps-page">
         <style>{styles}</style>
@@ -575,43 +575,55 @@ export default function ProfileSelection() {
 
         {/* Profile Grid */}
         <div className="ps-grid">
-          {VIRTUAL_PROFILES.map((profile, index) => (
-            <button
-              key={profile.id}
-              className="ps-card"
-              onClick={() => handleProfileClick(profile)}
-              style={{ animationDelay: `${0.1 + index * 0.08}s` }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = profile.borderTint;
-                el.style.background = profile.bgTint;
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget;
-                el.style.borderColor = 'hsl(36, 20%, 90%)';
-                el.style.background = 'white';
-              }}
-            >
-              <div
-                className="ps-card-dot"
-                style={{ background: profile.dotColor }}
-              />
-              <div
-                className="ps-card-icon"
-                style={{
-                  background: profile.gradient,
-                  boxShadow: `0 5px 18px ${profile.shadowColor}`,
+          {allUsers.map((user, index) => {
+            const style = getProfileStyle(user.role, user.branchId);
+            const shortName = getShortName(user.name, user.role, user.branchId);
+            const Icon = style.icon;
+            
+            return (
+              <button
+                key={user.id}
+                className="ps-card"
+                onClick={() => handleProfileClick(user)}
+                style={{ animationDelay: `${0.1 + index * 0.08}s` }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = style.borderTint;
+                  el.style.background = style.bgTint;
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = 'hsl(36, 20%, 90%)';
+                  el.style.background = 'white';
                 }}
               >
-                <profile.icon style={{ width: 26, height: 26, color: 'white' }} />
-              </div>
-              <span className="ps-card-name">{profile.name}</span>
-              <span className="ps-card-role">
-                {profile.role === 'branch_staff' ? 'Point of Sale' :
-                 profile.role === 'admin' ? 'Full Access' : 'Production'}
-              </span>
-            </button>
-          ))}
+                <div
+                  className="ps-card-dot"
+                  style={{ background: style.dotColor }}
+                />
+                <div
+                  className="ps-card-icon"
+                  style={{
+                    background: style.gradient,
+                    boxShadow: `0 5px 18px ${style.shadowColor}`,
+                  }}
+                >
+                  <Icon style={{ width: 26, height: 26, color: 'white' }} />
+                </div>
+                <span className="ps-card-name">{user.name}</span>
+                <span className="ps-card-role">
+                  {user.role === 'branch_staff' ? (user.branchId === 'branch_2' ? 'Branch 2 POS' : 'Branch 1 POS') :
+                   user.role === 'admin' ? 'Full Access' :
+                   user.role === 'accountant' ? 'Financials' : 'Production'}
+                </span>
+              </button>
+            );
+          })}
+          {allUsers.length === 0 && (
+            <div className="col-span-full py-8 text-center text-slate-400 italic">
+              No profiles initialized. Contact system administrator.
+            </div>
+          )}
         </div>
 
         {/* Footer */}
