@@ -1,6 +1,7 @@
 import { safeLower } from "../lib/utils";
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
+import type { LedgerEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,6 @@ import {
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
-import ReceiptDialog from '@/components/ReceiptDialog';
 
 interface RunningLedgerEntry extends LedgerEntry {
   runningBalance: number;

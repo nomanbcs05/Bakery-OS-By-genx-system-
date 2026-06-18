@@ -7,19 +7,23 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard, Edit, Search, FileDown, CalendarDays } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import type { DispatchDestination, DispatchItem, PaymentMethod } from '@/types';
+import type { DispatchDestination, DispatchItem, PaymentMethod, LedgerEntry } from '@/types';
 import { Navigate } from 'react-router-dom';
 import GOTDialog from '@/components/GOTDialog';
 import ReceiptDialog from '@/components/ReceiptDialog';
 import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 
 export default function DispatchPage() {
-  const { currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries, sales } = useApp();
+  const { 
+    currentUser, products, stock, createDispatch, dispatches, getProductById, ledgerEntries, sales,
+    deleteLedgerEntry, updateLedgerEntry
+  } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [destination, setDestination] = useState<DispatchDestination | ''>('');
@@ -28,6 +32,114 @@ export default function DispatchPage() {
   const [qty, setQty] = useState('');
   const [showGOT, setShowGOT] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Customer Ledger Filtering & Modal States
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState('all');
+  const [filterStation, setFilterStation] = useState('all');
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const [selectedCustName, setSelectedCustName] = useState<string | null>(null);
+  const [isCustDetailOpen, setIsCustDetailOpen] = useState(false);
+  const [custDetailStartDate, setCustDetailStartDate] = useState('');
+  const [custDetailEndDate, setCustDetailEndDate] = useState('');
+
+  const [isEditEntryOpen, setIsEditEntryOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Partial<LedgerEntry>>({});
+
+  const safeLower = (str: any) => String(str || '').toLowerCase();
+
+  const filterData = <T extends { date: string, station?: string, name?: string }>(items: T[]) => {
+    return items.filter(item => {
+      const date = new Date(item.date);
+      
+      let dateMatch = true;
+      if (startDate || endDate) {
+        const dateStr = item.date.split('T')[0];
+        if (startDate && dateStr < startDate) dateMatch = false;
+        if (endDate && dateStr > endDate) dateMatch = false;
+      } else {
+        const yearMatch = date.getFullYear().toString() === filterYear;
+        const monthMatch = filterMonth === 'all' || date.toLocaleString('default', { month: 'long' }) === filterMonth;
+        dateMatch = yearMatch && monthMatch;
+      }
+
+      const stationMatch = filterStation === 'all' || item.station === filterStation;
+      
+      let customerMatch = true;
+      if (searchCustomer) {
+        customerMatch = !!safeLower(item.name).includes(safeLower(searchCustomer));
+      }
+
+      return dateMatch && stationMatch && customerMatch;
+    });
+  };
+
+  const handleExportCustomerLedger = (format: 'pdf' | 'excel') => {
+    const filteredRecords = [
+      ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
+        id: e.id, date: e.date, name: e.name, station: e.station || 'NWS', debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+      }))
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const totalDebit = filteredRecords.reduce((sum, r) => sum + r.debit, 0);
+    const totalCredit = filteredRecords.reduce((sum, r) => sum + r.credit, 0);
+    const currentBalance = totalDebit - totalCredit;
+
+    const targetCustomerName = searchCustomer || "All Customers";
+    const reportTitle = `Customer Ledger Statement - ${targetCustomerName}`;
+    const fileBaseName = `customer_ledger_${safeLower(targetCustomerName).replace(/[^a-z0-9]/g, '_')}`;
+
+    if (format === 'pdf') {
+      const headers = ['Date', 'Customer Name', 'Station', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
+      let runningBalance = 0;
+      const pdfData = filteredRecords.map(r => {
+        runningBalance += (r.debit - r.credit);
+        return [
+          new Date(r.date).toLocaleDateString(),
+          r.name || 'Unknown',
+          r.station || 'NWS',
+          `Rs. ${r.debit.toLocaleString()}`,
+          `Rs. ${r.credit.toLocaleString()}`,
+          `Rs. ${runningBalance.toLocaleString()}`
+        ];
+      });
+
+      pdfData.push([]);
+      pdfData.push(['', '', 'TOTAL DEBIT (SALES):', `Rs. ${totalDebit.toLocaleString()}`, '', '']);
+      pdfData.push(['', '', 'TOTAL CREDIT (PAID):', `Rs. ${totalCredit.toLocaleString()}`, '', '']);
+      pdfData.push(['', '', 'CLOSING BALANCE:', `Rs. ${currentBalance.toLocaleString()}`, '', '']);
+
+      exportToPDF(reportTitle, headers, pdfData, fileBaseName);
+    } else {
+      let runningBalance = 0;
+      const excelData = filteredRecords.map(r => {
+        runningBalance += (r.debit - r.credit);
+        return {
+          'Date': new Date(r.date).toLocaleDateString(),
+          'Customer Name': r.name || 'Unknown',
+          'Station/City': r.station || 'NWS',
+          'Debit (Sales) (Rs.)': r.debit,
+          'Credit (Paid) (Rs.)': r.credit,
+          'Running Balance (Rs.)': runningBalance
+        };
+      });
+
+      excelData.push({
+        'Date': 'TOTAL DEBIT:',
+        'Customer Name': totalDebit,
+        'Station/City': 'TOTAL CREDIT:',
+        'Debit (Sales) (Rs.)': totalCredit,
+        'Credit (Paid) (Rs.)': 'CLOSING BALANCE:',
+        'Running Balance (Rs.)': currentBalance
+      } as any);
+
+      exportToExcel(excelData, fileBaseName, 'Customer Ledger');
+    }
+    toast.success(`Exported ${targetCustomerName} ledger statement successfully`);
+  };
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMethod>('cash');
   const [custName, setCustName] = useState('');
@@ -409,103 +521,188 @@ export default function DispatchPage() {
         }))}
       />
 
-      {/* Dispatch History */}
+      {/* Customer Ledger */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Dispatch History</CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="flex items-center gap-2 text-primary hover:bg-primary/5"
-            onClick={() => setShowSummary(true)}
-          >
-            <Eye className="h-4 w-4" /> Day Summary
-          </Button>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" /> Customer Ledger
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-2 text-primary hover:bg-primary/5"
+              onClick={() => setShowSummary(true)}
+            >
+              <Eye className="h-4 w-4" /> Day Summary
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          <div className="space-y-4 mb-6 p-4 bg-muted/30 rounded-lg border">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold uppercase text-slate-500">Year:</Label>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['2023', '2024', '2025', '2026', '2027'].map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold uppercase text-slate-500">Month:</Label>
+                <Select value={filterMonth} onValueChange={setFilterMonth}>
+                  <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Months</SelectItem>
+                    {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold uppercase text-slate-500">City/Station:</Label>
+                <Select value={filterStation} onValueChange={setFilterStation}>
+                  <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Cities</SelectItem>
+                    {Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer').map(e => e.station).filter(Boolean))).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold uppercase text-slate-500">Search Customer:</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input placeholder="Customer name..." value={searchCustomer} onChange={e => setSearchCustomer(e.target.value)} className="pl-7 h-8 text-xs w-40 bg-background" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 bg-muted/20 p-2 rounded-md border">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase text-slate-500">From:</span>
+                <div className="relative flex items-center">
+                  <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:light] dark:[color-scheme:dark]"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase text-slate-500">To:</span>
+                <div className="relative flex items-center">
+                  <CalendarDays className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-primary pointer-events-none z-10" />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="h-8 pl-7 pr-2 text-xs w-36 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:light] dark:[color-scheme:dark]"
+                  />
+                </div>
+              </div>
+              {(startDate || endDate || searchCustomer) && (
+                <Button variant="ghost" size="sm" onClick={() => { setStartDate(''); setEndDate(''); setSearchCustomer(''); }} className="h-8 text-xs text-muted-foreground hover:text-foreground">
+                  Clear
+                </Button>
+              )}
+              <div className="flex items-center gap-2 ml-auto">
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium shadow-sm transition-colors" onClick={() => handleExportCustomerLedger('pdf')}>
+                  <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 font-medium shadow-sm transition-colors" onClick={() => handleExportCustomerLedger('excel')}>
+                  <FileDown className="h-3.5 w-3.5 text-primary" /> Export Excel
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead>Customer Name</TableHead>
+                <TableHead>Station</TableHead>
+                <TableHead className="text-right">Debit (Sales)</TableHead>
+                <TableHead className="text-right">Credit (Paid)</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead className="text-right w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[...dispatches].reverse().map(d => (
-                <TableRow key={d.id}>
-                  <TableCell>{d.date}</TableCell>
-                  <TableCell><Badge variant="secondary">{destLabels[d.destination] || d.destination}</Badge></TableCell>
-                  <TableCell>
-                    {d.items.map(i => {
-                      const p = getProductById(i.productId);
-                      return <div key={i.productId} className="text-sm">{p?.name} × {i.quantity}</div>;
-                    })}
-                  </TableCell>
-                  <TableCell><Badge className="bg-success text-success-foreground">{d.status}</Badge></TableCell>
-                  <TableCell className="flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => printHistoryGOT(d.items, d.destination, d.tokenNumber)}
-                      className="h-8 w-8 p-0"
-                      title="Reprint GOT"
-                    >
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                    {!['branch_1', 'branch_2'].includes(d.destination) && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => {
-                          const items = d.items.map(i => ({
-                            name: getProductById(i.productId)?.name || 'Unknown',
-                            quantity: i.quantity,
-                            unitPrice: getProductById(i.productId)?.price || 0
-                          }));
-                          const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-                          
-                          // Find associated sale to get accurate payment method and sale ID
-                          const associatedSale = sales.find(s => {
-                            if (s.date !== d.date) return false;
-                            if (d.destination === 'walkin') {
-                              if (s.type !== 'factory_walkin') return false;
-                            } else {
-                              if (s.customerName !== d.destination) return false;
-                            }
-                            if (s.items.length !== d.items.length) return false;
-                            return s.items.every(si => 
-                              d.items.some(di => di.productId === si.productId && di.quantity === si.quantity)
-                            );
-                          });
+              {(() => {
+                const allCustomerRecords = [
+                  ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
+                    id: e.id,
+                    date: e.date,
+                    name: e.name,
+                    station: e.station || 'NWS',
+                    debit: e.debit,
+                    credit: e.credit,
+                    type: e.accountHead && e.accountHead.startsWith('Dispatched Sales') ? 'Dispatch' : 'Manual',
+                    accountHead: e.accountHead,
+                    isManual: true
+                  }))
+                ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-                          setReceiptData({
-                            open: true,
-                            items,
-                            total,
-                            paymentMethod: associatedSale?.paymentMethod || 'cash',
-                            saleId: associatedSale?.id || d.id,
-                            date: associatedSale?.date || d.date
-                          });
-                        }}
-                        className="h-8 w-8 p-0 text-primary"
-                        title="View/Reprint Receipt"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {dispatches.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No dispatches yet</TableCell></TableRow>
-              )}
+                if (allCustomerRecords.length === 0) return <TableRow><TableCell colSpan={7} className="text-center py-8">No customer data found</TableCell></TableRow>;
+                
+                return allCustomerRecords.map((rec, idx) => (
+                  <TableRow key={`${rec.id}-${idx}`}>
+                    <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span 
+                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline font-semibold cursor-pointer w-fit"
+                          onClick={() => {
+                            setSelectedCustName(rec.name || null);
+                            setCustDetailStartDate('');
+                            setCustDetailEndDate('');
+                            setIsCustDetailOpen(true);
+                          }}
+                        >
+                          {rec.name}
+                        </span>
+                        {rec.accountHead && (
+                          <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] break-words">
+                            {rec.accountHead}
+                          </span>
+                        )}
+                        <Badge variant="outline" className="w-fit text-[8px] h-3 px-1 mt-1">{rec.type}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px]">{rec.station}</Badge></TableCell>
+                    <TableCell className="text-right font-mono text-destructive">Rs. {rec.debit.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono text-success">Rs. {rec.credit.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono font-bold">Rs. {(rec.debit - rec.credit).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      {rec.isManual && (
+                        <div className="flex justify-end gap-2">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
+                            setEditingEntry(rec);
+                            setIsEditEntryOpen(true);
+                          }}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => {
+                            if (confirm(`Delete this ledger record?`)) deleteLedgerEntry(rec.id!);
+                          }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ));
+              })()}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
       <GOTDialog 
         open={showHistoryGOT}
         onClose={() => setShowHistoryGOT(false)}
@@ -513,6 +710,316 @@ export default function DispatchPage() {
         tokenNumber={historyToken}
         items={historyItems}
       />
+
+      {/* Individual Customer Detailed Ledger Dialog */}
+      <Dialog open={isCustDetailOpen} onOpenChange={setIsCustDetailOpen}>
+        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-background">
+          <DialogHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl font-bold text-white">
+                  Customer Detailed Statement
+                </DialogTitle>
+                <DialogDescription className="text-indigo-100 text-sm mt-0.5">
+                  Account Ledger statement for <span className="font-bold underline">{selectedCustName}</span>
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="px-6 py-5 space-y-6 max-h-[80vh] overflow-y-auto">
+            {/* Stats Summary Cards */}
+            {(() => {
+              const customerManual = ledgerEntries.filter(e => e.category === 'customer' && e.name === selectedCustName);
+              const totalDebit = customerManual.reduce((sum, e) => sum + e.debit, 0);
+              const totalCredit = customerManual.reduce((sum, e) => sum + e.credit, 0);
+              const balance = totalDebit - totalCredit;
+              const station = customerManual.length > 0 ? customerManual[0].station : 'Factory Gate';
+
+              const filteredModalEntries = customerManual.filter(entry => {
+                if (custDetailStartDate || custDetailEndDate) {
+                  const dateStr = entry.date.split('T')[0];
+                  if (custDetailStartDate && dateStr < custDetailStartDate) return false;
+                  if (custDetailEndDate && dateStr > custDetailEndDate) return false;
+                }
+                return true;
+              }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+              const modalDebit = filteredModalEntries.reduce((sum, r) => sum + r.debit, 0);
+              const modalCredit = filteredModalEntries.reduce((sum, r) => sum + r.credit, 0);
+              const modalBalance = modalDebit - modalCredit;
+
+              const exportSingleCustomer = (format: 'pdf' | 'excel') => {
+                const title = `Statement of Account - ${selectedCustName}`;
+                const fileBaseName = `statement_${(selectedCustName || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+                if (format === 'pdf') {
+                  const headers = ['Date', 'Details / Products', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
+                  let runningBal = 0;
+                  const pdfData = filteredModalEntries.map(r => {
+                    runningBal += (r.debit - r.credit);
+                    return [
+                      new Date(r.date).toLocaleDateString(),
+                      r.accountHead || 'Sales/Payment',
+                      `Rs. ${r.debit.toLocaleString()}`,
+                      `Rs. ${r.credit.toLocaleString()}`,
+                      `Rs. ${runningBal.toLocaleString()}`
+                    ];
+                  });
+                  pdfData.push([]);
+                  pdfData.push(['', 'TOTAL DEBIT:', `Rs. ${modalDebit.toLocaleString()}`, '', '']);
+                  pdfData.push(['', 'TOTAL CREDIT:', `Rs. ${modalCredit.toLocaleString()}`, '', '']);
+                  pdfData.push(['', 'CLOSING BALANCE:', `Rs. ${modalBalance.toLocaleString()}`, '', '']);
+
+                  exportToPDF(title, headers, pdfData, fileBaseName);
+                } else {
+                  let runningBal = 0;
+                  const excelData = filteredModalEntries.map(r => {
+                    runningBal += (r.debit - r.credit);
+                    return {
+                      'Date': new Date(r.date).toLocaleDateString(),
+                      'Details': r.accountHead || 'Sales/Payment',
+                      'Debit (Sales)': r.debit,
+                      'Credit (Paid)': r.credit,
+                      'Running Balance': runningBal
+                    };
+                  });
+                  excelData.push({
+                    'Date': 'TOTAL DEBIT:',
+                    'Details': modalDebit,
+                    'Debit (Sales)': 'TOTAL CREDIT:',
+                    'Credit (Paid)': modalCredit,
+                    'Running Balance': `BALANCE: ${modalBalance}`
+                  } as any);
+
+                  exportToExcel(excelData, fileBaseName, 'Customer Ledger');
+                }
+                toast.success(`Exported statement for ${selectedCustName}`);
+              };
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-muted/40 p-4 rounded-lg border flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">City/Station</span>
+                      <span className="text-lg font-bold text-foreground mt-1">{station}</span>
+                    </div>
+                    <div className="bg-destructive/5 dark:bg-destructive/10 p-4 rounded-lg border border-destructive/10 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-destructive tracking-wider">Total Sales (Debit)</span>
+                      <span className="text-xl font-extrabold text-destructive font-mono mt-1">Rs. {totalDebit.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-success/5 dark:bg-success/10 p-4 rounded-lg border border-success/10 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-success tracking-wider">Total Paid (Credit)</span>
+                      <span className="text-xl font-extrabold text-success font-mono mt-1">Rs. {totalCredit.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-indigo-50 dark:bg-indigo-950/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-900 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-300 tracking-wider">Outstanding Balance</span>
+                      <span className="text-xl font-extrabold text-indigo-700 dark:text-indigo-300 font-mono mt-1">Rs. {balance.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg border">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold uppercase text-muted-foreground">From:</span>
+                        <input
+                          type="date"
+                          value={custDetailStartDate}
+                          onChange={e => setCustDetailStartDate(e.target.value)}
+                          className="h-8 px-2 text-xs w-32 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold uppercase text-muted-foreground">To:</span>
+                        <input
+                          type="date"
+                          value={custDetailEndDate}
+                          onChange={e => setCustDetailEndDate(e.target.value)}
+                          className="h-8 px-2 text-xs w-32 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      {(custDetailStartDate || custDetailEndDate) && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => { setCustDetailStartDate(''); setCustDetailEndDate(''); }}
+                          className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Clear Filter
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 shadow-sm" onClick={() => exportSingleCustomer('pdf')}>
+                        <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 shadow-sm" onClick={() => exportSingleCustomer('excel')}>
+                        <FileDown className="h-3.5 w-3.5 text-primary" /> Export Excel
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden shadow-sm bg-background">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="w-[120px]">Date</TableHead>
+                          <TableHead>Details / Purchased Products</TableHead>
+                          <TableHead className="text-right w-[120px]">Debit (Sales)</TableHead>
+                          <TableHead className="text-right w-[120px]">Credit (Paid)</TableHead>
+                          <TableHead className="text-right w-[120px]">Balance</TableHead>
+                          <TableHead className="text-right w-[90px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredModalEntries.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No transactions found for the selected period
+                            </TableCell>
+                          </TableRow>
+                        ) : (() => {
+                          let rBal = 0;
+                          return filteredModalEntries.map((rec) => {
+                            rBal += (rec.debit - rec.credit);
+                            const entryType = rec.accountHead && rec.accountHead.startsWith('Dispatched Sales') ? 'Dispatch' : 'Manual';
+                            return (
+                              <TableRow key={rec.id}>
+                                <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="font-medium">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-foreground font-semibold">{rec.accountHead}</span>
+                                    <Badge variant="outline" className="w-fit text-[8px] h-3.5 px-1.5 mt-1">{entryType}</Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-destructive text-xs">Rs. {rec.debit.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-mono text-success text-xs">Rs. {rec.credit.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-mono font-bold text-xs">Rs. {rBal.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1.5">
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => {
+                                      setEditingEntry(rec);
+                                      setIsEditEntryOpen(true);
+                                    }}>
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => {
+                                      if (confirm(`Delete this ledger record?`)) {
+                                        deleteLedgerEntry(rec.id);
+                                        if (filteredModalEntries.length <= 1) {
+                                          setIsCustDetailOpen(false);
+                                        }
+                                      }
+                                    }}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          
+          <DialogFooter className="bg-slate-50 dark:bg-slate-900 px-6 py-3 border-t">
+            <Button size="sm" onClick={() => setIsCustDetailOpen(false)} className="rounded-lg px-5">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Ledger Entry Dialog */}
+      <Dialog open={isEditEntryOpen} onOpenChange={setIsEditEntryOpen}>
+        <DialogContent className="bg-background">
+          <DialogHeader>
+            <DialogTitle>Edit Ledger Entry</DialogTitle>
+            <DialogDescription>Update the details for this manual ledger entry.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2 col-span-2">
+              <Label>Date</Label>
+              <Input type="date" value={editingEntry.date?.split('T')[0]} onChange={e => setEditingEntry({...editingEntry, date: e.target.value})} />
+            </div>
+            
+            {(editingEntry.category === 'customer' || editingEntry.category === 'vendor') ? (
+              <>
+                <div className="space-y-2 col-span-2">
+                  <Label>{editingEntry.category === 'customer' ? 'Customer Name' : 'Vendor Name'}</Label>
+                  <Input value={editingEntry.name || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value})} />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label>Details / Description</Label>
+                  <Input value={editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, accountHead: e.target.value})} />
+                </div>
+                {editingEntry.category === 'customer' && (
+                  <div className="space-y-2 col-span-2">
+                    <Label>Station / City</Label>
+                    <Input value={editingEntry.station || ''} onChange={e => setEditingEntry({...editingEntry, station: e.target.value})} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 col-span-2">
+                  <Label>Name / Title of Account</Label>
+                  <Input value={editingEntry.name || editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value, accountHead: e.target.value})} />
+                </div>
+
+                {editingEntry.category === 'general' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Account No</Label>
+                      <Input value={editingEntry.accountNo || ''} onChange={e => setEditingEntry({...editingEntry, accountNo: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <Select value={editingEntry.accountType} onValueChange={v => setEditingEntry({...editingEntry, accountType: v as any})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Income">Income</SelectItem>
+                          <SelectItem value="Expense">Expense</SelectItem>
+                          <SelectItem value="Asset">Asset</SelectItem>
+                          <SelectItem value="Liability">Liability</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-destructive font-bold">Debit</Label>
+              <Input type="number" value={editingEntry.debit} onChange={e => setEditingEntry({...editingEntry, debit: Number(e.target.value)})} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-success font-bold">Credit</Label>
+              <Input type="number" value={editingEntry.credit} onChange={e => setEditingEntry({...editingEntry, credit: Number(e.target.value)})} />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Closing Balance</Label>
+              <Input type="number" value={editingEntry.closingBalance} onChange={e => setEditingEntry({...editingEntry, closingBalance: Number(e.target.value)})} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditEntryOpen(false)}>Cancel</Button>
+            <Button onClick={async () => {
+              if (editingEntry.id) {
+                await updateLedgerEntry(editingEntry.id, editingEntry);
+                setIsEditEntryOpen(false);
+              }
+            }}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

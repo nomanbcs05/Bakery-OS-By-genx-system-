@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
+import type { LedgerEntry } from '@/types';
 
 export default function Accounts() {
   const { 
