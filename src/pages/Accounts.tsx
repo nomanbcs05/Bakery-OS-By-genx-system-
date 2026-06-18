@@ -91,6 +91,12 @@ export default function Accounts() {
   const [isEditPurchaseOpen, setIsEditPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<{ id: string; date: string; vendorName: string; amountPaid: number; totalCost: number }>({ id: '', date: '', vendorName: '', amountPaid: 0, totalCost: 0 });
 
+  // Individual customer ledger modal states
+  const [selectedCustName, setSelectedCustName] = useState<string | null>(null);
+  const [isCustDetailOpen, setIsCustDetailOpen] = useState(false);
+  const [custDetailStartDate, setCustDetailStartDate] = useState('');
+  const [custDetailEndDate, setCustDetailEndDate] = useState('');
+
   const handleAddStaff = async () => {
     if (!newStaff.name || !newStaff.department || !newStaff.baseSalary) {
       toast.error("Please fill all fields");
@@ -774,6 +780,235 @@ export default function Accounts() {
           </DialogContent>
         </Dialog>
 
+        {/* Individual Customer Detailed Ledger Dialog */}
+        <Dialog open={isCustDetailOpen} onOpenChange={setIsCustDetailOpen}>
+          <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-background">
+            <DialogHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-xl font-bold text-white">
+                    Customer Detailed Statement
+                  </DialogTitle>
+                  <DialogDescription className="text-indigo-100 text-sm mt-0.5">
+                    Account Ledger statement for <span className="font-bold underline">{selectedCustName}</span>
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="px-6 py-5 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Stats Summary Cards */}
+              {(() => {
+                const customerManual = ledgerEntries.filter(e => e.category === 'customer' && e.name === selectedCustName);
+                const totalDebit = customerManual.reduce((sum, e) => sum + e.debit, 0);
+                const totalCredit = customerManual.reduce((sum, e) => sum + e.credit, 0);
+                const balance = totalDebit - totalCredit;
+                const station = customerManual.length > 0 ? customerManual[0].station : 'Factory Gate';
+
+                const filteredModalEntries = customerManual.filter(entry => {
+                  if (custDetailStartDate || custDetailEndDate) {
+                    const dateStr = entry.date.split('T')[0];
+                    if (custDetailStartDate && dateStr < custDetailStartDate) return false;
+                    if (custDetailEndDate && dateStr > custDetailEndDate) return false;
+                  }
+                  return true;
+                }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                // Calculate totals for export or PDF
+                const modalDebit = filteredModalEntries.reduce((sum, r) => sum + r.debit, 0);
+                const modalCredit = filteredModalEntries.reduce((sum, r) => sum + r.credit, 0);
+                const modalBalance = modalDebit - modalCredit;
+
+                const exportSingleCustomer = (format: 'pdf' | 'excel') => {
+                  const title = `Statement of Account - ${selectedCustName}`;
+                  const fileBaseName = `statement_${(selectedCustName || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+                  if (format === 'pdf') {
+                    const headers = ['Date', 'Details / Products', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
+                    let runningBal = 0;
+                    const pdfData = filteredModalEntries.map(r => {
+                      runningBal += (r.debit - r.credit);
+                      return [
+                        new Date(r.date).toLocaleDateString(),
+                        r.accountHead || 'Sales/Payment',
+                        `Rs. ${r.debit.toLocaleString()}`,
+                        `Rs. ${r.credit.toLocaleString()}`,
+                        `Rs. ${runningBal.toLocaleString()}`
+                      ];
+                    });
+                    pdfData.push([]);
+                    pdfData.push(['', 'TOTAL DEBIT:', `Rs. ${modalDebit.toLocaleString()}`, '', '']);
+                    pdfData.push(['', 'TOTAL CREDIT:', `Rs. ${modalCredit.toLocaleString()}`, '', '']);
+                    pdfData.push(['', 'CLOSING BALANCE:', `Rs. ${modalBalance.toLocaleString()}`, '', '']);
+
+                    exportToPDF(title, headers, pdfData, fileBaseName);
+                  } else {
+                    let runningBal = 0;
+                    const excelData = filteredModalEntries.map(r => {
+                      runningBal += (r.debit - r.credit);
+                      return {
+                        'Date': new Date(r.date).toLocaleDateString(),
+                        'Details': r.accountHead || 'Sales/Payment',
+                        'Debit (Sales)': r.debit,
+                        'Credit (Paid)': r.credit,
+                        'Running Balance': runningBal
+                      };
+                    });
+                    excelData.push({
+                      'Date': 'TOTAL DEBIT:',
+                      'Details': modalDebit,
+                      'Debit (Sales)': 'TOTAL CREDIT:',
+                      'Credit (Paid)': modalCredit,
+                      'Running Balance': `BALANCE: ${modalBalance}`
+                    } as any);
+
+                    exportToExcel(excelData, fileBaseName, 'Customer Ledger');
+                  }
+                  toast.success(`Exported statement for ${selectedCustName}`);
+                };
+
+                return (
+                  <>
+                    {/* Customer Info & Summary Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-muted/40 p-4 rounded-lg border flex flex-col justify-center">
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">City/Station</span>
+                        <span className="text-lg font-bold text-foreground mt-1">{station}</span>
+                      </div>
+                      <div className="bg-destructive/5 dark:bg-destructive/10 p-4 rounded-lg border border-destructive/10 flex flex-col justify-center">
+                        <span className="text-[10px] uppercase font-bold text-destructive tracking-wider">Total Sales (Debit)</span>
+                        <span className="text-xl font-extrabold text-destructive font-mono mt-1">Rs. {totalDebit.toLocaleString()}</span>
+                      </div>
+                      <div className="bg-success/5 dark:bg-success/10 p-4 rounded-lg border border-success/10 flex flex-col justify-center">
+                        <span className="text-[10px] uppercase font-bold text-success tracking-wider">Total Paid (Credit)</span>
+                        <span className="text-xl font-extrabold text-success font-mono mt-1">Rs. {totalCredit.toLocaleString()}</span>
+                      </div>
+                      <div className="bg-indigo-50 dark:bg-indigo-950/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-900 flex flex-col justify-center">
+                        <span className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-300 tracking-wider">Outstanding Balance</span>
+                        <span className="text-xl font-extrabold text-indigo-700 dark:text-indigo-300 font-mono mt-1">Rs. {balance.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Filter & Export Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg border">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold uppercase text-muted-foreground">From:</span>
+                          <input
+                            type="date"
+                            value={custDetailStartDate}
+                            onChange={e => setCustDetailStartDate(e.target.value)}
+                            className="h-8 px-2 text-xs w-32 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold uppercase text-muted-foreground">To:</span>
+                          <input
+                            type="date"
+                            value={custDetailEndDate}
+                            onChange={e => setCustDetailEndDate(e.target.value)}
+                            className="h-8 px-2 text-xs w-32 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        {(custDetailStartDate || custDetailEndDate) && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => { setCustDetailStartDate(''); setCustDetailEndDate(''); }}
+                            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear Filter
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 shadow-sm" onClick={() => exportSingleCustomer('pdf')}>
+                          <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 shadow-sm" onClick={() => exportSingleCustomer('excel')}>
+                          <FileDown className="h-3.5 w-3.5 text-primary" /> Export Excel
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Table View */}
+                    <div className="border rounded-lg overflow-hidden shadow-sm bg-background">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead className="w-[120px]">Date</TableHead>
+                            <TableHead>Details / Purchased Products</TableHead>
+                            <TableHead className="text-right w-[120px]">Debit (Sales)</TableHead>
+                            <TableHead className="text-right w-[120px]">Credit (Paid)</TableHead>
+                            <TableHead className="text-right w-[120px]">Balance</TableHead>
+                            <TableHead className="text-right w-[90px]">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredModalEntries.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                No transactions found for the selected period
+                              </TableCell>
+                            </TableRow>
+                          ) : (() => {
+                            let rBal = 0;
+                            return filteredModalEntries.map((rec) => {
+                              rBal += (rec.debit - rec.credit);
+                              const entryType = rec.accountHead && rec.accountHead.startsWith('Dispatched Sales') ? 'Dispatch' : 'Manual';
+                              return (
+                                <TableRow key={rec.id}>
+                                  <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
+                                  <TableCell className="font-medium">
+                                    <div className="flex flex-col">
+                                      <span className="text-xs text-foreground font-semibold">{rec.accountHead}</span>
+                                      <Badge variant="outline" className="w-fit text-[8px] h-3.5 px-1.5 mt-1">{entryType}</Badge>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-destructive text-xs">Rs. {rec.debit.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-mono text-success text-xs">Rs. {rec.credit.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-mono font-bold text-xs">Rs. {rBal.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-1.5">
+                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => {
+                                        setEditingEntry(rec);
+                                        setIsEditEntryOpen(true);
+                                      }}>
+                                        <Edit className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => {
+                                        if (confirm(`Delete this ledger record?`)) {
+                                          deleteLedgerEntry(rec.id);
+                                          if (filteredModalEntries.length <= 1) {
+                                            setIsCustDetailOpen(false);
+                                          }
+                                        }
+                                      }}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            });
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            
+            <DialogFooter className="bg-slate-50 dark:bg-slate-900 px-6 py-3 border-t">
+              <Button size="sm" onClick={() => setIsCustDetailOpen(false)} className="rounded-lg px-5">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <TabsContent value="overview">
           <Card>
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5" /> Staff Directory</CardTitle></CardHeader>
@@ -1358,7 +1593,17 @@ export default function Accounts() {
                           <TableCell className="text-xs">{new Date(rec.date).toLocaleDateString()}</TableCell>
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
-                              <span>{rec.name}</span>
+                              <span 
+                                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline font-semibold cursor-pointer w-fit"
+                                onClick={() => {
+                                  setSelectedCustName(rec.name || null);
+                                  setCustDetailStartDate('');
+                                  setCustDetailEndDate('');
+                                  setIsCustDetailOpen(true);
+                                }}
+                              >
+                                {rec.name}
+                              </span>
                               {rec.accountHead && (
                                 <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] break-words">
                                   {rec.accountHead}
