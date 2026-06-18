@@ -350,41 +350,79 @@ export default function POS({ branch }: POSProps) {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    
-                    <div className="flex items-center justify-between gap-2 bg-background/50 p-1 rounded-md border">
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-10 text-center text-sm font-bold">
-                          {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(2)}
-                        </span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        {product ? safeLower(product.unit) : '' === 'kg' && (
+                    <div className="flex flex-col gap-1.5 bg-background/50 p-1.5 rounded-md border">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-10 text-center text-sm font-bold">
+                            {Number.isInteger(item.quantity) ? item.quantity : item.quantity.toFixed(3)}
+                          </span>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQty(item.productId, 1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {product && safeLower(product.unit) === 'kg' && (
+                            <Button 
+                              variant="secondary" 
+                              size="icon" 
+                              className="h-7 w-7 text-primary shadow-sm" 
+                              onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
+                              title="Enter custom purchase amount"
+                            >
+                              <Calculator className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button 
                             variant="secondary" 
                             size="icon" 
-                            className="h-7 w-7 text-primary shadow-sm" 
-                            onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
+                            className="h-7 w-7 text-amber-600 shadow-sm" 
+                            onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
+                            title="Change custom/wholesale price"
                           >
-                            <Calculator className="h-3.5 w-3.5" />
+                            <Tag className="h-3.5 w-3.5" />
                           </Button>
-                        )}
-                        <Button 
-                          variant="secondary" 
-                          size="icon" 
-                          className="h-7 w-7 text-amber-600 shadow-sm" 
-                          onClick={() => setPricePrompt({ open: true, productId: item.productId, price: item.unitPrice.toString() })}
-                          title="Change custom/wholesale price"
-                        >
-                          <Tag className="h-3.5 w-3.5" />
-                        </Button>
+                        </div>
                       </div>
+                      {product && safeLower(product.unit) === 'kg' && (
+                        <div className="flex flex-col gap-1 mt-1 p-1 bg-primary/5 rounded border border-primary/10">
+                          <div className="text-[9px] font-black uppercase text-primary tracking-wider px-1">
+                            Buy by Amount (Rs.)
+                          </div>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {[100, 200, 300].map(amt => {
+                              const calculatedQty = amt / item.unitPrice;
+                              const isSelected = Math.abs(item.quantity * item.unitPrice - amt) < 0.1;
+                              return (
+                                <Button
+                                  key={amt}
+                                  variant={isSelected ? "default" : "outline"}
+                                  size="sm"
+                                  className="h-6 flex-1 text-[10px] font-bold py-0 px-1"
+                                  onClick={() => {
+                                    setCart(prev => prev.map(i => {
+                                      if (i.productId !== item.productId) return i;
+                                      return { ...i, quantity: calculatedQty };
+                                    }));
+                                  }}
+                                >
+                                  {amt}
+                                </Button>
+                              );
+                            })}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-1.5 text-[10px] font-bold text-primary hover:bg-primary hover:text-white"
+                              onClick={() => setAmountPrompt({ open: true, productId: item.productId, amount: '' })}
+                            >
+                              Custom
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
