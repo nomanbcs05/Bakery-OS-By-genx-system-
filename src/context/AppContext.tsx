@@ -1526,20 +1526,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const existingCust = ledgerEntriesRef.current.find(e => e.category === 'customer' && e.name === saleName);
         const station = customerStation || existingCust?.station || 'Factory Gate';
         const finalCredit = paymentMethod === 'cash' ? total : (amountPaid || 0);
-        const accountHead = paymentMethod === 'cash' ? 'Dispatch Cash Sale' : (finalCredit > 0 ? 'Dispatch Split Sale' : 'Dispatch Credit Sale');
-        
-        await addLedgerEntry({
-          date: today,
-          accountHead,
-          accountType: 'Asset',
-          debit: total,
-          credit: finalCredit,
-          name: saleName,
-          station: station,
-          accountNo: walkinSale.id,
-          closingBalance: 0,
-          category: 'customer'
-        });
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        const itemDetailsStr = items.map(i => {
+          const prod = products.find(p => p.id === i.productId);
+          return `${i.quantity}x ${prod?.name || 'Unknown'}`;
+        }).join(', ');
+        const newDetailsStr = `[${timeStr}] ${itemDetailsStr}`;
+
+        const existingEntry = ledgerEntriesRef.current.find(e => 
+          e.category === 'customer' && 
+          e.name === saleName && 
+          e.date === today &&
+          e.accountHead.startsWith('Dispatched Sales')
+        );
+
+        if (existingEntry) {
+          const newDebit = existingEntry.debit + total;
+          const newCredit = existingEntry.credit + finalCredit;
+          const newAccountHead = `${existingEntry.accountHead}; ${newDetailsStr}`;
+          const newAccountNo = existingEntry.accountNo ? `${existingEntry.accountNo},${walkinSale.id}` : walkinSale.id;
+          
+          await updateLedgerEntry(existingEntry.id, {
+            debit: newDebit,
+            credit: newCredit,
+            accountHead: newAccountHead,
+            accountNo: newAccountNo
+          });
+        } else {
+          const accountHead = `Dispatched Sales: ${newDetailsStr}`;
+          await addLedgerEntry({
+            date: today,
+            accountHead,
+            accountType: 'Asset',
+            debit: total,
+            credit: finalCredit,
+            name: saleName,
+            station: station,
+            accountNo: walkinSale.id,
+            closingBalance: 0,
+            category: 'customer'
+          });
+        }
       }
 
       return walkinSale.id;
@@ -1861,7 +1889,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateLedgerEntry = async (id: string, updates: Partial<LedgerEntry>) => {
     setLedgerEntries(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
     if (isOnline && hasSupabaseConfig) {
-      try { await supabase.from('ledger_entries').update(toDBLedgerEntry({ ...ledgerEntries.find(e => e.id === id)!, ...updates })).eq('id', id); } catch (err) { console.error(err); }
+      try {
+        const existing = ledgerEntriesRef.current.find(e => e.id === id);
+        if (existing) {
+          await supabase.from('ledger_entries').update(toDBLedgerEntry({ ...existing, ...updates })).eq('id', id);
+        }
+      } catch (err) { console.error('Ledger entry update error:', err); }
     }
   };
 

@@ -660,36 +660,50 @@ export default function Accounts() {
                 <Input type="date" value={editingEntry.date?.split('T')[0]} onChange={e => setEditingEntry({...editingEntry, date: e.target.value})} />
               </div>
               
-              <div className="space-y-2 col-span-2">
-                <Label>Name / Title of Account</Label>
-                <Input value={editingEntry.name || editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value, accountHead: e.target.value})} />
-              </div>
-
-              {editingEntry.category === 'customer' && (
-                <div className="space-y-2 col-span-2">
-                  <Label>Station / City</Label>
-                  <Input value={editingEntry.station || ''} onChange={e => setEditingEntry({...editingEntry, station: e.target.value})} />
-                </div>
-              )}
-
-              {editingEntry.category === 'general' && (
+              {(editingEntry.category === 'customer' || editingEntry.category === 'vendor') ? (
                 <>
-                  <div className="space-y-2">
-                    <Label>Account No</Label>
-                    <Input value={editingEntry.accountNo || ''} onChange={e => setEditingEntry({...editingEntry, accountNo: e.target.value})} />
+                  <div className="space-y-2 col-span-2">
+                    <Label>{editingEntry.category === 'customer' ? 'Customer Name' : 'Vendor Name'}</Label>
+                    <Input value={editingEntry.name || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value})} />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={editingEntry.accountType} onValueChange={v => setEditingEntry({...editingEntry, accountType: v as any})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Income">Income</SelectItem>
-                        <SelectItem value="Expense">Expense</SelectItem>
-                        <SelectItem value="Asset">Asset</SelectItem>
-                        <SelectItem value="Liability">Liability</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Details / Description</Label>
+                    <Input value={editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, accountHead: e.target.value})} />
                   </div>
+                  {editingEntry.category === 'customer' && (
+                    <div className="space-y-2 col-span-2">
+                      <Label>Station / City</Label>
+                      <Input value={editingEntry.station || ''} onChange={e => setEditingEntry({...editingEntry, station: e.target.value})} />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Name / Title of Account</Label>
+                    <Input value={editingEntry.name || editingEntry.accountHead || ''} onChange={e => setEditingEntry({...editingEntry, name: e.target.value, accountHead: e.target.value})} />
+                  </div>
+
+                  {editingEntry.category === 'general' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Account No</Label>
+                        <Input value={editingEntry.accountNo || ''} onChange={e => setEditingEntry({...editingEntry, accountNo: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select value={editingEntry.accountType} onValueChange={v => setEditingEntry({...editingEntry, accountType: v as any})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Income">Income</SelectItem>
+                            <SelectItem value="Expense">Expense</SelectItem>
+                            <SelectItem value="Asset">Asset</SelectItem>
+                            <SelectItem value="Liability">Liability</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -937,6 +951,10 @@ export default function Accounts() {
                               <Label>Title of Account (Vendor Name)</Label>
                               <Input value={manualEntry.name} onChange={e => setManualEntry({...manualEntry, name: e.target.value})} placeholder="e.g. Ali Traders" />
                             </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Details / Description</Label>
+                              <Input value={manualEntry.accountHead} onChange={e => setManualEntry({...manualEntry, accountHead: e.target.value})} placeholder="e.g. Raw material purchase, Payment, etc." />
+                            </div>
                             <div className="space-y-2">
                               <Label className="text-success font-bold">Debit (Paid)</Label>
                               <Input type="number" value={manualEntry.debit} onChange={e => setManualEntry({...manualEntry, debit: e.target.value})} placeholder="0.00" />
@@ -961,6 +979,10 @@ export default function Accounts() {
                             <div className="space-y-2">
                               <Label>Station / City</Label>
                               <Input value={manualEntry.station} onChange={e => setManualEntry({...manualEntry, station: e.target.value})} placeholder="e.g. Nawabshah" />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label>Details / Description</Label>
+                              <Input value={manualEntry.accountHead} onChange={e => setManualEntry({...manualEntry, accountHead: e.target.value})} placeholder="e.g. Customer balance, Payment, etc." />
                             </div>
                             <div className="space-y-2">
                               <Label className="text-destructive font-bold">Debit (Sales)</Label>
@@ -1213,10 +1235,10 @@ export default function Accounts() {
 
                       const allVendorRecords = [
                         ...filterData(purchases).map(p => ({
-                          id: p.id, date: p.date, name: p.vendorName, debit: p.amountPaid, credit: p.totalCost, type: 'Purchase'
+                          id: p.id, date: p.date, name: p.vendorName, debit: p.amountPaid, credit: p.totalCost, type: 'Purchase', accountHead: 'Purchase Record'
                         })),
                         ...filterData(ledgerEntries.filter(e => e.category === 'vendor')).map(e => ({
-                          id: e.id, date: e.date, name: e.name, debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+                          id: e.id, date: e.date, name: e.name, debit: e.debit, credit: e.credit, type: 'Manual', isManual: true, accountHead: e.accountHead
                         }))
                       ]
                       .filter(rec => !searchVendor || safeLower(rec.name).includes(safeLower(searchVendor)))
@@ -1230,6 +1252,11 @@ export default function Accounts() {
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
                               <span>{rec.name}</span>
+                              {rec.accountHead && (
+                                <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] break-words">
+                                  {rec.accountHead}
+                                </span>
+                              )}
                               <Badge variant="outline" className="w-fit text-[8px] h-3 px-1 mt-1">{rec.type}</Badge>
                             </div>
                           </TableCell>
@@ -1312,7 +1339,15 @@ export default function Accounts() {
 
                       const allCustomerRecords = [
                         ...filterData(ledgerEntries.filter(e => e.category === 'customer')).map(e => ({
-                          id: e.id, date: e.date, name: e.name, station: e.station || 'NWS', debit: e.debit, credit: e.credit, type: 'Manual', isManual: true
+                          id: e.id,
+                          date: e.date,
+                          name: e.name,
+                          station: e.station || 'NWS',
+                          debit: e.debit,
+                          credit: e.credit,
+                          type: e.accountHead && e.accountHead.startsWith('Dispatched Sales') ? 'Dispatch' : 'Manual',
+                          accountHead: e.accountHead,
+                          isManual: true
                         }))
                       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -1324,6 +1359,11 @@ export default function Accounts() {
                           <TableCell className="font-medium">
                             <div className="flex flex-col">
                               <span>{rec.name}</span>
+                              {rec.accountHead && (
+                                <span className="text-[10px] text-muted-foreground mt-0.5 max-w-[300px] break-words">
+                                  {rec.accountHead}
+                                </span>
+                              )}
                               <Badge variant="outline" className="w-fit text-[8px] h-3 px-1 mt-1">{rec.type}</Badge>
                             </div>
                           </TableCell>
