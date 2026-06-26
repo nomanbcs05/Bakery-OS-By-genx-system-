@@ -196,6 +196,7 @@ interface AppContextType extends AppState {
   clearPurchases: () => Promise<void>;
   clearExpenses: () => Promise<void>;
   clearSalaryVouchers: () => Promise<void>;
+  clearStaffDeductions: () => Promise<void>;
   ledgerEntries: LedgerEntry[];
   addLedgerEntry: (entry: Omit<LedgerEntry, 'id' | 'syncStatus'>) => Promise<void>;
   clearLedgerEntries: (category: 'general' | 'customer' | 'vendor') => Promise<void>;
@@ -880,11 +881,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [products, batches, dispatches, sales, branchStockAdjustments]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn('Session recovery error:', error.message);
+        supabase.auth.signOut().catch(() => {});
+        setIsLoading(false);
+        return;
+      }
       if (session?.user) fetchUserProfile(session.user.id);
       else setIsLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) fetchUserProfile(session.user.id);
       else { 
         setCurrentUser(null); 
@@ -1096,8 +1103,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAuditLogs(prev => [...prev, log]);
     if (isOnline && hasSupabaseConfig) {
       try {
-        await supabase.from('audit_logs').insert([toDBLog(log)]);
-      } catch (err) { console.warn('Failed to log to cloud'); }
+        const { error } = await supabase.from('audit_logs').insert([toDBLog(log)]);
+        if (error) console.warn('Cloud audit log failed:', error.message);
+      } catch (err) { console.warn('Failed to log to cloud:', err); }
     }
   }, [currentUser, isOnline]);
 

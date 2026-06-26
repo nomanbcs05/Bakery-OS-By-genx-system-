@@ -84,7 +84,8 @@ self.addEventListener('fetch', (event) => {
 
         return response;
       }).catch((err) => {
-        throw err;
+        console.warn('Fetch failed:', err);
+        return new Response('Offline / Network error', { status: 503, statusText: 'Service Unavailable' });
       });
     })
   );
