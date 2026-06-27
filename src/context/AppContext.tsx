@@ -6,7 +6,8 @@ import type {
   StaffMember, StaffDeduction, SalaryVoucher, AdvanceOrder, DBAdvanceOrder,
   DBProduct, DBProductionBatch, DBSale, DBAuditLog, DBExpense, DBDispatch, DBRawMaterial, DBRawMaterialAdjustment, DBBranchStockAdjustment,
   DBStaffMember, DBStaffDeduction, DBSalaryVoucher, Purchase, DBPurchase,
-  Department, DepartmentTransfer, DBDepartment, DBDepartmentTransfer
+  Department, DepartmentTransfer, DBDepartment, DBDepartmentTransfer,
+  LedgerEntry, DBLedgerEntry
 } from '@/types';
 import { toast } from 'sonner';
 import { supabase, hasSupabaseConfig } from '@/lib/supabase';
@@ -617,7 +618,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hasInitialFetched = useRef(false);
   const activeFetches = useRef<Map<string, Promise<any>>>(new Map());
   const dataCache = useRef<Map<string, { data: any, timestamp: number }>>(new Map());
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+  const CACHE_TTL = 30 * 1000; // 30 seconds cache
+
+  const invalidateCache = useCallback((table: string) => {
+    for (const key of dataCache.current.keys()) {
+      if (key.startsWith(`${table}-`)) {
+        dataCache.current.delete(key);
+      }
+    }
+  }, []);
 
   // Standardized Column Selections to ensure deduplication works
   const SALES_COLS = 'id,type,branch,items,total,payment_method,customer_name,customer_phone,is_credit_paid,date,sync_status';
@@ -826,7 +835,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isOnline && hasSupabaseConfig && currentUser) {
-      const pullInterval = setInterval(() => fetchData(), 300000); // Polling every 5 minutes instead of 30s
+      const pullInterval = setInterval(() => fetchData(), 60000); // Polling every 60 seconds
       const pushInterval = setInterval(() => syncOfflineData(), 15000);
       return () => { clearInterval(pullInterval); clearInterval(pushInterval); };
     }
@@ -958,6 +967,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } else if (p.eventType === 'DELETE') {
             setSales(prev => prev.filter(s => s.id !== (p.old as any).id));
           }
+          invalidateCache('sales');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'production_batches' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -967,7 +977,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               if (idx === -1) return [...prev, b];
               const next = [...prev]; next[idx] = b; return next;
             });
+          } else if (p.eventType === 'DELETE') {
+            setBatches(prev => prev.filter(b => b.id !== (p.old as any).id));
           }
+          invalidateCache('production_batches');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'dispatches' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -977,7 +990,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               if (idx === -1) return [...prev, d];
               const next = [...prev]; next[idx] = d; return next;
             });
+          } else if (p.eventType === 'DELETE') {
+            setDispatches(prev => prev.filter(d => d.id !== (p.old as any).id));
           }
+          invalidateCache('dispatches');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -987,7 +1003,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               if (idx === -1) return [...prev, pr];
               const next = [...prev]; next[idx] = pr; return next;
             });
+          } else if (p.eventType === 'DELETE') {
+            setProducts(prev => prev.filter(pr => pr.id !== (p.old as any).id));
           }
+          invalidateCache('products');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'raw_materials' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -997,7 +1016,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               if (idx === -1) return [...prev, rm];
               const next = [...prev]; next[idx] = rm; return next;
             });
+          } else if (p.eventType === 'DELETE') {
+            setRawMaterials(prev => prev.filter(rm => rm.id !== (p.old as any).id));
           }
+          invalidateCache('raw_materials');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -1014,6 +1036,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               });
             }
           }
+          invalidateCache('app_settings');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'advance_orders' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -1026,6 +1049,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } else if (p.eventType === 'DELETE') {
             setAdvanceOrders(prev => prev.filter(o => o.id !== (p.old as any).id));
           }
+          invalidateCache('advance_orders');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'departments' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -1038,6 +1062,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } else if (p.eventType === 'DELETE') {
             setDepartments(prev => prev.filter(d => d.id !== (p.old as any).id));
           }
+          invalidateCache('departments');
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'department_transfers' }, (p) => {
           if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
@@ -1050,6 +1075,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } else if (p.eventType === 'DELETE') {
             setDepartmentTransfers(prev => prev.filter(t => t.id !== (p.old as any).id));
           }
+          invalidateCache('department_transfers');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const exp = fromDBExpense(p.new as DBExpense);
+            setExpenses(prev => {
+              const idx = prev.findIndex(x => x.id === exp.id);
+              if (idx === -1) return [...prev, exp];
+              const next = [...prev]; next[idx] = exp; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setExpenses(prev => prev.filter(e => e.id !== (p.old as any).id));
+          }
+          invalidateCache('expenses');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_entries' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const entry = fromDBLedgerEntry(p.new as DBLedgerEntry);
+            setLedgerEntries(prev => {
+              const idx = prev.findIndex(x => x.id === entry.id);
+              if (idx === -1) return [...prev, entry];
+              const next = [...prev]; next[idx] = entry; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setLedgerEntries(prev => prev.filter(e => e.id !== (p.old as any).id));
+          }
+          invalidateCache('ledger_entries');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const pur = fromDBPurchase(p.new as DBPurchase);
+            setPurchases(prev => {
+              const idx = prev.findIndex(x => x.id === pur.id);
+              if (idx === -1) return [...prev, pur];
+              const next = [...prev]; next[idx] = pur; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setPurchases(prev => prev.filter(pur => pur.id !== (p.old as any).id));
+          }
+          invalidateCache('purchases');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'raw_material_adjustments' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const adj = fromDBRawAdjustment(p.new as DBRawMaterialAdjustment);
+            setRawMaterialAdjustments(prev => {
+              const idx = prev.findIndex(x => x.id === adj.id);
+              if (idx === -1) return [...prev, adj];
+              const next = [...prev]; next[idx] = adj; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setRawMaterialAdjustments(prev => prev.filter(a => a.id !== (p.old as any).id));
+          }
+          invalidateCache('raw_material_adjustments');
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {

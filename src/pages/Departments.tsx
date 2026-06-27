@@ -35,6 +35,22 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 
+const getLocalDateString = (offsetDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getFirstDayOfCurrentMonthLocalString = () => {
+  const d = new Date();
+  d.setDate(1); // Set to 1st of the month
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().slice(0, 10);
+};
+
 export default function Departments() {
   const { 
     currentUser, 
@@ -59,17 +75,27 @@ export default function Departments() {
     if (activeTab === 'dashboard') {
       setSearchTerm('');
       setDeptFilter('all');
-      setStartDateFilter('');
-      setEndDateFilter('');
+      setStartDateFilter(getLocalDateString(0));
+      setEndDateFilter(getLocalDateString(0));
+      setActivePreset('Today');
       setSelectedTransferIds(new Set());
     }
   }, [activeTab]);
 
+  const presets = [
+    { label: 'Today', getValue: () => ({ start: getLocalDateString(0), end: getLocalDateString(0) }) },
+    { label: 'Yesterday', getValue: () => ({ start: getLocalDateString(1), end: getLocalDateString(1) }) },
+    { label: 'Last 7 Days', getValue: () => ({ start: getLocalDateString(6), end: getLocalDateString(0) }) },
+    { label: 'This Month', getValue: () => ({ start: getFirstDayOfCurrentMonthLocalString(), end: getLocalDateString(0) }) },
+    { label: 'All Time', getValue: () => ({ start: '', end: '' }) },
+  ];
+
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
-  const [startDateFilter, setStartDateFilter] = useState(new Date().toISOString().split('T')[0]);
-  const [endDateFilter, setEndDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [startDateFilter, setStartDateFilter] = useState(() => getLocalDateString(0));
+  const [endDateFilter, setEndDateFilter] = useState(() => getLocalDateString(0));
+  const [activePreset, setActivePreset] = useState('Today');
 
   // Modals state
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
@@ -420,20 +446,80 @@ export default function Departments() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-100 p-1 rounded-2xl grid grid-cols-3 max-w-md">
-          <TabsTrigger value="dashboard" className="rounded-xl text-xs font-bold uppercase tracking-wider">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="transfers" className="rounded-xl text-xs font-bold uppercase tracking-wider">
-            <ClipboardList className="h-4 w-4 mr-2" />
-            Transfers Logs
-          </TabsTrigger>
-          <TabsTrigger value="departments" className="rounded-xl text-xs font-bold uppercase tracking-wider">
-            <Layers3 className="h-4 w-4 mr-2" />
-            Departments
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <TabsList className="bg-slate-100 p-1 rounded-2xl grid grid-cols-3 w-full lg:max-w-md">
+            <TabsTrigger value="dashboard" className="rounded-xl text-xs font-bold uppercase tracking-wider">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="transfers" className="rounded-xl text-xs font-bold uppercase tracking-wider">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Transfers Logs
+            </TabsTrigger>
+            <TabsTrigger value="departments" className="rounded-xl text-xs font-bold uppercase tracking-wider">
+              <Layers3 className="h-4 w-4 mr-2" />
+              Departments
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Unified Date Preset Filter Bar */}
+          {(activeTab === 'dashboard' || activeTab === 'transfers') && (
+            <div className="bg-white p-2 px-3 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-start">
+              {/* Presets */}
+              <div className="flex flex-wrap gap-1">
+                {presets.map(p => (
+                  <button
+                    key={p.label}
+                    onClick={() => {
+                      const { start, end } = p.getValue();
+                      setStartDateFilter(start);
+                      setEndDateFilter(end);
+                      setActivePreset(p.label);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 ${
+                      activePreset === p.label
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+              {/* Custom Inputs */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 text-[10px] font-bold text-slate-500">
+                  <span className="text-[9px] text-slate-400">FROM</span>
+                  <input
+                    type="date"
+                    value={startDateFilter}
+                    onChange={(e) => {
+                      setStartDateFilter(e.target.value);
+                      setActivePreset('Custom');
+                    }}
+                    className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer p-0 w-24 text-[10px]"
+                  />
+                </div>
+                <span className="text-slate-300 font-bold text-xs">—</span>
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 text-[10px] font-bold text-slate-500">
+                  <span className="text-[9px] text-slate-400">TO</span>
+                  <input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => {
+                      setEndDateFilter(e.target.value);
+                      setActivePreset('Custom');
+                    }}
+                    className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer p-0 w-24 text-[10px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* TAB 1: DASHBOARD / CHARTS */}
         <TabsContent value="dashboard" className="space-y-6 focus-visible:outline-none">
@@ -491,37 +577,10 @@ export default function Departments() {
           {/* Graphs Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-0 shadow-xl shadow-slate-100 rounded-3xl bg-white">
-              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-50 pb-5">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 pb-5">
                 <div>
                   <CardTitle className="text-lg font-black text-slate-900">Department-wise Material Costs</CardTitle>
                   <CardDescription>Value of materials sent, consumed, and leftover</CardDescription>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">From:</span>
-                    <Input 
-                      type="date" 
-                      id="dateSelectStart"
-                      className="max-w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                      value={startDateFilter}
-                      onChange={e => setStartDateFilter(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400">To:</span>
-                    <Input 
-                      type="date" 
-                      id="dateSelectEnd"
-                      className="max-w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                      value={endDateFilter}
-                      onChange={e => setEndDateFilter(e.target.value)}
-                    />
-                  </div>
-                  {(startDateFilter || endDateFilter) && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900" onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
@@ -608,7 +667,14 @@ export default function Departments() {
             <CardHeader className="border-b border-slate-50 pb-5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <CardTitle className="text-lg font-black text-slate-900">Daily Transfers Log</CardTitle>
+                  <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                    Daily Transfers Log
+                    {filteredTransfers.length > 0 && (
+                      <Badge variant="outline" className="text-[10px] font-bold text-slate-500 bg-slate-50 border-slate-200 px-2.5 py-0.5 rounded-full">
+                        {filteredTransfers.length} {filteredTransfers.length === 1 ? 'Record' : 'Records'}
+                      </Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription>Track sent materials, leftover entries, and main store returns</CardDescription>
                 </div>
                 
@@ -636,30 +702,6 @@ export default function Departments() {
                     </SelectContent>
                   </Select>
 
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 hidden sm:inline">From:</span>
-                    <Input 
-                      type="date"
-                      className="w-full sm:w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                      value={startDateFilter}
-                      onChange={e => setStartDateFilter(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 hidden sm:inline">To:</span>
-                    <Input 
-                      type="date"
-                      className="w-full sm:w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                      value={endDateFilter}
-                      onChange={e => setEndDateFilter(e.target.value)}
-                    />
-                  </div>
-                  {(startDateFilter || endDateFilter) && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-
                   {selectedTransferIds.size > 0 && (
                     <Button
                       variant="outline"
@@ -677,16 +719,16 @@ export default function Departments() {
                     onClick={() => {
                       setSearchTerm('');
                       setDeptFilter('all');
-                      setStartDateFilter('');
-                      setEndDateFilter('');
+                      setStartDateFilter(getLocalDateString(0));
+                      setEndDateFilter(getLocalDateString(0));
+                      setActivePreset('Today');
                       setSelectedTransferIds(new Set());
                     }}
-                    className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ml-2"
+                    className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
                   >
                     Clear Filters
                   </Button>
 
-                  {/* Export PDF Button */}
                   {/* Export Options Dropdown */}
                   <Select value="" onValueChange={(value) => {
                     if (value === 'pdf') {
