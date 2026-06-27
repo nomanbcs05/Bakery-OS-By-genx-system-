@@ -28,7 +28,8 @@ import {
   Layers, 
   Search, 
   Clock,
-  Layers3
+  Layers3,
+  X
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -58,7 +59,8 @@ export default function Departments() {
     if (activeTab === 'dashboard') {
       setSearchTerm('');
       setDeptFilter('all');
-      setDateFilter('');
+      setStartDateFilter('');
+      setEndDateFilter('');
       setSelectedTransferIds(new Set());
     }
   }, [activeTab]);
@@ -66,7 +68,8 @@ export default function Departments() {
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [startDateFilter, setStartDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [endDateFilter, setEndDateFilter] = useState(new Date().toISOString().split('T')[0]);
 
   // Modals state
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
@@ -121,14 +124,31 @@ export default function Departments() {
     
     const matchesSearch = material ? safeLower(material.name).includes(safeLower(searchTerm)) : false;
     const matchesDept = deptFilter === 'all' || t.departmentId === deptFilter;
-    const matchesDate = !dateFilter || t.date === dateFilter;
+    
+    let matchesDate = true;
+    if (startDateFilter) {
+      matchesDate = matchesDate && t.date >= startDateFilter;
+    }
+    if (endDateFilter) {
+      matchesDate = matchesDate && t.date <= endDateFilter;
+    }
 
     return matchesSearch && matchesDept && matchesDate;
   });
 
   // Chart 1: Department Cost Breakdown (Sent vs Leftover vs Used) for selected date or overall
   const deptCostChartData = activeDepartments.map(dept => {
-    const transfers = departmentTransfers.filter(t => t.departmentId === dept.id && (dateFilter ? t.date === dateFilter : true));
+    const transfers = departmentTransfers.filter(t => {
+      const matchesDept = t.departmentId === dept.id;
+      let matchesDate = true;
+      if (startDateFilter) {
+        matchesDate = matchesDate && t.date >= startDateFilter;
+      }
+      if (endDateFilter) {
+        matchesDate = matchesDate && t.date <= endDateFilter;
+      }
+      return matchesDept && matchesDate;
+    });
     const sentVal = transfers.reduce((sum, t) => sum + (t.quantitySent * t.costPerUnit), 0);
     const leftoverVal = transfers.filter(t => t.isVerified).reduce((sum, t) => sum + ((t.quantityLeftover || 0) * t.costPerUnit), 0);
     const usedVal = transfers.reduce((sum, t) => {
@@ -147,7 +167,17 @@ export default function Departments() {
 
   // Chart 2: Top Raw Materials sent to Departments (Total Cost)
   const matPieChartData = activeMaterials.map(mat => {
-    const transfers = departmentTransfers.filter(t => t.materialId === mat.id && (dateFilter ? t.date === dateFilter : true));
+    const transfers = departmentTransfers.filter(t => {
+      const matchesMaterial = t.materialId === mat.id;
+      let matchesDate = true;
+      if (startDateFilter) {
+        matchesDate = matchesDate && t.date >= startDateFilter;
+      }
+      if (endDateFilter) {
+        matchesDate = matchesDate && t.date <= endDateFilter;
+      }
+      return matchesMaterial && matchesDate;
+    });
     const totalCost = transfers.reduce((sum, t) => sum + (t.quantitySent * t.costPerUnit), 0);
     return {
       name: mat.name,
@@ -466,18 +496,30 @@ export default function Departments() {
                   <CardTitle className="text-lg font-black text-slate-900">Department-wise Material Costs</CardTitle>
                   <CardDescription>Value of materials sent, consumed, and leftover</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="dateSelect" className="sr-only">Select Date</Label>
-                  <Input 
-                    type="date" 
-                    id="dateSelect"
-                    className="max-w-[150px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                    value={dateFilter}
-                    onChange={e => setDateFilter(e.target.value)}
-                  />
-                  {dateFilter && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900" onClick={() => setDateFilter('')}>
-                      Clear
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400">From:</span>
+                    <Input 
+                      type="date" 
+                      id="dateSelectStart"
+                      className="max-w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
+                      value={startDateFilter}
+                      onChange={e => setStartDateFilter(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400">To:</span>
+                    <Input 
+                      type="date" 
+                      id="dateSelectEnd"
+                      className="max-w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
+                      value={endDateFilter}
+                      onChange={e => setEndDateFilter(e.target.value)}
+                    />
+                  </div>
+                  {(startDateFilter || endDateFilter) && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-900" onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}>
+                      <X className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
@@ -594,15 +636,27 @@ export default function Departments() {
                     </SelectContent>
                   </Select>
 
-                  <Input 
-                    type="date"
-                    className="w-full sm:w-[150px] rounded-xl text-xs bg-slate-50 border-slate-200"
-                    value={dateFilter}
-                    onChange={e => setDateFilter(e.target.value)}
-                  />
-                  {dateFilter && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => setDateFilter('')}>
-                      Clear
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 hidden sm:inline">From:</span>
+                    <Input 
+                      type="date"
+                      className="w-full sm:w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
+                      value={startDateFilter}
+                      onChange={e => setStartDateFilter(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 hidden sm:inline">To:</span>
+                    <Input 
+                      type="date"
+                      className="w-full sm:w-[130px] rounded-xl text-xs bg-slate-50 border-slate-200"
+                      value={endDateFilter}
+                      onChange={e => setEndDateFilter(e.target.value)}
+                    />
+                  </div>
+                  {(startDateFilter || endDateFilter) && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}>
+                      <X className="h-4 w-4" />
                     </Button>
                   )}
 
@@ -623,7 +677,8 @@ export default function Departments() {
                     onClick={() => {
                       setSearchTerm('');
                       setDeptFilter('all');
-                      setDateFilter('');
+                      setStartDateFilter('');
+                      setEndDateFilter('');
                       setSelectedTransferIds(new Set());
                     }}
                     className="rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ml-2"
