@@ -343,7 +343,7 @@ export default function DispatchPage() {
                 <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
               </Button>
             ) : (
-              <Button onClick={handleDispatch} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
+              <Button onClick={() => handleDispatch()} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
                 Confirm Dispatch
               </Button>
             )}
