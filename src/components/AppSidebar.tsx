@@ -1,6 +1,6 @@
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
-  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard, Cloud, CloudOff, ShoppingBag, TestTube2, ClipboardList, History
+  BarChart3, Receipt, Settings, LogOut, ChefHat, UserCircle, Layers, List, Wallet, CreditCard, Cloud, CloudOff, ShoppingBag, TestTube2, ClipboardList, History, Building2
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
@@ -26,6 +26,7 @@ const mainNav = [
   { title: 'Production Stock', url: '/production-stock', icon: Package },
   { title: 'Dispatch', url: '/dispatch', icon: Truck },
   { title: 'Dispatch History', url: '/dispatch-history', icon: History },
+  { title: 'Branch Dispatches', url: '/dispatch-history-branches', icon: Building2 },
   { title: 'Advance Orders', url: '/advance-orders-production', icon: ClipboardList },
 ];
 
@@ -60,8 +61,8 @@ export function AppSidebar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Departments', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Dispatch History', 'Advance Orders'].includes(item.title);
-    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Departments', 'Purchases'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Departments', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Dispatch History', 'Branch Dispatches', 'Advance Orders'].includes(item.title);
+    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Departments', 'Purchases', 'Dispatch History', 'Branch Dispatches'].includes(item.title);
     if (isRole(['branch_staff'])) return false; // No main nav items for branch staff
     return false;
   });

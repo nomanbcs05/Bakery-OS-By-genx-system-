@@ -158,6 +158,7 @@ interface AppContextType extends AppState {
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
   createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => Promise<string | boolean>;
+  clearBranchDispatches: (branch: 'all' | 'branch_1' | 'branch_2') => Promise<void>;
   createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => Promise<string | boolean>;
   refundSale: (id: string) => Promise<boolean>;
   addExpense: (e: Omit<Expense, 'id'>) => Promise<void>;
@@ -2031,7 +2032,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addRecipe, updateRecipe, deleteRecipe,
       adjustBranchStock, branchStockAdjustments,
       addProduction, addMultiProduction, updateProduction, deleteProduction,
-      createDispatch, createSale, refundSale,
+      createDispatch, clearBranchDispatches: async (branch: 'all' | 'branch_1' | 'branch_2') => {
+        const branchDests = branch === 'all' ? ['branch_1', 'branch_2'] : [branch];
+        const toDelete = dispatches.filter(d => branchDests.includes(d.destination));
+        setDispatches(prev => prev.filter(d => !branchDests.includes(d.destination)));
+        if (isOnline && hasSupabaseConfig && toDelete.length > 0) {
+          try {
+            for (let i = 0; i < toDelete.length; i += 50) {
+              const batch = toDelete.slice(i, i + 50).map(d => d.id);
+              await supabase.from('dispatches').delete().in('id', batch);
+            }
+          } catch (err) { console.error('Failed to clear branch dispatches:', err); }
+        }
+      },
+      createSale, refundSale,
       addExpense, updateExpense, deleteExpense,
       getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => s.date === new Date().toISOString().slice(0, 10)),
       getBranchStock: (b) => products.map(p => ({ productId: p.id, stock: stock[p.id]?.[b] || 0 })),

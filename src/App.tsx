@@ -23,6 +23,7 @@ import BranchProducts from "./pages/BranchProducts";
 import ProductionStock from "./pages/ProductionStock";
 import Recipes from "./pages/Recipes";
 import DispatchHistory from "./pages/DispatchHistory";
+import DispatchHistoryBranches from "./pages/DispatchHistoryBranches";
 import SettingsPage from "./pages/Settings";
 import BranchSettings from "./pages/BranchSettings";
 import LoginPage from "./pages/Login";
@@ -115,6 +116,11 @@ const AppRoutes = () => {
         <Route path="/dispatch-history" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
             <DispatchHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/dispatch-history-branches" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
+            <DispatchHistoryBranches />
           </ProtectedRoute>
         } />
 
