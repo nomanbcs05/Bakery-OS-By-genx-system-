@@ -36,6 +36,9 @@ export default function POS({ branch }: POSProps) {
     paymentMethod: string;
     saleId: string;
     date: string;
+    customerName?: string;
+    customerPhone?: string;
+    previousBalance?: number;
   }>({
     open: false,
     items: [],
@@ -48,12 +51,38 @@ export default function POS({ branch }: POSProps) {
     previousBalance: undefined,
   });
 
-  const [checkoutPrompt, setCheckoutPrompt] = useState<{ open: boolean; name: string; phone: string; method: PaymentMethod | null }>({
+  const [checkoutPrompt, setCheckoutPrompt] = useState<{
+    open: boolean;
+    name: string;
+    phone: string;
+    method: PaymentMethod | null;
+    customerAutoDetected: boolean;
+  }>({
     open: false,
     name: '',
     phone: '',
-    method: null
+    method: null,
+    customerAutoDetected: false,
   });
+
+  // Auto-lookup customer by phone number from existing sales
+  const handlePhoneChange = (phone: string) => {
+    if (phone.length >= 10) {
+      const matched = sales.find(
+        s => s.customerPhone && s.customerPhone.replace(/\s/g, '') === phone.replace(/\s/g, '') && s.customerName
+      );
+      if (matched && matched.customerName) {
+        setCheckoutPrompt(prev => ({
+          ...prev,
+          phone,
+          name: matched.customerName!,
+          customerAutoDetected: true,
+        }));
+        return;
+      }
+    }
+    setCheckoutPrompt(prev => ({ ...prev, phone, customerAutoDetected: false }));
+  };
 
   const [amountPrompt, setAmountPrompt] = useState<{ open: boolean; productId: string; amount: string }>({
     open: false,
@@ -238,7 +267,7 @@ export default function POS({ branch }: POSProps) {
       return;
     }
     checkout(checkoutPrompt.method, checkoutPrompt.name, checkoutPrompt.phone);
-    setCheckoutPrompt({ open: false, name: '', phone: '', method: null });
+    setCheckoutPrompt({ open: false, name: '', phone: '', method: null, customerAutoDetected: false });
   };
 
   return (
@@ -436,10 +465,10 @@ export default function POS({ branch }: POSProps) {
                   <span className="text-xl font-black text-primary">Rs. {total.toFixed(2)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'cash' })} className="w-full h-12 shadow-sm font-bold" variant="outline">
+                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'cash', customerAutoDetected: false })} className="w-full h-12 shadow-sm font-bold" variant="outline">
                     <Banknote className="h-4 w-4 mr-2" /> Cash
                   </Button>
-                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'credit' })} className="w-full h-12 shadow-lg font-bold">
+                  <Button onClick={() => setCheckoutPrompt({ open: true, name: '', phone: '', method: 'credit', customerAutoDetected: false })} className="w-full h-12 shadow-lg font-bold">
                     <CreditCard className="h-4 w-4 mr-2" /> Credit
                   </Button>
                 </div>
@@ -610,12 +639,13 @@ export default function POS({ branch }: POSProps) {
           </div>
           <DialogFooter className="flex gap-2 justify-end sm:flex-row flex-col">
             <Button variant="outline" onClick={() => setPricePrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
-            <Button variant="secondary" onClick={() => handlePriceConfirm(true)}>Update & Print GOT</Button>
+            <Button variant="secondary" onClick={() => handlePriceConfirm(true)}>Update &amp; Print GOT</Button>
             <Button onClick={() => handlePriceConfirm(false)}>Update Price</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Credit / Cash Sale Customer Info Dialog */}
       <Dialog open={checkoutPrompt.open} onOpenChange={(open) => !open && setCheckoutPrompt(prev => ({ ...prev, open: false }))}>
         <DialogContent>
           <DialogHeader>
@@ -629,36 +659,54 @@ export default function POS({ branch }: POSProps) {
             )}
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Phone Number FIRST — auto-detects returning customer */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="customerName">Customer Name {checkoutPrompt.method === 'credit' && '*'}</Label>
-              <Input 
-                id="customerName" 
-                placeholder="e.g. John Doe" 
-                value={checkoutPrompt.name}
-                onChange={e => setCheckoutPrompt(prev => ({ ...prev, name: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && checkoutPrompt.method === 'cash' && handleCheckoutConfirm()}
+              <Label htmlFor="customerPhone">Phone Number</Label>
+              <Input
+                id="customerPhone"
+                placeholder="e.g. 03001234567"
+                value={checkoutPrompt.phone}
+                onChange={e => handlePhoneChange(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCheckoutConfirm()}
                 autoFocus
               />
             </div>
+
+            {/* Customer Name — auto-filled when phone matches existing customer */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="customerPhone">Phone Number</Label>
-              <Input 
-                id="customerPhone" 
-                placeholder="e.g. 03001234567" 
-                value={checkoutPrompt.phone}
-                onChange={e => setCheckoutPrompt(prev => ({ ...prev, phone: e.target.value }))}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="customerName">
+                  Customer Name {checkoutPrompt.method === 'credit' && '*'}
+                </Label>
+                {checkoutPrompt.customerAutoDetected && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                    ✓ Customer Found
+                  </span>
+                )}
+              </div>
+              <Input
+                id="customerName"
+                placeholder="e.g. John Doe"
+                value={checkoutPrompt.name}
+                onChange={e => setCheckoutPrompt(prev => ({ ...prev, name: e.target.value, customerAutoDetected: false }))}
                 onKeyDown={e => e.key === 'Enter' && handleCheckoutConfirm()}
+                className={checkoutPrompt.customerAutoDetected ? 'border-emerald-400 bg-emerald-50/50 font-semibold' : ''}
               />
+              {checkoutPrompt.customerAutoDetected && (
+                <p className="text-xs text-emerald-600">
+                  Returning customer detected — this sale will be added to their existing ledger.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter className="flex gap-2 flex-col sm:flex-row">
             <Button variant="outline" onClick={() => setCheckoutPrompt(prev => ({ ...prev, open: false }))}>Cancel</Button>
             {checkoutPrompt.method === 'cash' && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   checkout('cash');
-                  setCheckoutPrompt({ open: false, name: '', phone: '', method: null });
+                  setCheckoutPrompt({ open: false, name: '', phone: '', method: null, customerAutoDetected: false });
                 }}
               >
                 Normal Cash Sale
