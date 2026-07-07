@@ -218,8 +218,8 @@ export default function DispatchHistory() {
 
   // Export to Excel / PDF
   const handleExport = (type: 'excel' | 'pdf') => {
-    const title = 'Dispatch & Customer Credit History';
-    const fileName = 'dispatch_credit_history';
+    const title = 'Customer Ledger';
+    const fileName = 'customer_ledger';
     const headers = ['Date', 'Customer Name', 'Station/City', 'Debit (Sales)', 'Credit (Paid)', 'Balance'];
     
     const data = filteredEntries.map(e => [
@@ -272,10 +272,10 @@ export default function DispatchHistory() {
             <div className="h-10 w-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/35">
               <History className="h-5 w-5" />
             </div>
-            Dispatch & Credit History
+            Customer Ledger
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Enterprise ledger auditing, permanent dispatch histories, and customer credit ledger balances.
+            Customer credit transactions, balances, and ledger history.
           </p>
         </div>
 

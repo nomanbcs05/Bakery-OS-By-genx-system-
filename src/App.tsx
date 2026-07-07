@@ -113,9 +113,14 @@ const AppRoutes = () => {
             <DispatchPage />
           </ProtectedRoute>
         } />
-        <Route path="/dispatch-history" element={
+        <Route path="/customer-ledger" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
             <DispatchHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/dispatch-history" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager', 'accountant']}>
+            <DispatchHistoryBranches />
           </ProtectedRoute>
         } />
         <Route path="/dispatch-history-branches" element={

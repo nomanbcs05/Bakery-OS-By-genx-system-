@@ -178,10 +178,10 @@ export default function DispatchHistoryBranches() {
             <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-violet-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/35">
               <Truck className="h-5 w-5" />
             </div>
-            Dispatch History (Branches)
+            Dispatch History
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Complete record of all dispatches sent to Branch 1 &amp; Branch 2 — saved in real database.
+            Complete record of all dispatches sent to Branch 1 &amp; Branch 2.
           </p>
         </div>
 
