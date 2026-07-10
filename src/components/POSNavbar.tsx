@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
   UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2, ClipboardList, History,
-  Search, X
+  Search, X, Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ const mainNav = [
   { title: 'Recipes (BOM)', url: '/recipes', icon: TestTube2 },
   { title: 'Production Stock', url: '/production-stock', icon: Package },
   { title: 'Dispatch', url: '/dispatch', icon: Truck },
+  { title: 'Dispatch History', url: '/dispatch-history', icon: Building2 },
   { title: 'Advance Orders', url: '/advance-orders-production', icon: ClipboardList },
 ];
 
@@ -108,8 +109,8 @@ export function POSNavbar() {
 
   const filteredMainNav = mainNav.filter(item => {
     if (isRole(['admin'])) return true;
-    if (isRole(['production_manager'])) return ['Raw Materials', 'Departments', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Advance Orders'].includes(item.title);
-    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Departments', 'Purchases'].includes(item.title);
+    if (isRole(['production_manager'])) return ['Raw Materials', 'Departments', 'Purchases', 'Production', 'Production History', 'Recipes (BOM)', 'Production Stock', 'Dispatch', 'Dispatch History', 'Advance Orders'].includes(item.title);
+    if (isRole(['accountant'])) return ['Dashboard', 'Raw Materials', 'Departments', 'Purchases', 'Dispatch History'].includes(item.title);
     return false;
   });
 
