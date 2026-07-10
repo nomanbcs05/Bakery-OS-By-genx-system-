@@ -1594,7 +1594,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isSaleDestination) {
       const saleItems: SaleItem[] = items.map(i => {
         const product = products.find(p => p.id === i.productId);
-        return { productId: i.productId, quantity: i.quantity, unitPrice: product?.price || 0 };
+        // Use customPrice (wholesale rate) if provided, else fall back to regular retail price
+        return { productId: i.productId, quantity: i.quantity, unitPrice: i.customPrice ?? product?.price ?? 0 };
       });
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
       const saleName = destination === 'walkin' ? customerName : destination;

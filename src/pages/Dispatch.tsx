@@ -30,8 +30,12 @@ export default function DispatchPage() {
   const [items, setItems] = useState<DispatchItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [qty, setQty] = useState('');
+  const [adjustedPrice, setAdjustedPrice] = useState('');
   const [showGOT, setShowGOT] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Is this destination a named customer (not branch/walkin)?
+  const isCustomerDestination = destination && !['branch_1', 'branch_2', 'walkin', ''].includes(destination);
 
   // Customer Ledger Filtering & Modal States
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
@@ -165,14 +169,23 @@ export default function DispatchPage() {
 
   const addItem = () => {
     if (!selectedProduct || !qty || parseFloat(qty) <= 0) return;
+    const product = getProductById(selectedProduct);
+    const finalPrice = isCustomerDestination && adjustedPrice !== ''
+      ? parseFloat(adjustedPrice)
+      : undefined;
     const existing = items.find(i => i.productId === selectedProduct);
     if (existing) {
-      setItems(items.map(i => i.productId === selectedProduct ? { ...i, quantity: i.quantity + parseFloat(qty) } : i));
+      // Update qty; also update customPrice if user changed it
+      setItems(items.map(i => i.productId === selectedProduct
+        ? { ...i, quantity: i.quantity + parseFloat(qty), customPrice: finalPrice ?? i.customPrice }
+        : i
+      ));
     } else {
-      setItems([...items, { productId: selectedProduct, quantity: parseFloat(qty) }]);
+      setItems([...items, { productId: selectedProduct, quantity: parseFloat(qty), customPrice: finalPrice }]);
     }
     setSelectedProduct('');
     setQty('');
+    setAdjustedPrice('');
   };
 
   const removeItem = (productId: string) => setItems(items.filter(i => i.productId !== productId));
@@ -186,11 +199,11 @@ export default function DispatchPage() {
       return;
     }
 
-    // Prepare receipt data
+    // Prepare receipt data — use customPrice for customer wholesale pricing
     let receiptItems = items.map(i => ({
       name: getProductById(i.productId)?.name || 'Unknown',
       quantity: i.quantity,
-      unitPrice: getProductById(i.productId)?.price || 0
+      unitPrice: i.customPrice ?? getProductById(i.productId)?.price ?? 0
     }));
     let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
@@ -277,7 +290,7 @@ export default function DispatchPage() {
         <CardContent className="space-y-4">
           <div>
             <Label>Destination</Label>
-            <Select value={destination} onValueChange={v => setDestination(v as DispatchDestination)}>
+            <Select value={destination} onValueChange={v => { setDestination(v as DispatchDestination); setItems([]); setSelectedProduct(''); setQty(''); setAdjustedPrice(''); }}>
               <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="branch_1">Branch 1</SelectItem>
@@ -289,12 +302,27 @@ export default function DispatchPage() {
                 ))}
               </SelectContent>
             </Select>
+            {isCustomerDestination && (
+              <div className="mt-2 flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 shrink-0">Wholesale Mode</span>
+                <span className="text-[10px] text-amber-500">— Set custom rates per product below</span>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Product selector row — shows price override for customer destinations */}
+          <div className={`grid gap-3 ${isCustomerDestination ? 'grid-cols-1 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
             <div>
               <Label>Product</Label>
-              <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <Select
+                value={selectedProduct}
+                onValueChange={v => {
+                  setSelectedProduct(v);
+                  // Auto-fill regular price as default for custom price input
+                  const p = products.find(pr => pr.id === v);
+                  setAdjustedPrice(p?.price !== undefined ? String(p.price) : '');
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
                 <SelectContent>
                   {availableProducts.map(p => (
@@ -303,33 +331,156 @@ export default function DispatchPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Wholesale price override — only for named customer destinations */}
+            {isCustomerDestination && (
+              <div>
+                <Label className="flex items-center gap-1.5">
+                  <span>Set Price</span>
+                  {selectedProduct && (() => {
+                    const p = getProductById(selectedProduct);
+                    const regular = p?.price;
+                    const current = parseFloat(adjustedPrice);
+                    if (!regular || !adjustedPrice) return null;
+                    if (current < regular) {
+                      const disc = (((regular - current) / regular) * 100).toFixed(0);
+                      return <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.5">↓ {disc}% off</span>;
+                    }
+                    if (current > regular) {
+                      return <span className="text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-1.5 py-0.5">↑ Premium</span>;
+                    }
+                    return <span className="text-[10px] font-black text-slate-400 bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5">Regular</span>;
+                  })()}
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">Rs.</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={adjustedPrice}
+                    onChange={e => setAdjustedPrice(e.target.value)}
+                    placeholder={selectedProduct ? String(getProductById(selectedProduct)?.price ?? '') : 'Select product first'}
+                    className="pl-9 font-mono font-bold border-amber-200 focus:border-amber-400 focus:ring-amber-200 bg-amber-50/30"
+                    disabled={!selectedProduct}
+                  />
+                </div>
+                {selectedProduct && (
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    Regular: <span className="font-bold text-slate-600">Rs. {getProductById(selectedProduct)?.price?.toLocaleString()}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <Label>Quantity</Label>
               <Input type="number" min="0.01" step="any" max={stock[selectedProduct]?.production || 999} value={qty} onChange={e => setQty(e.target.value)} />
             </div>
             <div className="flex items-end">
-              <Button variant="outline" onClick={addItem} disabled={!selectedProduct || !qty}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+              <Button variant="outline" onClick={addItem} disabled={!selectedProduct || !qty} className="w-full">
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
             </div>
           </div>
 
           {items.length > 0 && (
             <div className="space-y-2">
-              <Label>Items to dispatch:</Label>
-              {items.map(item => {
-                const p = getProductById(item.productId);
-                const available = stock[item.productId]?.production || 0;
-                const overStock = item.quantity > available;
-                return (
-                  <div key={item.productId} className={`flex items-center justify-between p-3 rounded-lg border ${overStock ? 'border-destructive bg-destructive/5' : 'border-border'}`}>
-                    <div>
-                      <span className="font-medium">{p?.name}</span>
-                      <span className="text-muted-foreground ml-2">× {item.quantity}</span>
-                      {overStock && <span className="text-destructive text-xs ml-2">(only {available} available!)</span>}
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => removeItem(item.productId)}><Trash2 className="h-4 w-4" /></Button>
+              <div className="flex items-center justify-between">
+                <Label>Items to dispatch:</Label>
+                {isCustomerDestination && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1">
+                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span> Wholesale Pricing Active
+                  </span>
+                )}
+              </div>
+              {/* Items table with pricing */}
+              <div className="rounded-xl border border-slate-100 overflow-hidden">
+                {/* Header */}
+                {isCustomerDestination && (
+                  <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <div className="col-span-4">Product</div>
+                    <div className="col-span-2 text-right">Regular</div>
+                    <div className="col-span-2 text-right">Wholesale</div>
+                    <div className="col-span-1 text-right">Qty</div>
+                    <div className="col-span-2 text-right">Subtotal</div>
+                    <div className="col-span-1"></div>
                   </div>
-                );
-              })}
+                )}
+                {items.map(item => {
+                  const p = getProductById(item.productId);
+                  const available = stock[item.productId]?.production || 0;
+                  const overStock = item.quantity > available;
+                  const regularPrice = p?.price || 0;
+                  const billedPrice = item.customPrice ?? regularPrice;
+                  const subtotal = item.quantity * billedPrice;
+                  const isDiscounted = item.customPrice !== undefined && item.customPrice < regularPrice;
+                  const isPremium = item.customPrice !== undefined && item.customPrice > regularPrice;
+
+                  return (
+                    <div
+                      key={item.productId}
+                      className={`flex items-center px-3 py-2.5 border-b last:border-b-0 border-slate-50 gap-2 ${
+                        overStock ? 'bg-rose-50' : isCustomerDestination ? 'bg-white hover:bg-slate-50/50' : 'hover:bg-slate-50/30'
+                      } transition-colors`}
+                    >
+                      {isCustomerDestination ? (
+                        <>
+                          {/* Product name — 4 cols */}
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-sm text-slate-800 truncate block">{p?.name}</span>
+                            {overStock && <span className="text-rose-500 text-[10px] font-bold">Only {available} available!</span>}
+                          </div>
+                          {/* Regular price */}
+                          <div className="w-20 text-right">
+                            <span className="font-mono text-xs text-slate-400 line-through">{regularPrice.toLocaleString()}</span>
+                          </div>
+                          {/* Wholesale price */}
+                          <div className="w-24 text-right">
+                            <span className={`font-mono text-sm font-black ${
+                              isDiscounted ? 'text-emerald-600' : isPremium ? 'text-rose-600' : 'text-slate-700'
+                            }`}>
+                              Rs. {billedPrice.toLocaleString()}
+                            </span>
+                            {isDiscounted && (
+                              <span className="block text-[9px] font-black text-emerald-500">
+                                ↓ {(((regularPrice - billedPrice) / regularPrice) * 100).toFixed(0)}% off
+                              </span>
+                            )}
+                          </div>
+                          {/* Quantity */}
+                          <div className="w-12 text-right">
+                            <span className="font-mono text-sm text-slate-600 font-bold">×{item.quantity}</span>
+                          </div>
+                          {/* Subtotal */}
+                          <div className="w-24 text-right">
+                            <span className="font-mono text-sm font-black text-slate-900">Rs. {subtotal.toLocaleString()}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1">
+                          <span className="font-medium">{p?.name}</span>
+                          <span className="text-muted-foreground ml-2">× {item.quantity}</span>
+                          {overStock && <span className="text-destructive text-xs ml-2">(only {available} available!)</span>}
+                        </div>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => removeItem(item.productId)} className="shrink-0 h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+
+                {/* Grand total row for customer dispatches */}
+                {isCustomerDestination && items.length > 0 && (
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-slate-900 text-white">
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''} — Invoice Total</span>
+                    <span className="font-mono text-base font-black text-white">
+                      Rs. {items.reduce((sum, i) => sum + i.quantity * (i.customPrice ?? getProductById(i.productId)?.price ?? 0), 0).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -374,11 +525,11 @@ export default function DispatchPage() {
           </DialogHeader>
           
           <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
-            {/* Total Payable */}
+            {/* Total Payable — respects wholesale custom prices */}
             <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-lg px-4 py-3 flex justify-between items-center">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Payable</span>
               <span className="text-xl font-black text-indigo-700 dark:text-indigo-300 font-mono">
-                Rs. {items.reduce((sum, item) => sum + item.quantity * (getProductById(item.productId)?.price || 0), 0).toLocaleString()}
+                Rs. {items.reduce((sum, item) => sum + item.quantity * (item.customPrice ?? getProductById(item.productId)?.price ?? 0), 0).toLocaleString()}
               </span>
             </div>
 

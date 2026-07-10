@@ -82,6 +82,7 @@ export interface Dispatch {
 export interface DispatchItem {
   productId: string;
   quantity: number;
+  customPrice?: number; // Wholesale override price for customer dispatches
 }
 
 export type PaymentMethod = 'cash' | 'card' | 'credit';
