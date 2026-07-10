@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Search, Calculator, Tag, ChefHat } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Calculator, Tag, ChefHat } from 'lucide-react';
 import type { SaleItem, PaymentMethod } from '@/types';
 import { Navigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,16 @@ export default function POS({ branch }: POSProps) {
   useEffect(() => {
     loadModuleData('sales');
   }, [loadModuleData]);
+
+  // Sync search query from POSNavbar via window event
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ query: string }>).detail;
+      setSearchQuery(detail.query ?? '');
+    };
+    window.addEventListener('pos-search-change', handler);
+    return () => window.removeEventListener('pos-search-change', handler);
+  }, []);
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<SaleItem[]>([]);
@@ -276,15 +286,6 @@ export default function POS({ branch }: POSProps) {
         {/* Product Grid — scrolls independently */}
         <div className="lg:col-span-2 overflow-y-auto pr-2 space-y-6" style={{ scrollbarWidth: 'thin' }}>
           <div className="flex flex-col sm:flex-row gap-4 sticky top-0 z-10 bg-slate-50 pb-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search products..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 bg-background"
-              />
-            </div>
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide items-center">
               {categories.map(c => (
                 <Badge 

@@ -29,11 +29,16 @@ import {
   Search, 
   Clock,
   Layers3,
-  X
+  X,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, parseISO, isValid } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 const getLocalDateString = (offsetDays = 0) => {
   const d = new Date();
@@ -491,31 +496,80 @@ export default function Departments() {
 
               {/* Custom Inputs */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 text-[10px] font-bold text-slate-500">
-                  <span className="text-[9px] text-slate-400">FROM</span>
-                  <input
-                    type="date"
-                    value={startDateFilter}
-                    onChange={(e) => {
-                      setStartDateFilter(e.target.value);
-                      setActivePreset('Custom');
-                    }}
-                    className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer p-0 w-24 text-[10px]"
-                  />
-                </div>
-                <span className="text-slate-300 font-bold text-xs">—</span>
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl px-2 py-1 text-[10px] font-bold text-slate-500">
-                  <span className="text-[9px] text-slate-400">TO</span>
-                  <input
-                    type="date"
-                    value={endDateFilter}
-                    onChange={(e) => {
-                      setEndDateFilter(e.target.value);
-                      setActivePreset('Custom');
-                    }}
-                    className="bg-transparent border-none outline-none font-mono text-slate-800 focus:ring-0 cursor-pointer p-0 w-24 text-[10px]"
-                  />
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-8 justify-start text-left font-mono text-[10px] font-bold bg-slate-50 border-slate-100 rounded-xl px-2.5 py-1 text-slate-800 hover:bg-slate-100/85 w-32 shadow-sm transition-all duration-200",
+                        !startDateFilter && "text-slate-400"
+                      )}
+                    >
+                      <CalendarIcon className="h-3 w-3 mr-1.5 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        {startDateFilter ? format(parseISO(startDateFilter), 'MMM dd, yyyy') : 'Start Date'}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 border-0 shadow-2xl rounded-2xl bg-white" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={startDateFilter ? parseISO(startDateFilter) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          // Format to local date string to avoid timezone offset issues
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setStartDateFilter(`${year}-${month}-${day}`);
+                          setActivePreset('Custom');
+                        } else {
+                          setStartDateFilter('');
+                          setActivePreset('Custom');
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span className="text-slate-300 font-bold text-xs shrink-0">—</span>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-8 justify-start text-left font-mono text-[10px] font-bold bg-slate-50 border-slate-100 rounded-xl px-2.5 py-1 text-slate-800 hover:bg-slate-100/85 w-32 shadow-sm transition-all duration-200",
+                        !endDateFilter && "text-slate-400"
+                      )}
+                    >
+                      <CalendarIcon className="h-3 w-3 mr-1.5 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        {endDateFilter ? format(parseISO(endDateFilter), 'MMM dd, yyyy') : 'End Date'}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 border-0 shadow-2xl rounded-2xl bg-white" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={endDateFilter ? parseISO(endDateFilter) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setEndDateFilter(`${year}-${month}-${day}`);
+                          setActivePreset('Custom');
+                        } else {
+                          setEndDateFilter('');
+                          setActivePreset('Custom');
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           )}

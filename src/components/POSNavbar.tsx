@@ -5,7 +5,8 @@ import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Factory, Truck, ShoppingCart, Store, Package, 
   BarChart3, Receipt, Settings, ChefHat, Layers, List, Wallet, CreditCard, ShoppingBag,
-  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2, ClipboardList, History
+  UserCircle, LogOut, Cloud, CloudOff, ChevronLeft, ChevronRight, TestTube2, ClipboardList, History,
+  Search, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,24 @@ export function POSNavbar() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [posSearch, setPosSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const isPosPage = location.pathname === '/pos/branch-1' || location.pathname === '/pos/branch-2';
+
+  // Broadcast search change to POS page via custom window event
+  const handleSearchChange = (value: string) => {
+    setPosSearch(value);
+    window.dispatchEvent(new CustomEvent('pos-search-change', { detail: { query: value } }));
+  };
+
+  // Reset search when leaving POS pages
+  useEffect(() => {
+    if (!isPosPage) {
+      setPosSearch('');
+      window.dispatchEvent(new CustomEvent('pos-search-change', { detail: { query: '' } }));
+    }
+  }, [isPosPage]);
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -119,6 +138,9 @@ export function POSNavbar() {
     <div className="flex-shrink-0 w-full bg-white px-2 py-2 flex items-center justify-between border-b border-slate-100 shadow-sm relative z-50">
       <style dangerouslySetInnerHTML={{ __html: `
         .nav-scroll::-webkit-scrollbar { display: none; }
+        .pos-search-input::placeholder { color: #94a3b8; font-weight: 600; font-size: 12px; letter-spacing: 0.02em; }
+        .pos-search-wrap { transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
+        .pos-search-wrap:focus-within { box-shadow: 0 0 0 2.5px #6366f1, 0 2px 12px 0 rgba(99,102,241,0.15); border-color: #6366f1 !important; }
       `}} />
 
       {/* Left Arrow */}
@@ -160,6 +182,36 @@ export function POSNavbar() {
             </NavLink>
           ))}
         </div>
+
+        {/* ── Premium POS Search Bar — only shown on POS pages ── */}
+        {isPosPage && (
+          <div className="flex items-center shrink-0 ml-3 pl-3 border-l border-slate-200">
+            <div
+              className="pos-search-wrap flex items-center gap-2 bg-slate-50 border-2 border-slate-200 rounded-2xl px-3 py-1.5 hover:border-indigo-300 hover:bg-white"
+              style={{ minWidth: 260, maxWidth: 340, width: '100%' }}
+            >
+              <Search className="h-4 w-4 text-indigo-400 shrink-0" strokeWidth={2.5} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={posSearch}
+                onChange={e => handleSearchChange(e.target.value)}
+                placeholder="Search products..."
+                className="pos-search-input flex-1 bg-transparent border-none outline-none text-[13px] font-bold text-slate-800 min-w-0"
+                style={{ caretColor: '#6366f1' }}
+              />
+              {posSearch && (
+                <button
+                  onClick={() => handleSearchChange('')}
+                  className="shrink-0 h-5 w-5 rounded-full bg-slate-300 hover:bg-indigo-400 hover:text-white text-slate-600 flex items-center justify-center transition-all duration-150"
+                  title="Clear search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Arrow */}
