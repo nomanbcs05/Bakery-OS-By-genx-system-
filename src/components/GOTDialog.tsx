@@ -4,16 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
+export interface GOTCustomerGroup {
+  customerName: string;
+  items: { name: string; quantity: number }[];
+}
+
 interface GOTDialogProps {
   open: boolean;
   onClose: () => void;
-  items: { name: string; quantity: number }[];
-  destination: string;
+  items?: { name: string; quantity: number }[];
+  destination?: string;
+  customerGroups?: GOTCustomerGroup[];
   tokenNumber?: number;
   autoPrint?: boolean;
 }
 
-export default function GOTDialog({ open, onClose, items, destination, tokenNumber, autoPrint }: GOTDialogProps) {
+export default function GOTDialog({ open, onClose, items = [], destination = '', customerGroups, tokenNumber, autoPrint }: GOTDialogProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const { receiptSettings } = useApp();
 
@@ -176,22 +182,53 @@ export default function GOTDialog({ open, onClose, items, destination, tokenNumb
             </div>
           )}
           <div className="text-[11pt] font-bold mt-1">DISPATCH TO:</div>
-          <div className="destination-box uppercase">
-            {destLabels[destination] || destination || 'UNSPECIFIED'}
-          </div>
         </div>
 
-        <div className="border-t-2 border-black pt-2">
-          {items.map((item, i) => (
-            <div key={i} className="flex justify-between border-b border-dashed border-stone-300 py-1">
-              <div className="font-bold text-[11pt] uppercase">{item.name}</div>
-              <div className="font-black text-[12pt]">x {item.quantity}</div>
+        {customerGroups && customerGroups.length > 0 ? (
+          <div>
+            {customerGroups.map((grp, gIdx) => (
+              <div key={gIdx} className={gIdx > 0 ? "mt-4 pt-2 border-t-2 border-dashed border-black" : ""}>
+                <div className="destination-box uppercase text-center mb-2">
+                  {destLabels[grp.customerName] || grp.customerName || 'UNSPECIFIED'}
+                </div>
+                <div className="pt-1">
+                  {grp.items.map((item, i) => (
+                    <div key={i} className="flex justify-between border-b border-dashed border-stone-300 py-1">
+                      <div className="font-bold text-[11pt] uppercase">{item.name}</div>
+                      <div className="font-black text-[12pt]">x {item.quantity}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="text-center mb-4">
+              <div className="destination-box uppercase">
+                {destLabels[destination] || destination || 'UNSPECIFIED'}
+              </div>
             </div>
-          ))}
-        </div>
+
+            <div className="border-t-2 border-black pt-2">
+              {items.map((item, i) => (
+                <div key={i} className="flex justify-between border-b border-dashed border-stone-300 py-1">
+                  <div className="font-bold text-[11pt] uppercase">{item.name}</div>
+                  <div className="font-black text-[12pt]">x {item.quantity}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="footer">
-          <div className="font-bold">TOTAL ITEMS: {items.reduce((acc, curr) => acc + curr.quantity, 0)}</div>
+          <div className="font-bold">
+            TOTAL ITEMS: {
+              customerGroups && customerGroups.length > 0
+                ? customerGroups.reduce((acc, g) => acc + g.items.reduce((s, it) => s + it.quantity, 0), 0)
+                : items.reduce((acc, curr) => acc + curr.quantity, 0)
+            }
+          </div>
           <div className="mt-2 text-[8pt]">Bakewise ERP - Dispatch System by genx systems +923342826675</div>
         </div>
       </div>

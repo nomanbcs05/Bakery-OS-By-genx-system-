@@ -7,17 +7,23 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard, Edit, Search, FileDown, CalendarDays } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard, Edit, Search, FileDown, CalendarDays, Users, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import type { DispatchDestination, DispatchItem, PaymentMethod, LedgerEntry } from '@/types';
 import { Navigate } from 'react-router-dom';
-import GOTDialog from '@/components/GOTDialog';
+import GOTDialog, { GOTCustomerGroup } from '@/components/GOTDialog';
 import ReceiptDialog from '@/components/ReceiptDialog';
 import DispatchSummaryDialog from '@/components/DispatchSummaryDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
+
+export interface CustomerDispatchOrder {
+  id: string;
+  destination: DispatchDestination | '';
+  items: DispatchItem[];
+}
 
 export default function DispatchPage() {
   const { 
@@ -26,13 +32,27 @@ export default function DispatchPage() {
   } = useApp();
 
   if (!currentUser) return <Navigate to="/login" replace />;
-  const [destination, setDestination] = useState<DispatchDestination | ''>('');
-  const [items, setItems] = useState<DispatchItem[]>([]);
+
+  // Multi-Customer State
+  const [customerOrders, setCustomerOrders] = useState<CustomerDispatchOrder[]>([
+    { id: 'cust-1', destination: '', items: [] }
+  ]);
+  const [activeCustIdx, setActiveCustIdx] = useState(0);
+  const [showMultiGOT, setShowMultiGOT] = useState(false);
+  const [multiGOTGroups, setMultiGOTGroups] = useState<GOTCustomerGroup[]>([]);
+
+  // Product Selection & Search State
+  const [productSearch, setProductSearch] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [qty, setQty] = useState('');
   const [adjustedPrice, setAdjustedPrice] = useState('');
   const [showGOT, setShowGOT] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+
+  // Active Customer Helpers
+  const activeOrder = customerOrders[activeCustIdx] || customerOrders[0];
+  const destination = activeOrder.destination;
+  const items = activeOrder.items;
 
   // Is this destination a named customer (not branch/walkin)?
   const isCustomerDestination = destination && !['branch_1', 'branch_2', 'walkin', ''].includes(destination);
@@ -167,28 +187,72 @@ export default function DispatchPage() {
     date: '',
   });
 
-  const addItem = () => {
-    if (!selectedProduct || !qty || parseFloat(qty) <= 0) return;
-    const product = getProductById(selectedProduct);
-    const finalPrice = isCustomerDestination && adjustedPrice !== ''
-      ? parseFloat(adjustedPrice)
-      : undefined;
-    const existing = items.find(i => i.productId === selectedProduct);
-    if (existing) {
-      // Update qty; also update customPrice if user changed it
-      setItems(items.map(i => i.productId === selectedProduct
-        ? { ...i, quantity: i.quantity + parseFloat(qty), customPrice: finalPrice ?? i.customPrice }
-        : i
-      ));
-    } else {
-      setItems([...items, { productId: selectedProduct, quantity: parseFloat(qty), customPrice: finalPrice }]);
-    }
+  const handleSetDestination = (dest: DispatchDestination) => {
+    setCustomerOrders(prev => prev.map((ord, idx) => 
+      idx === activeCustIdx ? { ...ord, destination: dest } : ord
+    ));
     setSelectedProduct('');
     setQty('');
     setAdjustedPrice('');
   };
 
-  const removeItem = (productId: string) => setItems(items.filter(i => i.productId !== productId));
+  const handleAddAnotherCustomer = () => {
+    const newOrder: CustomerDispatchOrder = {
+      id: `cust-${Date.now()}`,
+      destination: '',
+      items: []
+    };
+    setCustomerOrders(prev => [...prev, newOrder]);
+    setActiveCustIdx(customerOrders.length);
+    setSelectedProduct('');
+    setQty('');
+    setAdjustedPrice('');
+  };
+
+  const handleRemoveCustomer = (idxToRemove: number) => {
+    if (customerOrders.length <= 1) return;
+    const updated = customerOrders.filter((_, idx) => idx !== idxToRemove);
+    setCustomerOrders(updated);
+    setActiveCustIdx(Math.max(0, Math.min(activeCustIdx, updated.length - 1)));
+  };
+
+  const addItem = () => {
+    if (!selectedProduct || !qty || parseFloat(qty) <= 0) return;
+    const finalPrice = isCustomerDestination && adjustedPrice !== ''
+      ? parseFloat(adjustedPrice)
+      : undefined;
+
+    setCustomerOrders(prev => prev.map((ord, idx) => {
+      if (idx !== activeCustIdx) return ord;
+      const existing = ord.items.find(i => i.productId === selectedProduct);
+      if (existing) {
+        return {
+          ...ord,
+          items: ord.items.map(i => i.productId === selectedProduct
+            ? { ...i, quantity: i.quantity + parseFloat(qty), customPrice: finalPrice ?? i.customPrice }
+            : i
+          )
+        };
+      }
+      return {
+        ...ord,
+        items: [...ord.items, { productId: selectedProduct, quantity: parseFloat(qty), customPrice: finalPrice }]
+      };
+    }));
+    setSelectedProduct('');
+    setQty('');
+    setAdjustedPrice('');
+  };
+
+  const removeItem = (productId: string) => {
+    setCustomerOrders(prev => prev.map((ord, idx) => {
+      if (idx !== activeCustIdx) return ord;
+      return {
+        ...ord,
+        items: ord.items.filter(i => i.productId !== productId)
+      };
+    }));
+  };
 
   const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
@@ -228,8 +292,9 @@ export default function DispatchPage() {
         saleId: typeof success === 'string' ? success : `SL-${Date.now().toString(36).toUpperCase()}`,
         date: new Date().toISOString()
       });
-      setItems([]);
-      setDestination('');
+      setCustomerOrders(prev => prev.map((ord, idx) => 
+        idx === activeCustIdx ? { ...ord, destination: '', items: [] } : ord
+      ));
       setIsPaymentOpen(false);
       setCustName('');
       setCustPhone('');
@@ -258,6 +323,38 @@ export default function DispatchPage() {
     }
   };
 
+  const handlePrintAllGOT = async () => {
+    const validOrders = customerOrders.filter(c => c.items.length > 0 && c.destination);
+    if (validOrders.length === 0) {
+      toast.error('Please select customer destination and add items first');
+      return;
+    }
+
+    const groups: GOTCustomerGroup[] = validOrders.map(c => ({
+      customerName: destLabels[c.destination] || c.destination || 'Customer',
+      items: c.items.map(i => ({
+        name: getProductById(i.productId)?.name || 'Unknown',
+        quantity: i.quantity
+      }))
+    }));
+
+    setMultiGOTGroups(groups);
+    setShowMultiGOT(true);
+
+    for (const ord of validOrders) {
+      const isSale = !['branch_1', 'branch_2'].includes(ord.destination);
+      const cName = isSale ? (destLabels[ord.destination] || ord.destination) : undefined;
+      await createDispatch(
+        ord.destination,
+        ord.items,
+        'cash',
+        cName
+      );
+    }
+
+    toast.success(`Dispatched ${validOrders.length} customer order(s) in Single GOT!`);
+  };
+
   const [historyItems, setHistoryItems] = useState<{ name: string; quantity: number }[]>([]);
   const [historyDest, setHistoryDest] = useState('');
   const [historyToken, setHistoryToken] = useState<number | undefined>(undefined);
@@ -273,25 +370,98 @@ export default function DispatchPage() {
     setShowHistoryGOT(true);
   };
 
-  const availableProducts = products.filter(p => (stock[p.id]?.production || 0) > 0);
+  // Feature 2 & 3: Product Search + Over-Dispatch Allowed (never filter out zero stock)
+  const availableProducts = products.filter(p => 
+    p.isActive !== false &&
+    (!productSearch || 
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
+      p.category?.toLowerCase().includes(productSearch.toLowerCase()))
+  );
 
   const destLabels: Record<string, string> = { branch_1: 'Branch 1', branch_2: 'Branch 2', walkin: 'Walk-in (Factory)' };
   const customerDestinations = Array.from(new Set(ledgerEntries.filter(e => e.category === 'customer' && e.name).map(e => e.name!)));
+
+  const combinedTotalItems = customerOrders.reduce(
+    (total, ord) => total + ord.items.reduce((s, it) => s + it.quantity, 0),
+    0
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dispatch</h1>
-        <p className="text-sm text-muted-foreground">Send products to branches or walk-in sales</p>
+        <p className="text-sm text-muted-foreground">Send products to branches, customers, or walk-in sales with Single GOT printing</p>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Truck className="h-4 w-4" /> New Dispatch</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Truck className="h-4 w-4 text-primary" /> New Dispatch
+            </CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddAnotherCustomer}
+              className="text-xs font-bold border-dashed border-primary/50 text-primary hover:bg-primary/10"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Customer
+            </Button>
+          </div>
+
+          {/* Multi-Customer Tabs Bar */}
+          <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1">
+            {customerOrders.map((ord, idx) => {
+              const isActive = idx === activeCustIdx;
+              const count = ord.items.reduce((s, it) => s + it.quantity, 0);
+              const name = destLabels[ord.destination] || ord.destination || `Customer ${idx + 1}`;
+
+              return (
+                <div
+                  key={ord.id}
+                  onClick={() => setActiveCustIdx(idx)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all shrink-0",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted/50 hover:bg-muted text-muted-foreground border-border"
+                  )}
+                >
+                  <span>{idx + 1}. {name}</span>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] font-mono",
+                    isActive ? "bg-white/20 text-white" : "bg-muted text-foreground"
+                  )}>
+                    {count} items
+                  </span>
+                  {customerOrders.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveCustomer(idx);
+                      }}
+                      className="ml-1 hover:text-destructive transition-colors"
+                      title="Remove customer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardHeader>
+
         <CardContent className="space-y-4">
           <div>
-            <Label>Destination</Label>
-            <Select value={destination} onValueChange={v => { setDestination(v as DispatchDestination); setItems([]); setSelectedProduct(''); setQty(''); setAdjustedPrice(''); }}>
-              <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
+            <div className="flex justify-between items-center mb-1">
+              <Label>Destination for {destLabels[destination] || destination || `Customer ${activeCustIdx + 1}`}</Label>
+              <span className="text-[11px] text-muted-foreground font-semibold">Active: Order #{activeCustIdx + 1}</span>
+            </div>
+            <Select value={destination} onValueChange={v => handleSetDestination(v as DispatchDestination)}>
+              <SelectTrigger><SelectValue placeholder="Select customer or branch destination" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="branch_1">Branch 1</SelectItem>
                 <SelectItem value="branch_2">Branch 2</SelectItem>
@@ -310,7 +480,31 @@ export default function DispatchPage() {
             )}
           </div>
 
-          {/* Product selector row — shows price override for customer destinations */}
+          {/* Feature 2: Product Search Bar with Professional Search Icon */}
+          <div>
+            <Label className="text-xs mb-1 block">Search & Select Product</Label>
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                type="text"
+                placeholder="Search product by name or category…"
+                value={productSearch}
+                onChange={e => setProductSearch(e.target.value)}
+                className="pl-8 text-xs bg-background"
+              />
+              {productSearch && (
+                <button
+                  type="button"
+                  onClick={() => setProductSearch('')}
+                  className="absolute right-2.5 top-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Product selector row */}
           <div className={`grid gap-3 ${isCustomerDestination ? 'grid-cols-1 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
             <div>
               <Label>Product</Label>
@@ -318,21 +512,29 @@ export default function DispatchPage() {
                 value={selectedProduct}
                 onValueChange={v => {
                   setSelectedProduct(v);
-                  // Auto-fill regular price as default for custom price input
                   const p = products.find(pr => pr.id === v);
                   setAdjustedPrice(p?.price !== undefined ? String(p.price) : '');
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Choose product" /></SelectTrigger>
                 <SelectContent>
-                  {availableProducts.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} ({stock[p.id]?.production} avail)</SelectItem>
-                  ))}
+                  {availableProducts.length === 0 ? (
+                    <div className="p-2 text-xs text-muted-foreground text-center">No products found</div>
+                  ) : (
+                    availableProducts.map(p => {
+                      const avail = stock[p.id]?.production || 0;
+                      return (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} ({avail} avail)
+                        </SelectItem>
+                      );
+                    })
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Wholesale price override — only for named customer destinations */}
+            {/* Wholesale price override */}
             {isCustomerDestination && (
               <div>
                 <Label className="flex items-center gap-1.5">
@@ -365,17 +567,20 @@ export default function DispatchPage() {
                     disabled={!selectedProduct}
                   />
                 </div>
-                {selectedProduct && (
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Regular: <span className="font-bold text-slate-600">Rs. {getProductById(selectedProduct)?.price?.toLocaleString()}</span>
-                  </p>
-                )}
               </div>
             )}
 
+            {/* Feature 3: Over-dispatch allowed (No max constraint) */}
             <div>
               <Label>Quantity</Label>
-              <Input type="number" min="0.01" step="any" max={stock[selectedProduct]?.production || 999} value={qty} onChange={e => setQty(e.target.value)} />
+              <Input 
+                type="number" 
+                min="0.01" 
+                step="any" 
+                value={qty} 
+                onChange={e => setQty(e.target.value)} 
+                placeholder="Enter quantity"
+              />
             </div>
             <div className="flex items-end">
               <Button variant="outline" onClick={addItem} disabled={!selectedProduct || !qty} className="w-full">
@@ -384,21 +589,20 @@ export default function DispatchPage() {
             </div>
           </div>
 
+          {/* Active Customer Items Table */}
           {items.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Items to dispatch:</Label>
+                <Label>Items for {destLabels[destination] || destination || `Customer ${activeCustIdx + 1}`}:</Label>
                 {isCustomerDestination && (
                   <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1">
                     <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span> Wholesale Pricing Active
                   </span>
                 )}
               </div>
-              {/* Items table with pricing */}
-              <div className="rounded-xl border border-slate-100 overflow-hidden">
-                {/* Header */}
+              <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                 {isCustomerDestination && (
-                  <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
                     <div className="col-span-4">Product</div>
                     <div className="col-span-2 text-right">Regular</div>
                     <div className="col-span-2 text-right">Wholesale</div>
@@ -410,7 +614,7 @@ export default function DispatchPage() {
                 {items.map(item => {
                   const p = getProductById(item.productId);
                   const available = stock[item.productId]?.production || 0;
-                  const overStock = item.quantity > available;
+                  const isShortage = item.quantity > available;
                   const regularPrice = p?.price || 0;
                   const billedPrice = item.customPrice ?? regularPrice;
                   const subtotal = item.quantity * billedPrice;
@@ -420,48 +624,49 @@ export default function DispatchPage() {
                   return (
                     <div
                       key={item.productId}
-                      className={`flex items-center px-3 py-2.5 border-b last:border-b-0 border-slate-50 gap-2 ${
-                        overStock ? 'bg-rose-50' : isCustomerDestination ? 'bg-white hover:bg-slate-50/50' : 'hover:bg-slate-50/30'
+                      className={`flex items-center px-3 py-2.5 border-b last:border-b-0 border-slate-50 dark:border-slate-800 gap-2 ${
+                        isShortage ? 'bg-amber-50/50 dark:bg-amber-950/20' : 'hover:bg-slate-50/30'
                       } transition-colors`}
                     >
                       {isCustomerDestination ? (
                         <>
-                          {/* Product name — 4 cols */}
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold text-sm text-slate-800 truncate block">{p?.name}</span>
-                            {overStock && <span className="text-rose-500 text-[10px] font-bold">Only {available} available!</span>}
-                          </div>
-                          {/* Regular price */}
-                          <div className="w-20 text-right">
-                            <span className="font-mono text-xs text-slate-400 line-through">{regularPrice.toLocaleString()}</span>
-                          </div>
-                          {/* Wholesale price */}
-                          <div className="w-24 text-right">
-                            <span className={`font-mono text-sm font-black ${
-                              isDiscounted ? 'text-emerald-600' : isPremium ? 'text-rose-600' : 'text-slate-700'
-                            }`}>
-                              Rs. {billedPrice.toLocaleString()}
-                            </span>
-                            {isDiscounted && (
-                              <span className="block text-[9px] font-black text-emerald-500">
-                                ↓ {(((regularPrice - billedPrice) / regularPrice) * 100).toFixed(0)}% off
+                            <span className="font-bold text-sm text-foreground truncate block">{p?.name}</span>
+                            {isShortage && (
+                              <span className="text-amber-600 dark:text-amber-400 text-[10px] font-bold">
+                                ⚠️ Shortage: +{(item.quantity - available)} (Over-Dispatch Allowed)
                               </span>
                             )}
                           </div>
-                          {/* Quantity */}
-                          <div className="w-12 text-right">
-                            <span className="font-mono text-sm text-slate-600 font-bold">×{item.quantity}</span>
+                          <div className="w-20 text-right">
+                            <span className="font-mono text-xs text-muted-foreground line-through">{regularPrice.toLocaleString()}</span>
                           </div>
-                          {/* Subtotal */}
                           <div className="w-24 text-right">
-                            <span className="font-mono text-sm font-black text-slate-900">Rs. {subtotal.toLocaleString()}</span>
+                            <span className={`font-mono text-sm font-black ${
+                              isDiscounted ? 'text-emerald-600' : isPremium ? 'text-rose-600' : 'text-foreground'
+                            }`}>
+                              Rs. {billedPrice.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-12 text-right">
+                            <span className="font-mono text-sm text-foreground font-bold">×{item.quantity}</span>
+                          </div>
+                          <div className="w-24 text-right">
+                            <span className="font-mono text-sm font-black text-foreground">Rs. {subtotal.toLocaleString()}</span>
                           </div>
                         </>
                       ) : (
-                        <div className="flex-1">
-                          <span className="font-medium">{p?.name}</span>
-                          <span className="text-muted-foreground ml-2">× {item.quantity}</span>
-                          {overStock && <span className="text-destructive text-xs ml-2">(only {available} available!)</span>}
+                        <div className="flex-1 flex items-center justify-between">
+                          <div>
+                            <span className="font-medium text-foreground">{p?.name}</span>
+                            <span className="text-muted-foreground ml-2">× {item.quantity}</span>
+                            {isShortage && (
+                              <span className="text-amber-600 text-xs ml-2 font-bold">
+                                ⚠️ Shortage: +{(item.quantity - available)} (Over-Dispatch Allowed)
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono text-xs text-muted-foreground">Avail: {available}</span>
                         </div>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => removeItem(item.productId)} className="shrink-0 h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
@@ -471,10 +676,12 @@ export default function DispatchPage() {
                   );
                 })}
 
-                {/* Grand total row for customer dispatches */}
+                {/* Subtotal for active customer */}
                 {isCustomerDestination && items.length > 0 && (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-slate-900 text-white">
-                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''} — Invoice Total</span>
+                  <div className="flex items-center justify-between px-3 py-2 bg-slate-900 text-white">
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      {destLabels[destination] || destination}: {items.length} Item(s)
+                    </span>
                     <span className="font-mono text-base font-black text-white">
                       Rs. {items.reduce((sum, i) => sum + i.quantity * (i.customPrice ?? getProductById(i.productId)?.price ?? 0), 0).toLocaleString()}
                     </span>
@@ -484,29 +691,83 @@ export default function DispatchPage() {
             </div>
           )}
 
+          {/* Combined Multi-Customer Manifest Summary (when multiple customers added) */}
+          {customerOrders.length > 1 && (
+            <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-primary">
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4" /> Multi-Customer GOT Manifest ({customerOrders.length} Customers)
+                </span>
+                <span className="font-mono text-sm">TOTAL: {combinedTotalItems} Items</span>
+              </div>
+              <div className="space-y-1 text-xs">
+                {customerOrders.map((ord, idx) => (
+                  <div key={ord.id} className="flex justify-between py-1 border-b border-border/50 last:border-b-0">
+                    <span className="font-medium text-foreground">
+                      {idx + 1}. {destLabels[ord.destination] || ord.destination || 'Unnamed Customer'}
+                    </span>
+                    <span className="font-mono text-muted-foreground">
+                      {ord.items.reduce((s, it) => s + it.quantity, 0)} items ({ord.items.length} product lines)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {destination === 'walkin' && items.length > 0 && (
             <Alert><AlertCircle className="h-4 w-4" /><AlertDescription>Walk-in dispatch will automatically record as a factory gate sale.</AlertDescription></Alert>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            {!['branch_1', 'branch_2'].includes(destination) ? (
-              <Button onClick={handleWalkinDispatch} disabled={items.length === 0} className="flex-1 sm:flex-none bg-success hover:bg-success/90">
-                <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
-              </Button>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {customerOrders.length > 1 ? (
+              <>
+                <Button 
+                  onClick={handlePrintAllGOT}
+                  disabled={combinedTotalItems === 0}
+                  className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 font-bold"
+                >
+                  <Printer className="h-4 w-4 mr-2" /> Print All (Single GOT)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleAddAnotherCustomer}
+                  className="flex-1 sm:flex-none text-xs font-bold"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Customer
+                </Button>
+              </>
             ) : (
-              <Button onClick={() => handleDispatch()} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
-                Confirm Dispatch
-              </Button>
+              <>
+                {!['branch_1', 'branch_2'].includes(destination) ? (
+                  <Button onClick={handleWalkinDispatch} disabled={items.length === 0} className="flex-1 sm:flex-none bg-success hover:bg-success/90">
+                    <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
+                  </Button>
+                ) : (
+                  <Button onClick={() => handleDispatch()} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
+                    Confirm Dispatch
+                  </Button>
+                )}
+                
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setShowGOT(true)} 
+                  disabled={items.length === 0}
+                  className="flex-1 sm:flex-none"
+                >
+                  <Printer className="h-4 w-4 mr-2" /> GOT
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={handleAddAnotherCustomer}
+                  className="flex-1 sm:flex-none text-xs font-bold"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Customer
+                </Button>
+              </>
             )}
-            
-            <Button 
-              variant="secondary" 
-              onClick={() => setShowGOT(true)} 
-              disabled={items.length === 0}
-              className="flex-1 sm:flex-none"
-            >
-              <Printer className="h-4 w-4 mr-2" /> GOT
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -670,6 +931,13 @@ export default function DispatchPage() {
           name: getProductById(i.productId)?.name || 'Unknown', 
           quantity: i.quantity 
         }))}
+      />
+
+      <GOTDialog 
+        open={showMultiGOT}
+        onClose={() => setShowMultiGOT(false)}
+        customerGroups={multiGOTGroups}
+        tokenNumber={dispatches.filter(d => d.date === new Date().toISOString().slice(0, 10)).length + 1}
       />
 
       {/* Customer Ledger */}
