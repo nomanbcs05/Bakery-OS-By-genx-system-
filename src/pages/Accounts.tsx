@@ -21,9 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 import type { LedgerEntry } from '@/types';
+import { useNavigate } from 'react-router-dom';
 
 export default function Accounts() {
   const { 
+    currentUser, selectedProfile,
     staff, staffDeductions, salaryVouchers, 
     addStaffMember, deleteStaffMember,
     addStaffDeduction, deleteStaffDeduction,
@@ -35,6 +37,9 @@ export default function Accounts() {
     deletePurchase, updatePurchase,
     loadModuleData
   } = useApp();
+
+  const navigate = useNavigate();
+  const isProductManager = selectedProfile?.role === 'product_manager' || selectedProfile?.role === 'admin';
 
   useEffect(() => {
     loadModuleData('hr');
@@ -924,6 +929,18 @@ export default function Accounts() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {isProductManager && (
+                          <Button 
+                            size="sm" 
+                            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+                            onClick={() => {
+                              setIsCustDetailOpen(false);
+                              navigate(`/pm/customer/${encodeURIComponent(selectedCustName || '')}/today-invoice`);
+                            }}
+                          >
+                            <FileText className="h-3.5 w-3.5" /> Today Invoice
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" className="h-8 text-xs gap-1 border-primary/20 hover:bg-primary/5 shadow-sm" onClick={() => exportSingleCustomer('pdf')}>
                           <FileDown className="h-3.5 w-3.5 text-primary" /> Export PDF
                         </Button>
@@ -1619,7 +1636,17 @@ export default function Accounts() {
                           <TableCell className="text-right font-mono font-bold">Rs. {(rec.debit - rec.credit).toLocaleString()}</TableCell>
                           <TableCell className="text-right">
                             {rec.isManual && (
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-1.5 items-center">
+                                {isProductManager && rec.name && (
+                                  <Button 
+                                    size="sm" 
+                                    className="h-7 px-2 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs"
+                                    onClick={() => navigate(`/pm/customer/${encodeURIComponent(rec.name!)}/today-invoice`)}
+                                    title="Create Today Invoice"
+                                  >
+                                    <FileText className="h-3 w-3" /> Invoice
+                                  </Button>
+                                )}
                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => {
                                   const entry = ledgerEntries.find(e => e.id === rec.id);
                                   if (entry) {

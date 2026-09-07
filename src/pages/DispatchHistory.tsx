@@ -17,7 +17,7 @@ import {
   Printer, Eye, Truck, Calendar, TrendingUp, Coins, Users, 
   MapPin, Filter, ArrowUpDown, ChevronRight, FileText, FileSpreadsheet, X
 } from 'lucide-react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 
@@ -26,10 +26,13 @@ interface RunningLedgerEntry extends LedgerEntry {
 }
 
 export default function DispatchHistory() {
+  const navigate = useNavigate();
   const { 
     currentUser, selectedProfile, ledgerEntries, addLedgerEntry, 
     updateLedgerEntry, deleteLedgerEntry, loadModuleData, products, getProductById
   } = useApp();
+
+  const isProductManager = selectedProfile?.role === 'product_manager' || selectedProfile?.role === 'admin';
 
   useEffect(() => {
     loadModuleData('finance');
@@ -765,7 +768,16 @@ export default function DispatchHistory() {
                           Rs. {c.balance.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2 items-center">
+                            {isProductManager && (
+                              <Button 
+                                size="sm" 
+                                className="text-xs font-bold h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                onClick={() => navigate(`/pm/customer/${encodeURIComponent(c.name)}/today-invoice`)}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" /> Today Invoice
+                              </Button>
+                            )}
                             <Button 
                               size="sm" 
                               variant="outline" 
