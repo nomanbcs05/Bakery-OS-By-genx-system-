@@ -790,15 +790,27 @@ export default function Accounts() {
         <Dialog open={isCustDetailOpen} onOpenChange={setIsCustDetailOpen}>
           <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-background">
             <DialogHeader className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 text-white">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <DialogTitle className="text-xl font-bold text-white">
                     Customer Detailed Statement
                   </DialogTitle>
                   <DialogDescription className="text-indigo-100 text-sm mt-0.5">
-                    Account Ledger statement for <span className="font-bold underline">{selectedCustName}</span>
+                    Account Ledger statement for <span className="font-bold underline text-white">{selectedCustName}</span>
                   </DialogDescription>
                 </div>
+                {isProductManager && (
+                  <Button 
+                    size="sm" 
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs h-9 px-4 rounded-lg shadow-md flex items-center gap-1.5 border border-emerald-400"
+                    onClick={() => {
+                      setIsCustDetailOpen(false);
+                      navigate(`/pm/customer/${encodeURIComponent(selectedCustName || '')}/today-invoice`);
+                    }}
+                  >
+                    <FileText className="h-4 w-4" /> Today Invoice
+                  </Button>
+                )}
               </div>
             </DialogHeader>
 
@@ -1019,8 +1031,20 @@ export default function Accounts() {
               })()}
             </div>
             
-            <DialogFooter className="bg-slate-50 dark:bg-slate-900 px-6 py-3 border-t">
-              <Button size="sm" onClick={() => setIsCustDetailOpen(false)} className="rounded-lg px-5">
+            <DialogFooter className="bg-slate-50 dark:bg-slate-900 px-6 py-3 border-t flex items-center justify-between sm:justify-between w-full">
+              {isProductManager && (
+                <Button 
+                  size="sm" 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 px-4 shadow-sm"
+                  onClick={() => {
+                    setIsCustDetailOpen(false);
+                    navigate(`/pm/customer/${encodeURIComponent(selectedCustName || '')}/today-invoice`);
+                  }}
+                >
+                  <FileText className="h-4 w-4" /> Create Today Invoice
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setIsCustDetailOpen(false)} className="rounded-lg px-5">
                 Close
               </Button>
             </DialogFooter>
