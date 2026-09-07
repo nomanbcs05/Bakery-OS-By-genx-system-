@@ -39,7 +39,8 @@ export default function Accounts() {
   } = useApp();
 
   const navigate = useNavigate();
-  const isProductManager = selectedProfile?.role === 'product_manager' || selectedProfile?.role === 'admin';
+  const role = (selectedProfile?.role || currentUser?.role || '').toLowerCase();
+  const isProductManager = role === 'production_manager' || role === 'product_manager' || role === 'admin' || role.includes('manager');
 
   useEffect(() => {
     loadModuleData('hr');

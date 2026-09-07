@@ -32,7 +32,8 @@ export default function DispatchHistory() {
     updateLedgerEntry, deleteLedgerEntry, loadModuleData, products, getProductById
   } = useApp();
 
-  const isProductManager = selectedProfile?.role === 'product_manager' || selectedProfile?.role === 'admin';
+  const role = (selectedProfile?.role || currentUser?.role || '').toLowerCase();
+  const isProductManager = role === 'production_manager' || role === 'product_manager' || role === 'admin' || role.includes('manager');
 
   useEffect(() => {
     loadModuleData('finance');

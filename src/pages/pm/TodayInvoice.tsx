@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,8 +22,9 @@ export default function TodayInvoicePage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   // Security & Feature Flag check
-  // Allowed role: product_manager (or admin for system oversight)
-  const isProductManager = selectedProfile?.role === 'product_manager' || selectedProfile?.role === 'admin';
+  // Allowed role: production_manager / product_manager (or admin for system oversight)
+  const role = (selectedProfile?.role || currentUser?.role || '').toLowerCase();
+  const isProductManager = role === 'production_manager' || role === 'product_manager' || role === 'admin' || role.includes('manager');
 
   useEffect(() => {
     loadModuleData('sales');
