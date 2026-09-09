@@ -507,6 +507,15 @@ export default function Accounts() {
           <p className="text-sm text-muted-foreground">Manage bakery staff, salaries, and vouchers</p>
         </div>
         <div className="flex gap-2">
+          {isProductManager && (
+            <Button
+              onClick={() => navigate('/pm/today-billing')}
+              className="bg-[#1e3a6e] hover:bg-[#152a50] text-white font-bold text-xs gap-2 shadow-sm flex items-center"
+            >
+              <FileText className="h-4 w-4" />
+              Today's Billing
+            </Button>
+          )}
           <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2">

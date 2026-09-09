@@ -33,6 +33,7 @@ import AdvanceOrders from "./pages/AdvanceOrders";
 import AdvanceOrdersProduction from "./pages/AdvanceOrdersProduction";
 import Departments from "./pages/Departments";
 import TodayInvoicePage from "./pages/pm/TodayInvoice";
+import TodayBillingPage from "./pages/pm/TodayBilling";
 import NotFound from "./pages/NotFound";
 import type { UserRole } from "@/types";
 
@@ -206,6 +207,11 @@ const AppRoutes = () => {
         <Route path="/pm/customer/:id/today-invoice" element={
           <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
             <TodayInvoicePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/pm/today-billing" element={
+          <ProtectedRoute allowedRoles={['admin', 'production_manager']}>
+            <TodayBillingPage />
           </ProtectedRoute>
         } />
         <Route path="/credits" element={

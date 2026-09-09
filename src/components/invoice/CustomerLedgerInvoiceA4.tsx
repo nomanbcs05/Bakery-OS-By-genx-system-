@@ -23,192 +23,265 @@ export interface CustomerLedgerInvoiceA4Props {
   grandTotal: number;
 }
 
+// Inline SVG Logo
+const MABakersLogo = () => (
+  <svg width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 5 L90 25 L90 65 L50 95 L10 65 L10 25 Z" stroke="#1e3a6e" strokeWidth="4" fill="none" />
+    <path d="M50 14 L78 28 L78 62 L50 80 L22 62 L22 28 Z" stroke="#1e3a6e" strokeWidth="2.5" fill="none" />
+    <text x="50" y="58" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="26" fontWeight="900" fill="#1e3a6e">MA</text>
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', marginRight: '6px', flexShrink: 0, marginTop: '1px' }}>
+    <circle cx="12" cy="12" r="10" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+    <path d="M7 12.5L10.5 16L17 9" stroke="#1e3a6e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const CustomerLedgerInvoiceA4 = forwardRef<HTMLDivElement, CustomerLedgerInvoiceA4Props>(
   ({ invoiceNo, date, customer, items, todayTotal, prevBalance, totalAmount, grandTotal }, ref) => {
+    const MIN_ROWS = 6;
+    const emptyRowCount = Math.max(0, MIN_ROWS - items.length);
+
+    const cellStyle = (extra?: React.CSSProperties): React.CSSProperties => ({
+      padding: '7px 9px',
+      borderRight: '1px solid #d0dff0',
+      borderBottom: '1px solid #d0dff0',
+      fontSize: '11px',
+      ...extra,
+    });
+
     return (
-      <div 
-        ref={ref} 
-        className="bg-white text-black p-8 max-w-[210mm] mx-auto font-sans text-sm leading-normal print:p-6 print:m-0 print:w-full print:max-w-none"
-        style={{ minHeight: '297mm', boxSizing: 'border-box' }}
+      <div
+        ref={ref}
+        className="invoice-print-root"
+        style={{
+          width: '210mm',
+          minHeight: '297mm',
+          backgroundColor: '#ffffff',
+          color: '#000000',
+          fontFamily: "'Segoe UI', Arial, Helvetica, sans-serif",
+          fontSize: '12px',
+          lineHeight: '1.4',
+          boxSizing: 'border-box',
+          padding: '8mm 10mm',
+          margin: '0 auto',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
-        {/* Style tag for print layout */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        <style dangerouslySetInnerHTML={{
+          __html: `
           @media print {
-            @page {
-              size: A4 portrait;
-              margin: 10mm;
-            }
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-              background-color: white !important;
-            }
-            .no-print {
-              display: none !important;
-            }
+            @page { size: A4 portrait; margin: 0; }
+            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white !important; margin: 0 !important; }
+            .invoice-print-root { padding: 8mm 10mm !important; margin: 0 !important; }
+            .no-print { display: none !important; }
           }
         `}} />
 
-        {/* 1. HEADER DESIGN */}
-        <div className="text-center mb-6 border-b-2 border-black pb-4">
-          <div className="tracking-widest font-black text-xs uppercase text-slate-600 mb-1">
-            INVOICE
+        {/* ===== HEADER ===== */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '3mm', borderBottom: '2.5px solid #1e3a6e', marginBottom: '4mm' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <MABakersLogo />
+            <div>
+              <div style={{ fontSize: '30px', fontWeight: '900', color: '#1e3a6e', letterSpacing: '-0.5px', lineHeight: '1.1' }}>MA BAKERS</div>
+              <div style={{ fontSize: '9.5px', fontWeight: '700', color: '#1e3a6e', letterSpacing: '2.5px', textTransform: 'uppercase', marginTop: '3px' }}>PREMIUM BAKERY &amp; CAFE</div>
+              <div style={{ fontSize: '9px', fontWeight: '600', color: '#4a6a9e', letterSpacing: '2px', marginTop: '4px' }}>FRESH &nbsp;&nbsp;|&nbsp;&nbsp; QUALITY &nbsp;&nbsp;|&nbsp;&nbsp; TRUST</div>
+            </div>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-black uppercase mb-1">
-            M.A BAKERS
-          </h1>
-          <div className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-            RAHEEL MUSHTAQ SIDDIQUE
-          </div>
-          <div className="text-xs font-semibold text-slate-700 mt-1 flex justify-center gap-6">
-            <span>PHONE: 0309-3660360</span>
-            <span>PHONE: 0329-7040402</span>
+
+          <div style={{ textAlign: 'right', fontSize: '10px', color: '#1e3a6e' }}>
+            <div style={{ fontSize: '8.5px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '5px', color: '#1e3a6e' }}>
+              BAKING HAPPINESS<br />SINCE 1998
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end', marginBottom: '3px' }}>
+              <div style={{ fontSize: '10px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}>
+                  <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.47 11.47 0 003.58.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.47 11.47 0 00.57 3.58 1 1 0 01-.25 1.01l-2.2 2.2z" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                </svg>
+                <span style={{ fontWeight: '700' }}>Raheel Mushtaq</span><span style={{ color: '#6a8aae' }}> | </span><span style={{ fontWeight: '700' }}>Siddique</span>
+              </div>
+            </div>
+            <div style={{ marginBottom: '2px', fontWeight: '600' }}>0309-3660360 &nbsp;&nbsp;&nbsp;&nbsp; 0329-7040402</div>
+            <div style={{ marginBottom: '2px' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}>
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <path d="M2 7l10 7 10-7" stroke="#1e3a6e" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              info@mabakers.com.pk
+            </div>
+            <div style={{ marginBottom: '2px' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}>
+                <circle cx="12" cy="12" r="10" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <path d="M2 12h20M12 2c-2.5 2.5-4 5.5-4 10s1.5 7.5 4 10M12 2c2.5 2.5 4 5.5 4 10s-1.5 7.5-4 10" stroke="#1e3a6e" strokeWidth="1.8" fill="none" />
+              </svg>
+              www.mabakers.com.pk
+            </div>
+            <div>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}>
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <circle cx="12" cy="9" r="2.5" stroke="#1e3a6e" strokeWidth="1.8" fill="none" />
+              </svg>
+              Mabakers, Nawabshah, Sindh
+            </div>
           </div>
         </div>
 
-        {/* 2. CUSTOMER INFO BOX - with border */}
-        <div className="border-2 border-black p-4 rounded-md mb-6 bg-slate-50/50">
-          <div className="grid grid-cols-2 gap-y-2 text-xs">
-            <div className="flex">
-              <span className="font-bold w-36 uppercase text-slate-600">Invoice No:</span>
-              <span className="font-mono font-black text-black">{invoiceNo}</span>
+        {/* ===== INVOICE INFO BOX ===== */}
+        <div style={{ backgroundColor: '#e8f0fb', border: '1px solid #b8cce8', borderRadius: '5px', padding: '5mm 6mm', marginBottom: '4mm', position: 'relative', overflow: 'hidden' }}>
+          {/* Watermark */}
+          <div style={{ position: 'absolute', top: '8px', right: '14px', fontSize: '13px', fontFamily: 'Georgia, serif', fontStyle: 'italic', color: '#9ab8d8', lineHeight: '1.5', textAlign: 'right' }}>
+            Good<br />Food<br />Brings<br />People<br />Together
+          </div>
+
+          <div style={{ fontSize: '22px', fontWeight: '900', color: '#1e3a6e', marginBottom: '5px', letterSpacing: '1px' }}>INVOICE</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '55% 45%', rowGap: '4px', maxWidth: '88%' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '10.5px' }}>
+              <span style={{ color: '#4a6a9e', fontWeight: '600', minWidth: '105px' }}>Invoice No:</span>
+              <span style={{ fontWeight: '900', color: '#1e3a6e', fontFamily: 'monospace', fontSize: '11px' }}>{invoiceNo}</span>
             </div>
-            <div className="flex">
-              <span className="font-bold w-24 uppercase text-slate-600">Date:</span>
-              <span className="font-semibold text-black">{date}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '10.5px' }}>
+              <span style={{ color: '#4a6a9e', fontWeight: '600', minWidth: '38px' }}>Date:</span>
+              <span style={{ fontWeight: '700', color: '#1e3a6e' }}>{date}</span>
             </div>
-            <div className="flex">
-              <span className="font-bold w-36 uppercase text-slate-600">Customer Name:</span>
-              <span className="font-bold text-black uppercase">{customer.name || 'N/A'}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '10.5px' }}>
+              <span style={{ color: '#4a6a9e', fontWeight: '600', minWidth: '105px' }}>Customer Name:</span>
+              <span style={{ fontWeight: '900', color: '#1e3a6e', fontSize: '12px', textTransform: 'uppercase' }}>{customer.name || 'N/A'}</span>
             </div>
-            <div className="flex">
-              <span className="font-bold w-24 uppercase text-slate-600">City:</span>
-              <span className="font-semibold text-black uppercase">{customer.city || 'N/A'}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '10.5px' }}>
+              <span style={{ color: '#4a6a9e', fontWeight: '600', minWidth: '38px' }}>City:</span>
+              <span style={{ fontWeight: '700', color: '#1e3a6e', textTransform: 'uppercase' }}>{customer.city || 'N/A'}</span>
             </div>
-            <div className="flex col-span-2">
-              <span className="font-bold w-36 uppercase text-slate-600">Customer Contact No:</span>
-              <span className="font-mono font-semibold text-black">{customer.phone || 'N/A'}</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', fontSize: '10.5px' }}>
+              <span style={{ color: '#4a6a9e', fontWeight: '600', minWidth: '105px' }}>Customer Contact No:</span>
+              <span style={{ fontWeight: '600', color: '#1e3a6e', fontFamily: 'monospace' }}>{customer.phone || 'N/A'}</span>
             </div>
           </div>
         </div>
 
-        {/* 3. ITEMS TABLE - with border */}
-        <div className="border-2 border-black rounded-md overflow-hidden mb-6">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-200 border-b-2 border-black text-xs font-black uppercase text-black">
-                <th className="p-2.5 border-r-2 border-black w-12 text-center">Sr.</th>
-                <th className="p-2.5 border-r-2 border-black">Particulars</th>
-                <th className="p-2.5 border-r-2 border-black w-24 text-right">Qty</th>
-                <th className="p-2.5 border-r-2 border-black w-28 text-right">Rate</th>
-                <th className="p-2.5 w-32 text-right">Amount</th>
+        {/* ===== ITEMS TABLE ===== */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '5mm', border: '1px solid #b8cce8' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#1e3a6e' }}>
+              <th style={{ ...cellStyle({ color: '#fff', fontWeight: '800', fontSize: '9.5px', letterSpacing: '0.5px', textAlign: 'center', width: '36px', borderRight: '1px solid #3a5aae', borderBottom: 'none', textTransform: 'uppercase' }) }}>SR.</th>
+              <th style={{ ...cellStyle({ color: '#fff', fontWeight: '800', fontSize: '9.5px', letterSpacing: '0.5px', textAlign: 'left', borderRight: '1px solid #3a5aae', borderBottom: 'none', textTransform: 'uppercase' }) }}>PARTICULARS</th>
+              <th style={{ ...cellStyle({ color: '#fff', fontWeight: '800', fontSize: '9.5px', letterSpacing: '0.5px', textAlign: 'center', width: '55px', borderRight: '1px solid #3a5aae', borderBottom: 'none', textTransform: 'uppercase' }) }}>QTY</th>
+              <th style={{ ...cellStyle({ color: '#fff', fontWeight: '800', fontSize: '9.5px', letterSpacing: '0.5px', textAlign: 'center', width: '78px', borderRight: '1px solid #3a5aae', borderBottom: 'none', textTransform: 'uppercase' }) }}>RATE (PKR)</th>
+              <th style={{ ...cellStyle({ color: '#fff', fontWeight: '800', fontSize: '9.5px', letterSpacing: '0.5px', textAlign: 'right', width: '85px', borderRight: 'none', borderBottom: 'none', textTransform: 'uppercase' }) }}>AMOUNT (PKR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => (
+              <tr key={item.id || index} style={{ backgroundColor: '#ffffff' }}>
+                <td style={{ ...cellStyle({ textAlign: 'center', color: '#4a6a9e', fontWeight: '600' }) }}>{index + 1}</td>
+                <td style={{ ...cellStyle({ fontWeight: '700', color: '#1e3a6e', textTransform: 'uppercase' }) }}>{item.name}</td>
+                <td style={{ ...cellStyle({ textAlign: 'center', fontWeight: '700', color: '#000' }) }}>{item.qty}</td>
+                <td style={{ ...cellStyle({ textAlign: 'center', color: '#000' }) }}>{item.rate.toLocaleString()}</td>
+                <td style={{ ...cellStyle({ textAlign: 'right', fontWeight: '900', color: '#1e3a6e', borderRight: 'none' }) }}>{item.amount.toLocaleString()}</td>
               </tr>
-            </thead>
-            <tbody className="divide-y border-black text-xs">
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-6 text-center text-slate-400 italic">
-                    No items added to this invoice.
-                  </td>
-                </tr>
-              ) : (
-                items.map((item, index) => (
-                  <tr key={item.id || index} className="hover:bg-slate-50">
-                    <td className="p-2 border-r-2 border-black text-center font-mono text-slate-500">
-                      {index + 1}
-                    </td>
-                    <td className="p-2 border-r-2 border-black font-semibold text-black">
-                      {item.name}
-                    </td>
-                    <td className="p-2 border-r-2 border-black text-right font-mono font-bold">
-                      {item.qty}
-                    </td>
-                    <td className="p-2 border-r-2 border-black text-right font-mono">
-                      {item.rate.toLocaleString()}
-                    </td>
-                    <td className="p-2 text-right font-mono font-black text-black">
-                      {item.amount.toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
+            ))}
+            {Array.from({ length: emptyRowCount }).map((_, i) => (
+              <tr key={`empty-${i}`}>
+                <td style={{ ...cellStyle({ height: '28px' }) }}>&nbsp;</td>
+                <td style={{ ...cellStyle({}) }}>&nbsp;</td>
+                <td style={{ ...cellStyle({}) }}>&nbsp;</td>
+                <td style={{ ...cellStyle({}) }}>&nbsp;</td>
+                <td style={{ ...cellStyle({ borderRight: 'none' }) }}>&nbsp;</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-              {/* Pad empty rows if fewer than 5 items to make A4 look balanced */}
-              {items.length > 0 && items.length < 5 && Array.from({ length: 5 - items.length }).map((_, i) => (
-                <tr key={`empty-${i}`} className="opacity-40">
-                  <td className="p-2 border-r-2 border-black text-center font-mono">&nbsp;</td>
-                  <td className="p-2 border-r-2 border-black">&nbsp;</td>
-                  <td className="p-2 border-r-2 border-black text-right">&nbsp;</td>
-                  <td className="p-2 border-r-2 border-black text-right">&nbsp;</td>
-                  <td className="p-2 text-right">&nbsp;</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* ===== BOTTOM: Payment Terms + Totals ===== */}
+        <div style={{ display: 'flex', gap: '8mm', marginBottom: '4mm', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '7px' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="2" width="8" height="4" rx="1" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <path d="M8 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <line x1="9" y1="9" x2="15" y2="9" stroke="#1e3a6e" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="9" y1="13" x2="15" y2="13" stroke="#1e3a6e" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="9" y1="17" x2="13" y2="17" stroke="#1e3a6e" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#1e3a6e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>PAYMENT TERMS &amp; CONDITIONS</span>
+            </div>
+            {['Payment is due within the agreed term.', 'Kindly clear your invoice daily basis.', 'Late payments may be subject to additional charges.', 'For any queries, please contact us.'].map((t, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '5px', fontSize: '10px', color: '#333' }}>
+                <CheckIcon /><span>{t}</span>
+              </div>
+            ))}
+          </div>
 
-        {/* 4. SUMMARY BOX - Bold, Right Aligned */}
-        <div className="flex justify-end mb-10">
-          <div className="w-80 border-2 border-black rounded-md p-3 bg-slate-50 space-y-1.5 text-xs">
-            <div className="flex justify-between items-center py-0.5">
-              <span className="font-bold text-slate-700 uppercase">Current Invoice:</span>
-              <span className="font-mono font-bold text-black">
-                PKR {todayTotal.toLocaleString()}
-              </span>
+          {/* Totals */}
+          <div style={{ width: '225px', border: '1px solid #b8cce8', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '1px solid #dce8f5' }}>
+              <span style={{ fontSize: '9.5px', fontWeight: '600', color: '#4a6a9e', textTransform: 'uppercase', letterSpacing: '0.3px' }}>CURRENT INVOICE</span>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: '#1e3a6e' }}>PKR {todayTotal.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center py-0.5 border-b border-slate-300 pb-1.5">
-              <span className="font-bold text-slate-700 uppercase">Previous Remaining Balance:</span>
-              <span className={`font-mono font-bold ${prevBalance > 0 ? 'text-rose-700' : 'text-slate-800'}`}>
-                PKR {prevBalance.toLocaleString()}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '1px solid #dce8f5', backgroundColor: '#f5f8fd' }}>
+              <span style={{ fontSize: '9.5px', fontWeight: '600', color: '#4a6a9e', textTransform: 'uppercase', letterSpacing: '0.3px' }}>PREVIOUS REMAINING BALANCE</span>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: prevBalance > 0 ? '#b91c1c' : '#1e3a6e' }}>PKR {prevBalance.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center py-0.5">
-              <span className="font-bold text-slate-800 uppercase">Total Invoice Amount:</span>
-              <span className="font-mono font-black text-black text-sm">
-                PKR {totalAmount.toLocaleString()}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '2px solid #1e3a6e' }}>
+              <span style={{ fontSize: '9.5px', fontWeight: '700', color: '#1e3a6e', textTransform: 'uppercase', letterSpacing: '0.3px' }}>TOTAL INVOICE AMOUNT</span>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: '#1e3a6e' }}>PKR {totalAmount.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center pt-1.5 border-t-2 border-black">
-              <span className="font-black text-black text-sm uppercase">Grand Total:</span>
-              <span className="font-mono font-black text-black text-base underline decoration-double">
-                PKR {grandTotal.toLocaleString()}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: '#1e3a6e' }}>
+              <span style={{ fontSize: '11px', fontWeight: '900', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GRAND TOTAL</span>
+              <span style={{ fontSize: '13px', fontWeight: '900', color: '#ffffff', fontFamily: 'monospace' }}>PKR {grandTotal.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        {/* 5. FOOTER */}
-        <div className="mt-auto pt-6 border-t border-slate-300">
-          {/* Center: Payment Term & Conditions */}
-          <div className="text-center mb-8">
-            <div className="text-xs font-black uppercase tracking-wider text-slate-800">
-              Payment Term & Conditions
-            </div>
-            <div className="text-xs font-bold text-rose-700 mt-1 uppercase tracking-wide">
-              Kindly clear your Invoice DAILY BASIS
-            </div>
-          </div>
-
-          {/* Signatures Left & Right */}
-          <div className="flex justify-between items-end px-4 mb-8 text-xs font-bold text-black">
-            <div className="text-left">
-              <div className="w-52 border-b-2 border-black mb-1.5"></div>
-              <span>Checked & Approved By</span>
-            </div>
-            <div className="text-right">
-              <div className="w-52 border-b-2 border-black mb-1.5 ml-auto"></div>
-              <span>Customer Signature: ___________</span>
+        {/* ===== SIGNATURES ===== */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '5mm', marginBottom: '5mm' }}>
+          <div>
+            <div style={{ width: '150px', borderBottom: '1.5px solid #1e3a6e', marginBottom: '5px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="#1e3a6e" strokeWidth="2" fill="none" />
+                <path d="M7 12.5L10.5 16L17 9" stroke="#1e3a6e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: '#1e3a6e' }}>Checked &amp; Approved By</div>
+                <div style={{ fontSize: '10px', color: '#4a6a9e' }}>M.A Bakers</div>
+              </div>
             </div>
           </div>
 
-          {/* Center Bottom Addresses */}
-          <div className="text-center border-t border-black pt-3 text-[10px] text-slate-600 space-y-0.5">
-            <div className="font-medium">
-              <span className="font-bold text-black">Address:</span> Main Factory Gate, M.A Bakers, Narowal Road
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginBottom: '5px' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17 3a2.83 2.83 0 014 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="#1e3a6e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+              <span style={{ fontSize: '10px', fontWeight: '600', color: '#1e3a6e' }}>Customer Signature</span>
             </div>
-            <div className="font-semibold text-black tracking-tight">
-              Website: Mabakers.com.pk | Frosto.com.pk | FB | Insta
-            </div>
+            <div style={{ width: '140px', borderBottom: '1.5px solid #1e3a6e', marginBottom: '6px', marginLeft: 'auto' }} />
+            <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '19px', fontWeight: '700', color: '#1e3a6e', lineHeight: '1' }}>Thank You!</div>
+            <div style={{ fontSize: '8px', fontWeight: '700', color: '#4a6a9e', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>FOR YOUR BUSINESS</div>
+          </div>
+        </div>
+
+        {/* ===== FOOTER ===== */}
+        <div style={{ backgroundColor: '#1e3a6e', borderRadius: '3px', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', color: '#d0e0f8', fontSize: '10px', fontWeight: '600', gap: '4px' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="#d0e0f8" strokeWidth="2" fill="none" />
+              <circle cx="12" cy="9" r="2.5" stroke="#d0e0f8" strokeWidth="1.8" fill="none" />
+            </svg>
+            Mabakers, Nawabshah, Sindh
+          </div>
+          <div style={{ color: '#8aadcc', fontSize: '12px' }}>|</div>
+          <div style={{ display: 'flex', alignItems: 'center', color: '#d0e0f8', fontSize: '10px', fontWeight: '600', gap: '4px' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke="#d0e0f8" strokeWidth="2" fill="none" />
+              <path d="M2 12h20M12 2c-2.5 2.5-4 5.5-4 10s1.5 7.5 4 10M12 2c2.5 2.5 4 5.5 4 10s-1.5 7.5-4 10" stroke="#d0e0f8" strokeWidth="1.8" fill="none" />
+            </svg>
+            www.mabakers.com.pk
           </div>
         </div>
       </div>
