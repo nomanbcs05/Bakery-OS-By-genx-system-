@@ -1573,19 +1573,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ─── Helper: Upsert dispatch with retry + DB verification ─────────────────
+  const dispatchUpsertWithRetry = async (dispatchData: Dispatch, maxRetries = 2): Promise<boolean> => {
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const { error } = await supabase.from('dispatches').upsert([toDBDispatch(dispatchData)]);
+        if (error) throw error;
+
+        // ── Verify the record actually landed in DB ──
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('dispatches')
+          .select('id')
+          .eq('id', dispatchData.id)
+          .maybeSingle();
+
+        if (verifyError) {
+          console.error(`[Dispatch Save] DB verify error on attempt ${attempt}:`, verifyError);
+        } else if (verifyData) {
+          return true; // ✅ Confirmed in DB
+        } else {
+          console.error(`[Dispatch Save] Dispatch ${dispatchData.id} NOT FOUND in DB after upsert — attempt ${attempt}. Retrying...`);
+        }
+      } catch (err: any) {
+        console.error(`[Dispatch Save] Upsert attempt ${attempt} failed for ${dispatchData.id}:`, err?.message || err);
+      }
+      if (attempt <= maxRetries) {
+        await new Promise(r => setTimeout(r, 600 * attempt)); // 600ms, 1200ms backoff
+      }
+    }
+    return false;
+  };
+
   const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => {
     const id = `d${Date.now()}`;
     const today = new Date().toISOString().slice(0, 10);
     const todayDispatches = dispatches.filter(d => d.date === today);
     const tokenNumber = todayDispatches.length + 1;
     const dispatch: Dispatch = { id, destination, date: today, status: 'confirmed', items, tokenNumber, syncStatus: isOnline ? 'synced' : 'pending' };
+    // ✅ Always save locally first — dispatch is NEVER lost even if DB is temporarily down
     setDispatches(prev => [...prev, dispatch]);
+
     if (isOnline && hasSupabaseConfig) {
-      try {
-        const { error } = await supabase.from('dispatches').upsert([toDBDispatch(dispatch)]);
-        if (error) throw error;
-      } catch (err) {
+      const saved = await dispatchUpsertWithRetry(dispatch, 2);
+      if (!saved) {
+        console.error(`[Dispatch Save] ❌ ALL retries exhausted for dispatch ${id} (dest: ${destination}). Keeping as 'pending' — will auto-sync on reconnect.`);
         setDispatches(prev => prev.map(d => d.id === id ? { ...d, syncStatus: 'pending' } : d));
+        toast.warning('Dispatch saved locally. Cloud sync will retry automatically when connection is stable.', { duration: 6000 });
       }
     }
 

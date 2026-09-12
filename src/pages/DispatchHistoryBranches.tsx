@@ -12,7 +12,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import {
   Truck, Search, Download, Trash2, Filter, X, Calendar,
   FileText, FileSpreadsheet, Package, ChevronDown, ChevronRight,
-  Building2, AlertTriangle, CheckCircle2, Printer, Coins, Users, Clock, ShoppingBag
+  Building2, AlertTriangle, CheckCircle2, Printer, Coins, Users, Clock, ShoppingBag,
+  LayoutList, ShieldAlert
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -20,6 +21,8 @@ import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 import type { Dispatch } from '@/types';
 import ReceiptDialog from '@/components/ReceiptDialog';
 import GOTDialog from '@/components/GOTDialog';
+import DispatchItemSummaryModal from '@/components/DispatchItemSummaryModal';
+
 
 export default function DispatchHistoryBranches() {
   const {
@@ -45,6 +48,13 @@ export default function DispatchHistoryBranches() {
   // Clear history dialog
   const [isClearOpen, setIsClearOpen] = useState(false);
   const [clearTarget, setClearTarget] = useState<'all' | 'branch_1' | 'branch_2'>('all');
+  // Admin PIN gate for Clear History (PIN: 9036)
+  const [clearPin, setClearPin] = useState('');
+  const [clearPinError, setClearPinError] = useState(false);
+
+  // Per Item Summary print modal
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
 
   // Reprint states
   const [reprintGOTData, setReprintGOTData] = useState<{
@@ -180,11 +190,20 @@ export default function DispatchHistoryBranches() {
   };
 
   const handleClearHistory = async () => {
+    const ADMIN_PIN = '9036';
+    if (clearPin !== ADMIN_PIN) {
+      setClearPinError(true);
+      toast.error('Incorrect admin PIN. History was NOT cleared.');
+      return;
+    }
     await clearBranchDispatches(clearTarget);
     setIsClearOpen(false);
+    setClearPin('');
+    setClearPinError(false);
     const label = clearTarget === 'all' ? 'All branch' : clearTarget === 'branch_1' ? 'Branch 1' : 'Branch 2';
     toast.success(`${label} dispatch history cleared successfully`);
   };
+
 
   const handleReprint = (d: Dispatch) => {
     const isBranch = d.destination === 'branch_1' || d.destination === 'branch_2';
@@ -332,11 +351,21 @@ export default function DispatchHistoryBranches() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Per Item Summary Print — NEW */}
+          <Button
+            variant="outline"
+            className="h-10 border-indigo-100 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 dark:border-indigo-900 dark:text-indigo-400 dark:hover:bg-indigo-950/20 flex items-center gap-2 font-bold rounded-2xl transition-all shadow-sm"
+            onClick={() => setIsSummaryOpen(true)}
+            title="Print per-item summary for current filtered view"
+          >
+            <LayoutList className="h-4 w-4" /> Per Item Summary
+          </Button>
+
           {/* Clear History */}
           <Button
             variant="outline"
             className="h-10 border-rose-100 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/20 flex items-center gap-2 font-bold rounded-2xl transition-all"
-            onClick={() => { setClearTarget('all'); setIsClearOpen(true); }}
+            onClick={() => { setClearTarget('all'); setClearPin(''); setClearPinError(false); setIsClearOpen(true); }}
           >
             <Trash2 className="h-4 w-4" /> Clear History
           </Button>
@@ -360,6 +389,7 @@ export default function DispatchHistoryBranches() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
       </div>
 
       {/* KPI Dashboard Stats Cards */}
@@ -788,6 +818,25 @@ export default function DispatchHistoryBranches() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-500" /> Admin Security PIN Required
+              </Label>
+              <Input
+                type="password"
+                placeholder="Enter 4-digit admin PIN"
+                value={clearPin}
+                onChange={e => {
+                  setClearPin(e.target.value);
+                  if (clearPinError && e.target.value === '9036') setClearPinError(false);
+                }}
+                className={`h-10 rounded-xl border-slate-200 text-sm font-semibold ${clearPinError ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50/20' : ''}`}
+              />
+              {clearPinError && (
+                <p className="text-rose-600 text-xs font-bold mt-1">Incorrect PIN. Please enter admin PIN (9036) to confirm.</p>
+              )}
+            </div>
+
             <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-2xl p-4">
               <p className="text-xs text-rose-700 dark:text-rose-300 font-bold">
                 ⚠️ Confirming this will erase <strong>
@@ -838,6 +887,13 @@ export default function DispatchHistoryBranches() {
         destination={reprintGOTData.destination}
         tokenNumber={reprintGOTData.tokenNumber}
         autoPrint={true}
+      />
+
+      {/* Per-Item Aggregated Summary Modal */}
+      <DispatchItemSummaryModal
+        open={isSummaryOpen}
+        onClose={() => setIsSummaryOpen(false)}
+        filteredDispatches={filteredDispatches}
       />
     </div>
   );
