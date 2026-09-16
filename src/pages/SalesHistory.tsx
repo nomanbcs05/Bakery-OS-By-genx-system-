@@ -26,6 +26,24 @@ export default function SalesHistory() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const summaryRef = useRef<HTMLDivElement>(null);
 
+  const formatSaleTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+      }
+    } catch {
+      // fallback
+    }
+    return '';
+  };
+
+  const formatSaleDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    return dateStr.split('T')[0].split(' ')[0];
+  };
+
   const filtered = useMemo(() => {
     return sales.filter(sale => {
       // Branch filter
@@ -37,20 +55,24 @@ export default function SalesHistory() {
         }
       }
       // Date filter
-      if (dateFrom && sale.date < format(dateFrom, 'yyyy-MM-dd')) return false;
-      if (dateTo && sale.date > format(dateTo, 'yyyy-MM-dd')) return false;
+      const saleDateOnly = formatSaleDate(sale.date);
+      if (dateFrom && saleDateOnly < format(dateFrom, 'yyyy-MM-dd')) return false;
+      if (dateTo && saleDateOnly > format(dateTo, 'yyyy-MM-dd')) return false;
       // Search
       if (search) {
         const q = safeLower(search);
         const matchesId = safeLower(sale.id).includes(q);
+        const matchesDate = safeLower(sale.date).includes(q);
+        const matchesTime = safeLower(formatSaleTime(sale.date)).includes(q);
+        const matchesBranch = safeLower(getBranchLabel(sale)).includes(q);
         const matchesProduct = sale.items.some(i => {
           const p = getProductById(i.productId);
           return p ? safeLower(p.name).includes(q) : false;
         });
-        if (!matchesId && !matchesProduct) return false;
+        if (!matchesId && !matchesDate && !matchesTime && !matchesBranch && !matchesProduct) return false;
       }
       return true;
-    }).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id.localeCompare(a.id));
   }, [sales, branchFilter, dateFrom, dateTo, search, getProductById]);
 
   const branchSummary = useMemo(() => {
@@ -87,10 +109,11 @@ export default function SalesHistory() {
   };
 
   const exportCSV = () => {
-    const headers = ['Sale ID', 'Date', 'Branch', 'Items', 'Payment', 'Total'];
+    const headers = ['Sale ID', 'Date', 'Time', 'Branch', 'Items', 'Payment', 'Total'];
     const rows = filtered.map(sale => [
       sale.id,
-      sale.date,
+      formatSaleDate(sale.date),
+      formatSaleTime(sale.date),
       getBranchLabel(sale),
       sale.items.map(i => {
         const p = getProductById(i.productId);
@@ -149,10 +172,10 @@ export default function SalesHistory() {
         </table>
         <h2 style="font-size:16px;margin-top:24px;">Detailed Transactions (${filtered.length})</h2>
         <table>
-          <tr><th>ID</th><th>Date</th><th>Branch</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr>
+          <tr><th>ID</th><th>Date & Time</th><th>Branch</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr>
           ${filtered.map(sale => `<tr>
             <td>${sale.id}</td>
-            <td>${sale.date}</td>
+            <td>${formatSaleDate(sale.date)}${formatSaleTime(sale.date) ? ` <span style="color:#666;font-size:11px;">(${formatSaleTime(sale.date)})</span>` : ''}</td>
             <td>${getBranchLabel(sale)}</td>
             <td>${sale.items.map(i => { const p = getProductById(i.productId); return `${p?.name || '?'} x${i.quantity}`; }).join(', ')}</td>
             <td>${sale.paymentMethod}</td>
@@ -277,7 +300,7 @@ export default function SalesHistory() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Sale ID</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Date & Time</TableHead>
                   <TableHead>Branch</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Payment</TableHead>
@@ -287,8 +310,14 @@ export default function SalesHistory() {
               <TableBody>
                 {filtered.map(sale => (
                   <TableRow key={sale.id}>
-                    <TableCell className="font-mono text-xs">{sale.id}</TableCell>
-                    <TableCell>{sale.date}</TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">{sale.id}</TableCell>
+                    <TableCell>
+                      <div className="font-medium text-foreground">{formatSaleDate(sale.date)}</div>
+                      <div className="text-xs text-muted-foreground font-mono flex items-center gap-1 mt-0.5">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/70"></span>
+                        {formatSaleTime(sale.date) || '—'}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge className={getBranchColor(sale)} variant="secondary">{getBranchLabel(sale)}</Badge>
                     </TableCell>
