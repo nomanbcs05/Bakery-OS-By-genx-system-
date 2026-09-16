@@ -231,11 +231,20 @@ const fromDBProduct = (p: DBProduct): Product => ({
 const fromDBBatch = (b: DBProductionBatch): ProductionBatch => ({
   id: b.id, items: b.items || [], date: b.date, notes: b.notes, syncStatus: b.sync_status || 'synced'
 });
-const fromDBSale = (s: DBSale): Sale => ({
-  id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: String(s.payment_method || 'cash'), 
-  customerName: s.customer_name ? String(s.customer_name) : undefined, customerPhone: s.customer_phone ? String(s.customer_phone) : undefined, isCreditPaid: s.is_credit_paid,
-  date: s.date, syncStatus: s.sync_status || 'synced'
-});
+const fromDBSale = (s: DBSale): Sale => {
+  let createdAt = (s as any).created_at || (s as any).createdAt;
+  if (!createdAt && s.id && /^s\d{10,15}$/.test(s.id)) {
+    const epoch = parseInt(s.id.slice(1), 10);
+    if (!isNaN(epoch) && epoch > 1500000000000 && epoch < 2500000000000) {
+      createdAt = new Date(epoch).toISOString();
+    }
+  }
+  return {
+    id: s.id, type: s.type, branch: s.branch, items: s.items, total: s.total, paymentMethod: String(s.payment_method || 'cash'), 
+    customerName: s.customer_name ? String(s.customer_name) : undefined, customerPhone: s.customer_phone ? String(s.customer_phone) : undefined, isCreditPaid: s.is_credit_paid,
+    date: s.date, createdAt, syncStatus: s.sync_status || 'synced'
+  };
+};
 const fromDBExpense = (e: DBExpense): Expense => ({
   id: e.id, title: e.title, amount: e.amount, category: e.category, date: e.date, branchId: e.branch_id, syncStatus: e.sync_status || 'synced'
 });
@@ -1632,7 +1641,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       const total = saleItems.reduce((sum, si) => sum + si.quantity * si.unitPrice, 0);
       const saleName = destination === 'walkin' ? customerName : destination;
-      const walkinSale: Sale = { id: `s${Date.now()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName: saleName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: today, syncStatus: isOnline ? 'synced' : 'pending' };
+      const walkinNow = new Date();
+      const walkinIso = walkinNow.toISOString();
+      const walkinSale: Sale = { id: `s${walkinNow.getTime()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName: saleName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: walkinIso, createdAt: walkinIso, syncStatus: isOnline ? 'synced' : 'pending' };
       setSales(prev => [...prev, walkinSale]);
       if (isOnline && hasSupabaseConfig) {
         try {
@@ -1698,9 +1709,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => {
     const total = manualTotal !== undefined ? manualTotal : items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
-    const id = `s${Date.now()}`;
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: todayStr, syncStatus: isOnline ? 'synced' : 'pending' };
+    const now = new Date();
+    const id = `s${now.getTime()}`;
+    const isoString = now.toISOString();
+    const todayStr = isoString.slice(0, 10);
+    const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: isoString, createdAt: isoString, syncStatus: isOnline ? 'synced' : 'pending' };
     setSales(prev => [...prev, newSale]);
     if (isOnline && hasSupabaseConfig) {
       try {

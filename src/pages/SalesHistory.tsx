@@ -26,22 +26,62 @@ export default function SalesHistory() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const summaryRef = useRef<HTMLDivElement>(null);
 
-  const formatSaleTime = (dateStr: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-      }
-    } catch {
-      // fallback
+  const getSaleTimestamp = (sale: typeof sales[0]): number => {
+    if (sale.createdAt) {
+      const t = new Date(sale.createdAt).getTime();
+      if (!isNaN(t)) return t;
     }
-    return '';
+    if (sale.date && sale.date.includes('T')) {
+      const t = new Date(sale.date).getTime();
+      if (!isNaN(t)) return t;
+    }
+    if (sale.id && /^s\d{10,15}$/.test(sale.id)) {
+      const epoch = parseInt(sale.id.slice(1), 10);
+      if (!isNaN(epoch) && epoch > 1500000000000 && epoch < 2500000000000) {
+        return epoch;
+      }
+    }
+    if (sale.date) {
+      const t = new Date(sale.date).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
   };
 
-  const formatSaleDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    return dateStr.split('T')[0].split(' ')[0];
+  const hasSaleTime = (sale: typeof sales[0]): boolean => {
+    if (sale.createdAt) return true;
+    if (sale.date && (sale.date.includes('T') || sale.date.includes(':'))) return true;
+    if (sale.id && /^s\d{10,15}$/.test(sale.id)) {
+      const epoch = parseInt(sale.id.slice(1), 10);
+      return !isNaN(epoch) && epoch > 1500000000000 && epoch < 2500000000000;
+    }
+    return false;
+  };
+
+  const formatSaleDateTime = (sale: typeof sales[0]) => {
+    const dStr = formatSaleDate(sale);
+    const tStr = formatSaleTime(sale);
+    if (dStr && tStr) return `${dStr}, ${tStr}`;
+    return dStr || tStr || sale.date || '';
+  };
+
+  const formatSaleDate = (sale: typeof sales[0]) => {
+    const ts = getSaleTimestamp(sale);
+    if (!ts) return sale.date ? sale.date.split('T')[0].split(' ')[0] : '';
+    return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
+  };
+
+  const formatSaleTime = (sale: typeof sales[0]) => {
+    if (!hasSaleTime(sale)) return '';
+    const ts = getSaleTimestamp(sale);
+    if (!ts) return '';
+    return new Date(ts).toLocaleTimeString('en-US', {
+      timeZone: 'Asia/Karachi',
+      hour12: true,
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   const filtered = useMemo(() => {
@@ -54,25 +94,24 @@ export default function SalesHistory() {
           if (sale.branch !== branchFilter) return false;
         }
       }
-      // Date filter
-      const saleDateOnly = formatSaleDate(sale.date);
+      // Date filter (comparing against YYYY-MM-DD in PKT)
+      const saleDateOnly = formatSaleDate(sale);
       if (dateFrom && saleDateOnly < format(dateFrom, 'yyyy-MM-dd')) return false;
       if (dateTo && saleDateOnly > format(dateTo, 'yyyy-MM-dd')) return false;
       // Search
       if (search) {
         const q = safeLower(search);
         const matchesId = safeLower(sale.id).includes(q);
-        const matchesDate = safeLower(sale.date).includes(q);
-        const matchesTime = safeLower(formatSaleTime(sale.date)).includes(q);
+        const matchesDateTime = safeLower(formatSaleDateTime(sale)).includes(q);
         const matchesBranch = safeLower(getBranchLabel(sale)).includes(q);
         const matchesProduct = sale.items.some(i => {
           const p = getProductById(i.productId);
           return p ? safeLower(p.name).includes(q) : false;
         });
-        if (!matchesId && !matchesDate && !matchesTime && !matchesBranch && !matchesProduct) return false;
+        if (!matchesId && !matchesDateTime && !matchesBranch && !matchesProduct) return false;
       }
       return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id.localeCompare(a.id));
+    }).sort((a, b) => getSaleTimestamp(b) - getSaleTimestamp(a) || b.id.localeCompare(a.id));
   }, [sales, branchFilter, dateFrom, dateTo, search, getProductById]);
 
   const branchSummary = useMemo(() => {
@@ -109,11 +148,12 @@ export default function SalesHistory() {
   };
 
   const exportCSV = () => {
-    const headers = ['Sale ID', 'Date', 'Time', 'Branch', 'Items', 'Payment', 'Total'];
+    const headers = ['Sale ID', 'Date & Time', 'Date', 'Time', 'Branch', 'Items', 'Payment', 'Total'];
     const rows = filtered.map(sale => [
       sale.id,
-      formatSaleDate(sale.date),
-      formatSaleTime(sale.date),
+      formatSaleDateTime(sale),
+      formatSaleDate(sale),
+      formatSaleTime(sale),
       getBranchLabel(sale),
       sale.items.map(i => {
         const p = getProductById(i.productId);
@@ -175,7 +215,7 @@ export default function SalesHistory() {
           <tr><th>ID</th><th>Date & Time</th><th>Branch</th><th>Items</th><th>Payment</th><th class="right">Total</th></tr>
           ${filtered.map(sale => `<tr>
             <td>${sale.id}</td>
-            <td>${formatSaleDate(sale.date)}${formatSaleTime(sale.date) ? ` <span style="color:#666;font-size:11px;">(${formatSaleTime(sale.date)})</span>` : ''}</td>
+            <td>${formatSaleDateTime(sale)}</td>
             <td>${getBranchLabel(sale)}</td>
             <td>${sale.items.map(i => { const p = getProductById(i.productId); return `${p?.name || '?'} x${i.quantity}`; }).join(', ')}</td>
             <td>${sale.paymentMethod}</td>
@@ -312,10 +352,10 @@ export default function SalesHistory() {
                   <TableRow key={sale.id}>
                     <TableCell className="font-mono text-xs font-semibold">{sale.id}</TableCell>
                     <TableCell>
-                      <div className="font-medium text-foreground">{formatSaleDate(sale.date)}</div>
+                      <div className="font-medium text-foreground">{formatSaleDate(sale)}</div>
                       <div className="text-xs text-muted-foreground font-mono flex items-center gap-1 mt-0.5">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/70"></span>
-                        {formatSaleTime(sale.date) || '—'}
+                        {formatSaleTime(sale) || '—'}
                       </div>
                     </TableCell>
                     <TableCell>

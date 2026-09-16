@@ -99,6 +99,7 @@ export interface Sale {
   customerPhone?: string;
   isCreditPaid?: boolean;
   date: string;
+  createdAt?: string;
   syncStatus: 'synced' | 'pending';
 }
 
@@ -187,6 +188,8 @@ export interface DBSale {
   customer_phone?: string;
   is_credit_paid?: boolean;
   date: string;
+  created_at?: string;
+  createdAt?: string;
   sync_status: 'synced' | 'pending';
 }
 
