@@ -299,7 +299,7 @@ export default function POS({ branch }: POSProps) {
     const printDate = now.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const printTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-    const win = window.open('', '_blank', 'width=800,height=700');
+    const win = window.open('', '_blank', 'width=400,height=700');
     if (!win) return;
 
     win.document.write(`
@@ -307,101 +307,117 @@ export default function POS({ branch }: POSProps) {
       <html>
       <head>
         <title>${branchLabel} - Products Summary</title>
+        <meta charset="UTF-8">
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; color: #1f2937; max-width: 800px; margin: 0 auto; }
-          .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px; }
-          .header h1 { margin: 0 0 4px 0; font-size: 22px; color: #b91c1c; }
-          .header h2 { margin: 0 0 6px 0; font-size: 16px; color: #374151; }
-          .header p { margin: 2px 0; font-size: 12px; color: #6b7280; }
-          .cat-section { margin-bottom: 20px; page-break-inside: avoid; }
-          .cat-title { background: #fee2e2; color: #991b1b; padding: 6px 12px; font-size: 14px; font-weight: bold; border-radius: 4px; display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px; }
-          th { background: #f9fafb; text-align: left; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #4b5563; }
-          td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
-          .right { text-align: right; }
-          .center { text-align: center; }
-          .subtotal-row { background: #fff5f5; font-weight: 600; border-top: 1px solid #fca5a5; }
-          .badge-out { color: #dc2626; font-weight: bold; font-size: 11px; }
-          .badge-ok { color: #15803d; font-weight: 600; }
-          .grand-total-box { margin-top: 24px; padding: 16px; background: #fef2f2; border: 2px solid #f87171; border-radius: 8px; page-break-inside: avoid; }
-          .grand-total-box table { margin: 0; font-size: 15px; font-weight: bold; }
-          .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #9ca3af; border-top: 1px dashed #e5e7eb; padding-top: 12px; }
+          @page { size: 80mm auto; margin: 0; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: Arial, 'Courier New', monospace;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 4mm 3mm;
+            width: 76mm;
+          }
+          .title1 { font-size: 13px; font-weight: bold; text-align: center; margin: 0 0 1px 0; }
+          .title2 { font-size: 10px; font-weight: bold; text-align: center; margin: 0 0 4px 0; letter-spacing: 0.5px; }
+          .meta { font-size: 9px; text-align: center; margin: 1px 0; }
+          .dot-line { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+          .solid-line { border: none; border-top: 1px solid #000; margin: 4px 0; }
+          .cat-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 5px 0 2px 0;
+            word-wrap: break-word;
+          }
+          .prod-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: 10px;
+            margin: 2px 0;
+            gap: 4px;
+          }
+          .prod-name {
+            flex: 1;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.3;
+          }
+          .prod-stock {
+            white-space: nowrap;
+            font-weight: bold;
+            min-width: 28px;
+            text-align: right;
+          }
+          .out-label { font-style: italic; font-size: 8px; font-weight: normal; }
+          .cat-total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 3px;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin: 3px 0;
+          }
+          .summary-row.bold-row {
+            font-weight: bold;
+            font-size: 11px;
+          }
+          .footer-txt { font-size: 8px; text-align: center; margin-top: 6px; }
           @media print {
-            body { padding: 10px; }
-            .header h1 { color: #000; }
-            .cat-title { background: #eee !important; color: #000 !important; }
-            .grand-total-box { background: #fafafa !important; border-color: #000 !important; }
+            body { width: 76mm; padding: 3mm 2mm; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>🍞 BakeryOS — ${branchLabel}</h1>
-          <h2>REMAINING PRODUCTS SUMMARY BY CATEGORY</h2>
-          <p><strong>Print Date & Time:</strong> ${printDate} at ${printTime}</p>
-          <p>Branch: ${branchLabel} | Generated by: ${currentUser?.name || 'Staff'}</p>
-        </div>
+        <div class="title1">BakeryOS &mdash; ${branchLabel}</div>
+        <div class="title2">REMAINING PRODUCTS SUMMARY BY CATEGORY</div>
+        <hr class="solid-line">
+        <div class="meta">Print Date &amp; Time: ${printDate} at ${printTime}</div>
+        <div class="meta">Branch: ${branchLabel} | Generated by: ${currentUser?.name || 'Staff'}</div>
+        <hr class="dot-line">
 
         ${Object.entries(categoriesMap).map(([catName, items]) => {
           const catUnits = items.reduce((sum, i) => sum + i.remaining, 0);
-          const catVal = items.reduce((sum, i) => sum + i.value, 0);
           return `
-            <div class="cat-section">
-              <div class="cat-title">
-                <span>📁 Category: ${catName}</span>
-                <span>${catUnits} units remaining</span>
+            <div class="cat-label">CATEGORY: ${catName}</div>
+            <hr class="dot-line">
+            ${items.map(item => `
+              <div class="prod-row">
+                <span class="prod-name">${item.product.name}${item.remaining === 0 ? ' <span class="out-label">(Out)</span>' : ''}</span>
+                <span class="prod-stock">${Number.isInteger(item.remaining) ? item.remaining : Number(item.remaining).toFixed(2)}</span>
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Product Name</th>
-                    <th class="right">Unit Price</th>
-                    <th class="center">Unit</th>
-                    <th class="right">Remaining Stock</th>
-                    <th class="right">Total Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${items.map(item => `
-                    <tr>
-                      <td><strong>${item.product.name}</strong></td>
-                      <td class="right">Rs. ${item.product.price.toFixed(2)}</td>
-                      <td class="center">${item.product.unit}</td>
-                      <td class="right ${item.remaining === 0 ? 'badge-out' : 'badge-ok'}">
-                        ${item.remaining} ${item.remaining === 0 ? '(Out of stock)' : ''}
-                      </td>
-                      <td class="right">Rs. ${item.value.toFixed(2)}</td>
-                    </tr>
-                  `).join('')}
-                  <tr class="subtotal-row">
-                    <td colspan="3"><strong>${catName} Subtotal</strong></td>
-                    <td class="right"><strong>${catUnits} units</strong></td>
-                    <td class="right"><strong>Rs. ${catVal.toFixed(2)}</strong></td>
-                  </tr>
-                </tbody>
-              </table>
+            `).join('')}
+            <hr class="dot-line">
+            <div class="cat-total-row">
+              <span>Category Total:</span>
+              <span>${Number.isInteger(catUnits) ? catUnits : Number(catUnits).toFixed(2)}</span>
             </div>
           `;
-        }).join('')}
+        }).join('<hr class="solid-line">')}
 
-        <div class="grand-total-box">
-          <table>
-            <tr>
-              <td>Total Remaining Items Across All Categories:</td>
-              <td class="right">${grandTotalUnits} units</td>
-            </tr>
-            <tr>
-              <td>Total Inventory Stock Value:</td>
-              <td class="right" style="color: #b91c1c;">Rs. ${grandTotalValue.toFixed(2)}</td>
-            </tr>
-          </table>
+        <hr class="solid-line">
+        <div class="summary-row bold-row">
+          <span>TOTAL REMAINING ITEMS:</span>
+          <span>${grandTotalUnits}</span>
         </div>
-
-        <div class="footer">
-          BakeryOS Point of Sale — Branch Inventory System
+        <div class="summary-row bold-row">
+          <span>TOTAL INVENTORY STOCK VALUE:</span>
+          <span>Rs. ${grandTotalValue.toFixed(2)}</span>
         </div>
+        <hr class="dot-line">
+        <div class="footer-txt">BakeryOS Point of Sale &mdash; Branch Inventory System</div>
         <script>
-          window.print();
+          window.onload = function() { window.print(); };
         </script>
       </body>
       </html>
@@ -465,7 +481,7 @@ export default function POS({ branch }: POSProps) {
     const printDate = now.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
     const printTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-    const win = window.open('', '_blank', 'width=800,height=700');
+    const win = window.open('', '_blank', 'width=400,height=700');
     if (!win) return;
 
     win.document.write(`
@@ -473,133 +489,134 @@ export default function POS({ branch }: POSProps) {
       <html>
       <head>
         <title>${branchLabel} - Category-Wise Sales Summary</title>
+        <meta charset="UTF-8">
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 24px; color: #1f2937; max-width: 800px; margin: 0 auto; }
-          .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px; }
-          .header h1 { margin: 0 0 4px 0; font-size: 22px; color: #047857; }
-          .header h2 { margin: 0 0 6px 0; font-size: 16px; color: #374151; }
-          .header p { margin: 2px 0; font-size: 12px; color: #6b7280; }
-          .cat-section { margin-bottom: 20px; page-break-inside: avoid; }
-          .cat-title { background: #d1fae5; color: #065f46; padding: 6px 12px; font-size: 14px; font-weight: bold; border-radius: 4px; display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px; }
-          th { background: #f9fafb; text-align: left; padding: 8px 10px; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #4b5563; }
-          td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
-          .right { text-align: right; }
-          .center { text-align: center; }
-          .subtotal-row { background: #ecfdf5; font-weight: 600; border-top: 1px solid #6ee7b7; }
-          .grand-total-box { margin-top: 24px; padding: 16px; background: #f0fdf4; border: 2px solid #34d399; border-radius: 8px; page-break-inside: avoid; }
-          .grand-total-box table { margin: 0; font-size: 14px; }
-          .grand-row { font-size: 16px; font-weight: bold; color: #047857; }
-          .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #9ca3af; border-top: 1px dashed #e5e7eb; padding-top: 12px; }
+          @page { size: 80mm auto; margin: 0; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: Arial, 'Courier New', monospace;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 4mm 3mm;
+            width: 76mm;
+          }
+          .title1 { font-size: 13px; font-weight: bold; text-align: center; margin: 0 0 1px 0; }
+          .title2 { font-size: 10px; font-weight: bold; text-align: center; margin: 0 0 4px 0; letter-spacing: 0.5px; }
+          .meta { font-size: 9px; text-align: center; margin: 1px 0; }
+          .dot-line { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+          .solid-line { border: none; border-top: 1px solid #000; margin: 4px 0; }
+          .cat-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin: 5px 0 2px 0;
+            word-wrap: break-word;
+          }
+          .prod-block { margin: 3px 0; }
+          .prod-name {
+            font-size: 10px;
+            font-weight: bold;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.3;
+            margin-bottom: 1px;
+          }
+          .prod-detail { font-size: 9px; margin: 1px 0; }
+          .cat-footer-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 3px;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin: 3px 0;
+          }
+          .summary-row.bold-row {
+            font-weight: bold;
+            font-size: 11px;
+          }
+          .payment-block { font-size: 10px; margin: 2px 0; }
+          .no-sales { font-size: 10px; text-align: center; margin: 10px 0; }
+          .footer-txt { font-size: 8px; text-align: center; margin-top: 6px; }
           @media print {
-            body { padding: 10px; }
-            .header h1 { color: #000; }
-            .cat-title { background: #eee !important; color: #000 !important; }
-            .grand-total-box { background: #fafafa !important; border-color: #000 !important; }
+            body { width: 76mm; padding: 3mm 2mm; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>🍞 BakeryOS — ${branchLabel}</h1>
-          <h2>CATEGORY-WISE SALES SUMMARY</h2>
-          <p><strong>Print Date & Time:</strong> ${printDate} at ${printTime}</p>
-          <p>Branch: ${branchLabel} | Operator: ${currentUser?.name || 'Staff'}</p>
-        </div>
+        <div class="title1">BakeryOS &mdash; ${branchLabel}</div>
+        <div class="title2">CATEGORY-WISE SALES SUMMARY</div>
+        <hr class="solid-line">
+        <div class="meta">Print Date &amp; Time: ${printDate} at ${printTime}</div>
+        <div class="meta">Branch: ${branchLabel} | Operator: ${currentUser?.name || 'Staff'}</div>
+        <hr class="dot-line">
 
         ${Object.keys(categorySales).length === 0 ? `
-          <div style="text-align: center; padding: 40px; color: #6b7280;">
-            <p>No sales recorded yet for ${branchLabel}.</p>
-          </div>
+          <div class="no-sales">No sales recorded yet for ${branchLabel}.</div>
         ` : `
           ${Object.values(categorySales).map(cat => `
-            <div class="cat-section">
-              <div class="cat-title">
-                <span>📁 Category: ${cat.category}</span>
-                <span>${cat.totalUnits} sold · Rs. ${cat.totalRevenue.toFixed(2)}</span>
+            <div class="cat-label">CATEGORY: ${cat.category}</div>
+            <hr class="dot-line">
+            ${Object.values(cat.products).map(p => `
+              <div class="prod-block">
+                <div class="prod-name">${p.name}</div>
+                <div class="prod-detail">Unit Price: Rs. ${p.unitPrice.toFixed(2)}</div>
+                <div class="prod-detail">Qty Sold: ${Number.isInteger(p.quantity) ? p.quantity : Number(p.quantity).toFixed(2)}</div>
+                <div class="prod-detail">Total Revenue: Rs. ${p.revenue.toFixed(2)}</div>
               </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Product Name</th>
-                    <th class="right">Unit Price</th>
-                    <th class="center">Qty Sold</th>
-                    <th class="right">Total Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${Object.values(cat.products).map(p => `
-                    <tr>
-                      <td><strong>${p.name}</strong></td>
-                      <td class="right">Rs. ${p.unitPrice.toFixed(2)}</td>
-                      <td class="center">${p.quantity}</td>
-                      <td class="right">Rs. ${p.revenue.toFixed(2)}</td>
-                    </tr>
-                  `).join('')}
-                  <tr class="subtotal-row">
-                    <td colspan="2"><strong>${cat.category} Category Total</strong></td>
-                    <td class="center"><strong>${cat.totalUnits}</strong></td>
-                    <td class="right"><strong>Rs. ${cat.totalRevenue.toFixed(2)}</strong></td>
-                  </tr>
-                </tbody>
-              </table>
+            `).join('')}
+            <hr class="dot-line">
+            <div class="cat-footer-row">
+              <span>Category Qty:</span>
+              <span>${cat.totalUnits}</span>
             </div>
-          `).join('')}
-
-          <div class="cat-section">
-            <div class="cat-title" style="background: #e0e7ff; color: #3730a3;">
-              <span>📊 Category Performance Breakdown</span>
-              <span>All Categories</span>
+            <div class="cat-footer-row">
+              <span>Category Revenue:</span>
+              <span>Rs. ${cat.totalRevenue.toFixed(2)}</span>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th class="center">Items Sold</th>
-                  <th class="right">Revenue</th>
-                  <th class="right">% of Sales</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${Object.values(categorySales).map(c => `
-                  <tr>
-                    <td><strong>${c.category}</strong></td>
-                    <td class="center">${c.totalUnits}</td>
-                    <td class="right">Rs. ${c.totalRevenue.toFixed(2)}</td>
-                    <td class="right">${totalBranchRevenue > 0 ? ((c.totalRevenue / totalBranchRevenue) * 100).toFixed(1) : '0'}%</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
+          `).join('<hr class="solid-line">')}
         `}
 
-        <div class="grand-total-box">
-          <table>
-            <tr>
-              <td>Total Transactions:</td>
-              <td class="right"><strong>${branchSales.length}</strong></td>
-            </tr>
-            <tr>
-              <td>Total Items Sold:</td>
-              <td class="right"><strong>${totalItemsSold}</strong></td>
-            </tr>
-            <tr>
-              <td>Payment Breakdown:</td>
-              <td class="right">Cash: <strong>Rs. ${cashTotal.toFixed(2)}</strong> | Card: <strong>Rs. ${cardTotal.toFixed(2)}</strong></td>
-            </tr>
-            <tr class="grand-row">
-              <td style="padding-top: 8px;">GRAND TOTAL SALES:</td>
-              <td class="right" style="padding-top: 8px;">Rs. ${totalBranchRevenue.toFixed(2)}</td>
-            </tr>
-          </table>
+        <hr class="solid-line">
+        <div class="summary-row bold-row">
+          <span>TOTAL TRANSACTIONS:</span>
+          <span>${branchSales.length}</span>
         </div>
-
-        <div class="footer">
-          BakeryOS Point of Sale — Branch Sales Summary
+        <div class="summary-row bold-row">
+          <span>TOTAL ITEMS SOLD:</span>
+          <span>${totalItemsSold}</span>
         </div>
+        <hr class="dot-line">
+        <div class="payment-block">PAYMENT BREAKDOWN:</div>
+        <div class="summary-row">
+          <span>Cash:</span>
+          <span>Rs. ${cashTotal.toFixed(2)}</span>
+        </div>
+        <div class="summary-row">
+          <span>Card:</span>
+          <span>Rs. ${cardTotal.toFixed(2)}</span>
+        </div>
+        <div class="summary-row">
+          <span>Other:</span>
+          <span>Rs. ${Math.max(0, totalBranchRevenue - cashTotal - cardTotal).toFixed(2)}</span>
+        </div>
+        <hr class="dot-line">
+        <div class="summary-row bold-row">
+          <span>GRAND TOTAL SALES:</span>
+          <span>Rs. ${totalBranchRevenue.toFixed(2)}</span>
+        </div>
+        <hr class="dot-line">
+        <div class="footer-txt">BakeryOS Point of Sale &mdash; Branch Sales Summary</div>
         <script>
-          window.print();
+          window.onload = function() { window.print(); };
         </script>
       </body>
       </html>
