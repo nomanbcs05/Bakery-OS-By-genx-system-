@@ -11,6 +11,7 @@ import type {
 } from '@/types';
 import { toast } from 'sonner';
 import { supabase, hasSupabaseConfig } from '@/lib/supabase';
+import { getPKDateString } from '@/lib/utils';
 
 // Sample data (used as initial state if local storage and Supabase are empty)
 const sampleProducts: Product[] = [
@@ -169,6 +170,8 @@ interface AppContextType extends AppState {
   getTodaySales: () => Sale[];
   getBranchStock: (branch: 'branch_1' | 'branch_2') => { productId: string; stock: number }[];
   getProductionStock: () => { productId: string; stock: number }[];
+  refreshAuthoritativeStock: () => Promise<StockMap>;
+  setProductBranchStock: (productId: string, branch: 'branch_1' | 'branch_2' | 'factory', targetStock: number, reason?: string) => Promise<void>;
   clearSales: (range: 'today' | 'weekly' | 'monthly' | 'all') => Promise<void>;
   clearAllReportData: () => Promise<void>;
   selectProfile: (profile: User) => void;
@@ -719,8 +722,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     switch (module) {
       case 'sales':
         const [sData, dData, aoData] = await Promise.all([
-          fetchTable('sales', 'date', SALES_COLS, 500),
-          fetchTable('dispatches', 'date', DISPATCH_COLS, 300),
+          fetchTable('sales', 'date', SALES_COLS, 1000),
+          fetchTable('dispatches', 'date', DISPATCH_COLS, 1000),
           fetchTable('advance_orders', 'created_at', ADVANCE_ORDER_COLS, 200)
         ]);
         if (sData) setSales(prev => merge(sData, prev, fromDBSale));
@@ -731,7 +734,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       case 'inventory':
         const [rmaData, bsaData, rmData, pData, purData, recData] = await Promise.all([
           fetchTable('raw_material_adjustments', 'date', 'id,material_id,type,quantity,reason,date,user_id,sync_status', 300),
-          fetchTable('branch_stock_adjustments', 'date', 'id,product_id,branch,quantity,reason,date,user_id', 200),
+          fetchTable('branch_stock_adjustments', 'date', 'id,product_id,branch,quantity,reason,date,user_id', 500),
           fetchTable('raw_materials', 'last_updated', RM_COLS, 1000),
           fetchTable('products', 'created_at', PRODUCT_COLS, 1000),
           fetchTable('purchases', 'date', 'id,material_id,quantity,total_cost,amount_paid,payment_method,vendor_name,vendor_city,date,sync_status', 300),
@@ -789,18 +792,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // If it's a background pull, refresh any modules that are already loaded
     if (!isInitial) {
       if (loadedModulesRef.current.has('sales')) {
-        tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
-        tasks.push(fetchTable('dispatches', 'date', DISPATCH_COLS, 300));
+        tasks.push(fetchTable('sales', 'date', SALES_COLS, 1000));
+        tasks.push(fetchTable('dispatches', 'date', DISPATCH_COLS, 1000));
       }
       if (loadedModulesRef.current.has('inventory')) {
-        tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
+        tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 500));
         tasks.push(fetchTable('recipes', 'id', 'id,product_id,ingredients,is_active,sync_status'));
       }
     } else {
-      // On initial load, fetch just enough for the dashboard
-      // Use the same parameters if we expect them to be requested soon to leverage deduplication
-      tasks.push(fetchTable('sales', 'date', SALES_COLS, 500));
-      tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 300));
+      // On initial load, fetch recent operational data
+      tasks.push(fetchTable('sales', 'date', SALES_COLS, 1000));
+      tasks.push(fetchTable('production_batches', 'date', BATCH_COLS, 500));
+      tasks.push(fetchTable('dispatches', 'date', DISPATCH_COLS, 1000));
+      tasks.push(fetchTable('branch_stock_adjustments', 'date', 'id,product_id,branch,quantity,reason,date,user_id', 500));
       tasks.push(fetchTable('ledger_entries', 'date', 'id,date,account_head,account_type,debit,credit,name,station,account_no,closing_balance,category,sync_status', 500));
     }
 
@@ -815,9 +819,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isInitial) {
       const initialSales = results[3];
       const initialBatches = results[4];
-      const initialLedger = results[5];
+      const initialDispatches = results[5];
+      const initialBSA = results[6];
+      const initialLedger = results[7];
       if (initialSales) setSales(prev => merge(initialSales, prev, fromDBSale));
       if (initialBatches) setBatches(prev => merge(initialBatches, prev, fromDBBatch));
+      if (initialDispatches) setDispatches(prev => merge(initialDispatches, prev, fromDBDispatch));
+      if (initialBSA) setBranchStockAdjustments(prev => merge(initialBSA, prev, fromDBBranchAdjustment));
       if (initialLedger) setLedgerEntries(prev => merge(initialLedger, prev, fromDBLedgerEntry));
     }
 
@@ -868,36 +876,203 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { hasLoaded.current = true; }, []);
 
-  const stock = React.useMemo(() => {
-    const map: StockMap = {};
-    products.forEach(p => { map[p.id] = { production: 0, branch_1: 0, branch_2: 0 }; });
-    batches.forEach(b => { 
-      if (b.items) {
-        b.items.forEach(item => {
-          if (map[item.productId]) map[item.productId].production += item.quantity;
+  // Authoritative Branch Products Stock Store (Single Source of Truth)
+  const [stock, setStock] = useState<StockMap>(() => {
+    try {
+      const savedStock = localStorage.getItem('bakewise_authoritative_stock');
+      if (savedStock) {
+        const parsed = JSON.parse(savedStock);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+
+    if (initialState.stock && Object.keys(initialState.stock).length > 0) {
+      return initialState.stock;
+    }
+    return {};
+  });
+
+  const stockRef = useRef<StockMap>(stock);
+  useEffect(() => {
+    stockRef.current = stock;
+  }, [stock]);
+
+  // Idempotency: Track deducted sale IDs to prevent double stock deductions
+  const deductedSalesRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('bakewise_deducted_sales');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          deductedSalesRef.current = new Set(parsed);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  // Persist authoritative stock to LocalStorage + Supabase
+  const persistAuthoritativeStock = useCallback(async (newStock: StockMap) => {
+    try {
+      localStorage.setItem('bakewise_authoritative_stock', JSON.stringify(newStock));
+    } catch (e) {
+      console.warn('Failed to save authoritative stock to localStorage', e);
+    }
+
+    if (!hasSupabaseConfig) return;
+
+    // 1. Atomically sync via app_settings
+    try {
+      await supabase.from('app_settings').upsert([{
+        id: 'branch_products_stock',
+        settings: newStock,
+        updated_at: new Date().toISOString()
+      }]);
+    } catch (err) {
+      console.warn('Failed to sync authoritative stock to app_settings:', err);
+    }
+
+    // 2. Also sync to branch_products table (if exists)
+    try {
+      const rows: any[] = [];
+      const nowIso = new Date().toISOString();
+      for (const [productId, branches] of Object.entries(newStock)) {
+        rows.push({
+          id: `branch_1_${productId}`,
+          branch_id: 'branch_1',
+          product_id: productId,
+          available_quantity: branches.branch_1 || 0,
+          updated_at: nowIso
+        });
+        rows.push({
+          id: `branch_2_${productId}`,
+          branch_id: 'branch_2',
+          product_id: productId,
+          available_quantity: branches.branch_2 || 0,
+          updated_at: nowIso
         });
       }
-    });
-    dispatches.forEach(d => {
-      d.items.forEach(item => {
-        if (map[item.productId]) {
-          map[item.productId].production -= item.quantity;
-          if (d.destination === 'branch_1') map[item.productId].branch_1 += item.quantity;
-          else if (d.destination === 'branch_2') map[item.productId].branch_2 += item.quantity;
+      if (rows.length > 0) {
+        for (let i = 0; i < rows.length; i += 100) {
+          await supabase.from('branch_products').upsert(rows.slice(i, i + 100));
+        }
+      }
+    } catch (err) {
+      // Handled silently if table not created yet
+    }
+  }, [hasSupabaseConfig]);
+
+  // Fetch fresh authoritative branch stock
+  const fetchAuthoritativeStock = useCallback(async (): Promise<StockMap> => {
+    if (!hasSupabaseConfig) return stockRef.current;
+    try {
+      // 1. Try branch_products table first
+      const { data: bpData, error: bpError } = await supabase.from('branch_products').select('*');
+      if (!bpError && bpData && bpData.length > 0) {
+        const map: StockMap = { ...stockRef.current };
+        bpData.forEach((row: any) => {
+          if (!map[row.product_id]) {
+            map[row.product_id] = { production: 0, branch_1: 0, branch_2: 0 };
+          }
+          const bKey = row.branch_id === 'branch_2' ? 'branch_2' : 'branch_1';
+          map[row.product_id][bKey] = Number(row.available_quantity) || 0;
+        });
+        setStock(map);
+        try { localStorage.setItem('bakewise_authoritative_stock', JSON.stringify(map)); } catch (e) {}
+        return map;
+      }
+
+      // 2. Try app_settings ('branch_products_stock')
+      const { data: asData, error: asError } = await supabase.from('app_settings').select('*').eq('id', 'branch_products_stock').maybeSingle();
+      if (!asError && asData && asData.settings && Object.keys(asData.settings).length > 0) {
+        setStock(asData.settings);
+        try { localStorage.setItem('bakewise_authoritative_stock', JSON.stringify(asData.settings)); } catch (e) {}
+        return asData.settings;
+      }
+
+      // 3. Fallback: if neither exists, calculate baseline from current loaded data and persist
+      if (Object.keys(stockRef.current).length > 0) {
+        persistAuthoritativeStock(stockRef.current);
+        return stockRef.current;
+      }
+
+      const initialMap: StockMap = {};
+      products.forEach(p => { initialMap[p.id] = { production: 0, branch_1: 0, branch_2: 0 }; });
+      batches.forEach(b => { 
+        if (b.items) {
+          b.items.forEach(item => {
+            if (initialMap[item.productId]) initialMap[item.productId].production += item.quantity;
+          });
         }
       });
-    });
-    sales.forEach(s => {
-      s.items.forEach(item => {
-        if (map[item.productId]) {
-          if (s.branch === 'branch_1') map[item.productId].branch_1 -= item.quantity;
-          else if (s.branch === 'branch_2') map[item.productId].branch_2 -= item.quantity;
+      dispatches.forEach(d => {
+        (d.items || []).forEach(item => {
+          if (initialMap[item.productId]) {
+            initialMap[item.productId].production -= item.quantity;
+            if (d.destination === 'branch_1') initialMap[item.productId].branch_1 += item.quantity;
+            else if (d.destination === 'branch_2') initialMap[item.productId].branch_2 += item.quantity;
+          }
+        });
+      });
+      sales.forEach(s => {
+        (s.items || []).forEach(item => {
+          if (initialMap[item.productId]) {
+            if (s.branch === 'branch_1') initialMap[item.productId].branch_1 -= item.quantity;
+            else if (s.branch === 'branch_2') initialMap[item.productId].branch_2 -= item.quantity;
+          }
+        });
+      });
+      branchStockAdjustments.forEach(adj => {
+        if (initialMap[adj.productId]) {
+          const key = adj.branch === 'factory' ? 'production' : adj.branch;
+          initialMap[adj.productId][key] -= adj.quantity;
         }
       });
+      setStock(initialMap);
+      persistAuthoritativeStock(initialMap);
+      return initialMap;
+    } catch (err) {
+      console.warn('Failed to fetch authoritative stock from Supabase:', err);
+      return stockRef.current;
+    }
+  }, [hasSupabaseConfig, products, batches, dispatches, sales, branchStockAdjustments, persistAuthoritativeStock]);
+
+  // Keep stock map populated for all products
+  useEffect(() => {
+    if (products.length === 0) return;
+    setStock(prev => {
+      let changed = false;
+      const next = { ...prev };
+      products.forEach(p => {
+        if (!next[p.id]) {
+          next[p.id] = { production: 0, branch_1: 0, branch_2: 0 };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
     });
-    branchStockAdjustments.forEach(adj => { if (map[adj.productId]) { const key = adj.branch === 'factory' ? 'production' : adj.branch; map[adj.productId][key] -= adj.quantity; } });
-    return map;
-  }, [products, batches, dispatches, sales, branchStockAdjustments]);
+  }, [products]);
+
+  // Direct target stock setter for Central Inventory / Admin
+  const setProductBranchStock = useCallback(async (productId: string, branch: 'branch_1' | 'branch_2' | 'factory', targetStock: number, reason?: string) => {
+    setStock(prev => {
+      const next = { ...prev };
+      if (!next[productId]) {
+        next[productId] = { production: 0, branch_1: 0, branch_2: 0 };
+      }
+      const key = branch === 'factory' ? 'production' : branch;
+      const prevQty = next[productId][key] || 0;
+      next[productId] = {
+        ...next[productId],
+        [key]: targetStock
+      };
+      console.log(`[INVENTORY] ${branch}, ${productId}, SET_STOCK, before: ${prevQty}, new: ${targetStock}, reason: ${reason || 'Direct Set'}`);
+      persistAuthoritativeStock(next);
+      return next;
+    });
+  }, [persistAuthoritativeStock]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -1044,6 +1219,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
                 return prev;
               });
+            } else if (data.id === 'branch_products_stock' && data.settings) {
+              setStock(data.settings);
+              try { localStorage.setItem('bakewise_authoritative_stock', JSON.stringify(data.settings)); } catch (e) {}
             }
           }
           invalidateCache('app_settings');
@@ -1138,6 +1316,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setRawMaterialAdjustments(prev => prev.filter(a => a.id !== (p.old as any).id));
           }
           invalidateCache('raw_material_adjustments');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'branch_stock_adjustments' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const adj = fromDBBranchAdjustment(p.new as DBBranchStockAdjustment);
+            setBranchStockAdjustments(prev => {
+              const idx = prev.findIndex(x => x.id === adj.id);
+              if (idx === -1) return [...prev, adj];
+              const next = [...prev]; next[idx] = adj; return next;
+            });
+          } else if (p.eventType === 'DELETE') {
+            setBranchStockAdjustments(prev => prev.filter(a => a.id !== (p.old as any).id));
+          }
+          invalidateCache('branch_stock_adjustments');
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'branch_products' }, (p) => {
+          if (p.eventType === 'INSERT' || p.eventType === 'UPDATE') {
+            const row = p.new as any;
+            if (row && row.branch_id && row.product_id) {
+              setStock(prev => {
+                const next = { ...prev };
+                if (!next[row.product_id]) {
+                  next[row.product_id] = { production: 0, branch_1: 0, branch_2: 0 };
+                }
+                const bKey = row.branch_id === 'branch_2' ? 'branch_2' : 'branch_1';
+                next[row.product_id] = {
+                  ...next[row.product_id],
+                  [bKey]: Number(row.available_quantity) || 0
+                };
+                try { localStorage.setItem('bakewise_authoritative_stock', JSON.stringify(next)); } catch (e) {}
+                return next;
+              });
+            }
+          }
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
@@ -1514,6 +1725,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isOnline && hasSupabaseConfig) {
       try { await supabase.from('branch_stock_adjustments').upsert([toDBBranchAdjustment(adj)]); } catch (err) { console.error('Stock adjustment sync error'); }
     }
+    setStock(prev => {
+      const next = { ...prev };
+      if (!next[productId]) {
+        next[productId] = { production: 0, branch_1: 0, branch_2: 0 };
+      }
+      const key = branch === 'factory' ? 'production' : branch;
+      const prevQty = next[productId][key] || 0;
+      const newQty = prevQty - quantity;
+      next[productId] = {
+        ...next[productId],
+        [key]: newQty
+      };
+      console.log(`[INVENTORY] ${branch}, ${productId}, ADJUSTMENT, before: ${prevQty}, change: -${quantity}, after: ${newQty}, reason: ${reason}`);
+      persistAuthoritativeStock(next);
+      return next;
+    });
   };
 
   const addProduction = async (productId: string, quantity: number, notes?: string) => {
@@ -1535,6 +1762,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
       }
     }
+    setStock(prev => {
+      const next = { ...prev };
+      if (!next[productId]) {
+        next[productId] = { production: 0, branch_1: 0, branch_2: 0 };
+      }
+      next[productId] = {
+        ...next[productId],
+        production: (next[productId].production || 0) + quantity
+      };
+      persistAuthoritativeStock(next);
+      return next;
+    });
     return true;
   };
 
@@ -1564,6 +1803,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setBatches(prev => prev.map(b => b.id === id ? { ...b, syncStatus: 'pending' } : b));
       }
     }
+    setStock(prev => {
+      const next = { ...prev };
+      items.forEach(item => {
+        if (!next[item.productId]) {
+          next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
+        }
+        next[item.productId] = {
+          ...next[item.productId],
+          production: (next[item.productId].production || 0) + item.quantity
+        };
+      });
+      persistAuthoritativeStock(next);
+      return next;
+    });
     return true;
   };
 
@@ -1630,6 +1883,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast.warning('Dispatch saved locally. Cloud sync will retry automatically when connection is stable.', { duration: 6000 });
       }
     }
+
+    // Update authoritative stock
+    setStock(prev => {
+      const next = { ...prev };
+      items.forEach(item => {
+        if (!next[item.productId]) {
+          next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
+        }
+        const prevProd = next[item.productId].production || 0;
+        next[item.productId] = {
+          ...next[item.productId],
+          production: prevProd - item.quantity
+        };
+        if (destination === 'branch_1' || destination === 'branch_2') {
+          const prevBranch = next[item.productId][destination] || 0;
+          const newBranch = prevBranch + item.quantity;
+          next[item.productId][destination] = newBranch;
+          console.log(`[INVENTORY] ${destination}, ${item.productId}, DISPATCH_IN, before: ${prevBranch}, change: +${item.quantity}, after: ${newBranch}, ref: ${id}`);
+        }
+      });
+      persistAuthoritativeStock(next);
+      return next;
+    });
 
     const isSaleDestination = !['branch_1', 'branch_2'].includes(destination);
     
@@ -1715,6 +1991,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const todayStr = isoString.slice(0, 10);
     const newSale: Sale = { id, type, branch, items, total, paymentMethod, customerName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: isoString, createdAt: isoString, syncStatus: isOnline ? 'synced' : 'pending' };
     setSales(prev => [...prev, newSale]);
+
+    // Authoritative Stock Deduction (Branch Isolated & Idempotent)
+    if (branch === 'branch_1' || branch === 'branch_2') {
+      if (!deductedSalesRef.current.has(id)) {
+        deductedSalesRef.current.add(id);
+        try {
+          const arr = Array.from(deductedSalesRef.current);
+          if (arr.length > 500) arr.splice(0, arr.length - 500);
+          localStorage.setItem('bakewise_deducted_sales', JSON.stringify(arr));
+        } catch (e) {}
+
+        setStock(prev => {
+          const next = { ...prev };
+          items.forEach(item => {
+            if (!next[item.productId]) {
+              next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
+            }
+            const prevQty = next[item.productId][branch] || 0;
+            const newQty = prevQty - item.quantity;
+            next[item.productId] = {
+              ...next[item.productId],
+              [branch]: newQty
+            };
+            console.log(`[INVENTORY] ${branch}, ${item.productId}, SALE, before: ${prevQty}, change: -${item.quantity}, after: ${newQty}, ref: ${id}`);
+          });
+          persistAuthoritativeStock(next);
+          return next;
+        });
+      }
+    }
+
     if (isOnline && hasSupabaseConfig) {
       try {
         const { error } = await supabase.from('sales').upsert([toDBSale(newSale)]);
@@ -1746,9 +2053,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     return id;
-  }, [addLog, isOnline]);
+  }, [addLog, isOnline, persistAuthoritativeStock]);
 
   const refundSale = async (id: string) => {
+    const saleToRefund = sales.find(s => s.id === id);
+    if (saleToRefund && (saleToRefund.branch === 'branch_1' || saleToRefund.branch === 'branch_2')) {
+      const bKey = saleToRefund.branch;
+      setStock(prev => {
+        const next = { ...prev };
+        (saleToRefund.items || []).forEach(item => {
+          if (!next[item.productId]) {
+            next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
+          }
+          const prevQty = next[item.productId][bKey] || 0;
+          const newQty = prevQty + item.quantity;
+          next[item.productId] = {
+            ...next[item.productId],
+            [bKey]: newQty
+          };
+          console.log(`[INVENTORY] ${bKey}, ${item.productId}, REFUND, before: ${prevQty}, change: +${item.quantity}, after: ${newQty}, ref: ${id}`);
+        });
+        persistAuthoritativeStock(next);
+        return next;
+      });
+    }
     setSales(prev => prev.filter(s => s.id !== id));
     if (isOnline && hasSupabaseConfig) {
       try { await supabase.from('sales').delete().eq('id', id); } catch (err) { console.error('Sale refund error'); }
@@ -2094,9 +2422,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       createSale, refundSale,
       addExpense, updateExpense, deleteExpense,
-      getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => s.date === new Date().toISOString().slice(0, 10)),
+      getProductById, getInventorySnapshots, getTodaySales: () => sales.filter(s => getPKDateString(s.date || s.createdAt) === getPKDateString()),
       getBranchStock: (b) => products.map(p => ({ productId: p.id, stock: stock[p.id]?.[b] || 0 })),
       getProductionStock: () => products.map(p => ({ productId: p.id, stock: stock[p.id]?.production || 0 })),
+      refreshAuthoritativeStock: fetchAuthoritativeStock,
+      setProductBranchStock,
       clearSales: async (r) => {
         const now = new Date();
         const today = now.toISOString().slice(0, 10);

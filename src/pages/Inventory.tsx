@@ -11,7 +11,7 @@ import { Package, Pencil } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function Inventory() {
-  const { currentUser, getInventorySnapshots, getProductById, loadModuleData, adjustBranchStock, stock } = useApp();
+  const { currentUser, getInventorySnapshots, getProductById, loadModuleData, setProductBranchStock, stock } = useApp();
 
   useEffect(() => {
     loadModuleData('inventory');
@@ -42,42 +42,30 @@ export default function Inventory() {
 
   const handleSave = () => {
     if (!editProductId) return;
-    const s = stock[editProductId];
-    if (!s) return;
 
     const newFactory = parseFloat(factoryVal);
     const newBranch1 = parseFloat(branch1Val);
     const newBranch2 = parseFloat(branch2Val);
-
-    // Delta = current - target (positive delta = reduction, negative delta = increase)
-    // Because stock computation does: stock -= adjustment.quantity
-    const factoryDelta = s.production - newFactory;
-    const branch1Delta = s.branch_1 - newBranch1;
-    const branch2Delta = s.branch_2 - newBranch2;
-
     const adjustmentReason = reason || 'Manual Inventory Adjustment';
-    const timestamp = Date.now();
 
-    if (factoryDelta !== 0 && !isNaN(newFactory)) {
-      adjustBranchStock(editProductId, 'factory', factoryDelta, adjustmentReason);
+    // Directly set the authoritative stock to the target values
+    // setProductBranchStock is idempotent — it sets the EXACT quantity, not a delta
+    if (!isNaN(newFactory)) {
+      setProductBranchStock(editProductId, 'factory', newFactory, adjustmentReason);
     }
-    // Slight delay to ensure unique IDs
-    setTimeout(() => {
-      if (branch1Delta !== 0 && !isNaN(newBranch1)) {
-        adjustBranchStock(editProductId!, 'branch_1', branch1Delta, adjustmentReason);
-      }
-    }, 10);
-    setTimeout(() => {
-      if (branch2Delta !== 0 && !isNaN(newBranch2)) {
-        adjustBranchStock(editProductId!, 'branch_2', branch2Delta, adjustmentReason);
-      }
-    }, 20);
+    if (!isNaN(newBranch1)) {
+      setProductBranchStock(editProductId, 'branch_1', newBranch1, adjustmentReason);
+    }
+    if (!isNaN(newBranch2)) {
+      setProductBranchStock(editProductId, 'branch_2', newBranch2, adjustmentReason);
+    }
 
     setIsDialogOpen(false);
     setEditProductId(null);
   };
 
   const editProduct = editProductId ? getProductById(editProductId) : null;
+
 
   return (
     <div className="space-y-6 animate-fade-in">

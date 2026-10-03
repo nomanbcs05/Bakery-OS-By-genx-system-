@@ -13,3 +13,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Returns YYYY-MM-DD in Pakistan Standard Time (PKT, UTC+5).
+ * Ensures sales/inventory reporting is strictly aligned with the Pakistan business day.
+ */
+export const getPKDateString = (dateInput?: string | Date | number): string => {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+};
+
