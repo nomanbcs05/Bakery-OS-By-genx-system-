@@ -158,7 +158,7 @@ interface AppContextType extends AppState {
   addMultiProduction: (items: { productId: string; quantity: number }[], notes?: string) => Promise<boolean | void>;
   updateProduction: (id: string, updates: Partial<ProductionBatch>) => Promise<void>;
   deleteProduction: (id: string) => Promise<void>;
-  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => Promise<string | boolean>;
+  createDispatch: (destination: DispatchDestination, items: DispatchItem[], paymentMethod?: PaymentMethod, customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string, invoiceId?: string) => Promise<string | boolean>;
   clearBranchDispatches: (branch: 'all' | 'branch_1' | 'branch_2') => Promise<void>;
   createSale: (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => Promise<string | boolean>;
   refundSale: (id: string) => Promise<boolean>;
@@ -899,15 +899,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stockRef.current = stock;
   }, [stock]);
 
-  // Idempotency: Track deducted sale IDs to prevent double stock deductions
+  // Idempotency: Track deducted sale and dispatch IDs to prevent double stock deductions
   const deductedSalesRef = useRef<Set<string>>(new Set());
+  const deductedDispatchesRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('bakewise_deducted_sales');
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      const savedSales = localStorage.getItem('bakewise_deducted_sales');
+      if (savedSales) {
+        const parsed = JSON.parse(savedSales);
         if (Array.isArray(parsed)) {
           deductedSalesRef.current = new Set(parsed);
+        }
+      }
+      const savedDispatches = localStorage.getItem('bakewise_deducted_dispatches');
+      if (savedDispatches) {
+        const parsed = JSON.parse(savedDispatches);
+        if (Array.isArray(parsed)) {
+          deductedDispatchesRef.current = new Set(parsed);
         }
       }
     } catch (e) {}
@@ -1866,14 +1874,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string) => {
-    const id = `d${Date.now()}`;
+  const createDispatch = async (destination: DispatchDestination, items: DispatchItem[], paymentMethod: PaymentMethod = 'cash', customerName?: string, customerPhone?: string, amountPaid?: number, customerStation?: string, invoiceId?: string) => {
     const today = new Date().toISOString().slice(0, 10);
-    const todayDispatches = dispatches.filter(d => d.date === today);
+    const now = Date.now();
+    // Deterministic ID if invoiceId provided, else timestamp-based
+    const id = invoiceId 
+      ? (invoiceId.startsWith('d') ? invoiceId : `d_${invoiceId}`) 
+      : `d${now}`;
+
+    // 1. Verify if dispatch already exists in local memory by ID or invoiceId
+    const existingById = dispatchesRef.current.find(d => 
+      d.id === id || (invoiceId && ((d as any).invoiceId === invoiceId || d.id === `d_${invoiceId}`))
+    );
+    if (existingById) {
+      console.warn(`[createDispatch] Duplicate dispatch prevented by invoiceId/id verification: ${id}`);
+      return existingById.id;
+    }
+
+    // 2. Prevent rapid double-clicks (signature check within 12 seconds)
+    const currentSig = [...items]
+      .sort((a, b) => a.productId.localeCompare(b.productId))
+      .map(i => `${i.productId}:${i.quantity}:${i.customPrice ?? 0}`)
+      .join('|');
+
+    const recentDuplicate = dispatchesRef.current.find(d => {
+      if (d.destination !== destination || d.date !== today) return false;
+      const dSig = [...(d.items || [])]
+        .sort((a, b) => a.productId.localeCompare(b.productId))
+        .map(i => `${i.productId}:${i.quantity}:${i.customPrice ?? 0}`)
+        .join('|');
+      if (dSig !== currentSig) return false;
+      const createdAt = (d as any)._createdAt || 0;
+      return (now - createdAt < 12000);
+    });
+
+    if (recentDuplicate) {
+      console.warn(`[createDispatch] Duplicate dispatch blocked by payload signature verification within 12s: ${recentDuplicate.id}`);
+      return recentDuplicate.id;
+    }
+
+    // 3. Verify in Cloud DB if online
+    if (isOnline && hasSupabaseConfig) {
+      try {
+        const { data: dbExisting } = await supabase
+          .from('dispatches')
+          .select('id')
+          .eq('id', id)
+          .maybeSingle();
+        if (dbExisting) {
+          console.warn(`[createDispatch] Dispatch ${id} already verified in database. Returning existing.`);
+          return dbExisting.id;
+        }
+      } catch (err) {
+        console.warn('[createDispatch] Offline or DB check failed, continuing with local idempotency:', err);
+      }
+    }
+
+    const todayDispatches = dispatchesRef.current.filter(d => d.date === today);
     const tokenNumber = todayDispatches.length + 1;
-    const dispatch: Dispatch = { id, destination, date: today, status: 'confirmed', items, tokenNumber, syncStatus: isOnline ? 'synced' : 'pending' };
+    const dispatch: Dispatch = { 
+      id, 
+      destination, 
+      date: today, 
+      status: 'confirmed', 
+      items, 
+      tokenNumber, 
+      syncStatus: isOnline ? 'synced' : 'pending',
+      invoiceId: invoiceId || id,
+      _createdAt: now
+    };
+
     // ✅ Always save locally first — dispatch is NEVER lost even if DB is temporarily down
-    setDispatches(prev => [...prev, dispatch]);
+    setDispatches(prev => {
+      if (prev.some(d => d.id === id)) return prev;
+      return [...prev, dispatch];
+    });
 
     if (isOnline && hasSupabaseConfig) {
       const saved = await dispatchUpsertWithRetry(dispatch, 2);
@@ -1884,32 +1959,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Update authoritative stock
-    setStock(prev => {
-      const next = { ...prev };
-      items.forEach(item => {
-        if (!next[item.productId]) {
-          next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
-        }
-        const prevProd = next[item.productId].production || 0;
-        next[item.productId] = {
-          ...next[item.productId],
-          production: prevProd - item.quantity
-        };
-        if (destination === 'branch_1' || destination === 'branch_2') {
-          const prevBranch = next[item.productId][destination] || 0;
-          const newBranch = prevBranch + item.quantity;
-          next[item.productId][destination] = newBranch;
-          console.log(`[INVENTORY] ${destination}, ${item.productId}, DISPATCH_IN, before: ${prevBranch}, change: +${item.quantity}, after: ${newBranch}, ref: ${id}`);
-        }
+    // 4. Update authoritative stock with idempotency guard
+    if (!deductedDispatchesRef.current.has(id)) {
+      deductedDispatchesRef.current.add(id);
+      try {
+        localStorage.setItem('bakewise_deducted_dispatches', JSON.stringify(Array.from(deductedDispatchesRef.current)));
+      } catch (e) {}
+
+      setStock(prev => {
+        const next = { ...prev };
+        items.forEach(item => {
+          if (!next[item.productId]) {
+            next[item.productId] = { production: 0, branch_1: 0, branch_2: 0 };
+          }
+          const prevProd = next[item.productId].production || 0;
+          next[item.productId] = {
+            ...next[item.productId],
+            production: prevProd - item.quantity
+          };
+          if (destination === 'branch_1' || destination === 'branch_2') {
+            const prevBranch = next[item.productId][destination] || 0;
+            const newBranch = prevBranch + item.quantity;
+            next[item.productId][destination] = newBranch;
+            console.log(`[INVENTORY] ${destination}, ${item.productId}, DISPATCH_IN, before: ${prevBranch}, change: +${item.quantity}, after: ${newBranch}, ref: ${id}`);
+          }
+        });
+        persistAuthoritativeStock(next);
+        return next;
       });
-      persistAuthoritativeStock(next);
-      return next;
-    });
+    }
 
     const isSaleDestination = !['branch_1', 'branch_2'].includes(destination);
     
     if (isSaleDestination) {
+      const saleId = invoiceId ? `s_${invoiceId.replace(/^[ds]_?/, '')}` : `s${now}`;
+      const existingSale = salesRef.current.find(s => s.id === saleId);
+      
       const saleItems: SaleItem[] = items.map(i => {
         const product = products.find(p => p.id === i.productId);
         // Use customPrice (wholesale rate) if provided, else fall back to regular retail price
@@ -1919,18 +2004,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const saleName = destination === 'walkin' ? customerName : destination;
       const walkinNow = new Date();
       const walkinIso = walkinNow.toISOString();
-      const walkinSale: Sale = { id: `s${walkinNow.getTime()}`, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName: saleName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: walkinIso, createdAt: walkinIso, syncStatus: isOnline ? 'synced' : 'pending' };
-      setSales(prev => [...prev, walkinSale]);
-      if (isOnline && hasSupabaseConfig) {
-        try {
-          const { error } = await supabase.from('sales').upsert([toDBSale(walkinSale)]);
-          if (error) throw error;
-        } catch (err) {
-          setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
+
+      if (!existingSale) {
+        const walkinSale: Sale = { id: saleId, type: 'factory_walkin', items: saleItems, total, paymentMethod, customerName: saleName, customerPhone, isCreditPaid: paymentMethod !== 'credit', date: walkinIso, createdAt: walkinIso, syncStatus: isOnline ? 'synced' : 'pending' };
+        setSales(prev => [...prev, walkinSale]);
+        if (isOnline && hasSupabaseConfig) {
+          try {
+            const { error } = await supabase.from('sales').upsert([toDBSale(walkinSale)]);
+            if (error) throw error;
+          } catch (err) {
+            setSales(prev => prev.map(s => s.id === walkinSale.id ? { ...s, syncStatus: 'pending' } : s));
+          }
         }
       }
 
-      if (saleName) {
+      if (saleName && !existingSale) {
         const existingCust = ledgerEntriesRef.current.find(e => e.category === 'customer' && e.name === saleName);
         const station = customerStation || existingCust?.station || 'Factory Gate';
         const finalCredit = paymentMethod === 'cash' ? total : (amountPaid || 0);
@@ -1953,7 +2041,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const newDebit = existingEntry.debit + total;
           const newCredit = existingEntry.credit + finalCredit;
           const newAccountHead = `${existingEntry.accountHead}; ${newDetailsStr}`;
-          const newAccountNo = existingEntry.accountNo ? `${existingEntry.accountNo},${walkinSale.id}` : walkinSale.id;
+          const newAccountNo = existingEntry.accountNo ? `${existingEntry.accountNo},${saleId}` : saleId;
           
           await updateLedgerEntry(existingEntry.id, {
             debit: newDebit,
@@ -1971,16 +2059,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             credit: finalCredit,
             name: saleName,
             station: station,
-            accountNo: walkinSale.id,
+            accountNo: saleId,
             closingBalance: 0,
             category: 'customer'
           });
         }
       }
 
-      return walkinSale.id;
+      return saleId;
     }
-    return true;
+    return id;
   };
 
   const createSale = useCallback(async (type: SaleType, branch: 'branch_1' | 'branch_2' | undefined, items: SaleItem[], paymentMethod: PaymentMethod, customerName?: string, customerPhone?: string, manualTotal?: number) => {

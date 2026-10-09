@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard, Edit, Search, FileDown, CalendarDays, Users, X } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, Printer, Eye, Banknote, CreditCard, Edit, Search, FileDown, CalendarDays, Users, X, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import type { DispatchDestination, DispatchItem, PaymentMethod, LedgerEntry } from '@/types';
@@ -23,7 +23,10 @@ export interface CustomerDispatchOrder {
   id: string;
   destination: DispatchDestination | '';
   items: DispatchItem[];
+  invoiceId?: string;
 }
+
+const generateInvoiceId = () => `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
 export default function DispatchPage() {
   const { 
@@ -33,9 +36,12 @@ export default function DispatchPage() {
 
   if (!currentUser) return <Navigate to="/login" replace />;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
   // Multi-Customer State
   const [customerOrders, setCustomerOrders] = useState<CustomerDispatchOrder[]>([
-    { id: 'cust-1', destination: '', items: [] }
+    { id: 'cust-1', destination: '', items: [], invoiceId: generateInvoiceId() }
   ]);
   const [activeCustIdx, setActiveCustIdx] = useState(0);
   const [showMultiGOT, setShowMultiGOT] = useState(false);
@@ -200,7 +206,8 @@ export default function DispatchPage() {
     const newOrder: CustomerDispatchOrder = {
       id: `cust-${Date.now()}`,
       destination: '',
-      items: []
+      items: [],
+      invoiceId: generateInvoiceId()
     };
     setCustomerOrders(prev => [...prev, newOrder]);
     setActiveCustIdx(customerOrders.length);
@@ -256,6 +263,10 @@ export default function DispatchPage() {
 
   const handleDispatch = async (paymentMeth: PaymentMethod = 'cash') => {
     if (!destination || items.length === 0) return;
+    if (isSubmittingRef.current) {
+      console.warn('[Dispatch] Submission already in progress, blocking duplicate click');
+      return;
+    }
     
     const isSale = !['branch_1', 'branch_2'].includes(destination);
     if (isSale && !custName) {
@@ -263,48 +274,62 @@ export default function DispatchPage() {
       return;
     }
 
-    // Prepare receipt data — use customPrice for customer wholesale pricing
-    let receiptItems = items.map(i => ({
-      name: getProductById(i.productId)?.name || 'Unknown',
-      quantity: i.quantity,
-      unitPrice: i.customPrice ?? getProductById(i.productId)?.price ?? 0
-    }));
-    let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    const numericAmountPaid = parseFloat(amountPaid) || 0;
+    try {
+      // Prepare receipt data — use customPrice for customer wholesale pricing
+      let receiptItems = items.map(i => ({
+        name: getProductById(i.productId)?.name || 'Unknown',
+        quantity: i.quantity,
+        unitPrice: i.customPrice ?? getProductById(i.productId)?.price ?? 0
+      }));
+      let total = receiptItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-    const success = await createDispatch(
-      destination, 
-      items, 
-      paymentMeth, 
-      custName, 
-      custPhone || undefined, 
-      numericAmountPaid, 
-      custStation || undefined
-    );
-    
-    if (success) {
-      setReceiptData({
-        open: true,
-        items: receiptItems,
-        total,
-        paymentMethod: paymentMeth,
-        saleId: typeof success === 'string' ? success : `SL-${Date.now().toString(36).toUpperCase()}`,
-        date: new Date().toISOString()
-      });
-      setCustomerOrders(prev => prev.map((ord, idx) => 
-        idx === activeCustIdx ? { ...ord, destination: '', items: [] } : ord
-      ));
-      setIsPaymentOpen(false);
-      setCustName('');
-      setCustPhone('');
-      setCustStation('');
-      setAmountPaid('');
-      toast.success('Sale completed successfully!');
+      const numericAmountPaid = parseFloat(amountPaid) || 0;
+      const orderInvoiceId = activeOrder.invoiceId || generateInvoiceId();
+
+      const success = await createDispatch(
+        destination, 
+        items, 
+        paymentMeth, 
+        custName, 
+        custPhone || undefined, 
+        numericAmountPaid, 
+        custStation || undefined,
+        orderInvoiceId
+      );
+      
+      if (success) {
+        setReceiptData({
+          open: true,
+          items: receiptItems,
+          total,
+          paymentMethod: paymentMeth,
+          saleId: typeof success === 'string' ? success : `SL-${Date.now().toString(36).toUpperCase()}`,
+          date: new Date().toISOString()
+        });
+        setCustomerOrders(prev => prev.map((ord, idx) => 
+          idx === activeCustIdx ? { ...ord, destination: '', items: [], invoiceId: generateInvoiceId() } : ord
+        ));
+        setIsPaymentOpen(false);
+        setCustName('');
+        setCustPhone('');
+        setCustStation('');
+        setAmountPaid('');
+        toast.success('Dispatch recorded successfully!');
+      }
+    } catch (err: any) {
+      console.error('Dispatch error:', err);
+      toast.error(err?.message || 'Failed to record dispatch');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const handleWalkinDispatch = () => {
+    if (isSubmittingRef.current) return;
     if (!destination || items.length === 0) return;
     const isSale = !['branch_1', 'branch_2'].includes(destination);
     if (isSale) {
@@ -324,35 +349,56 @@ export default function DispatchPage() {
   };
 
   const handlePrintAllGOT = async () => {
+    if (isSubmittingRef.current) return;
     const validOrders = customerOrders.filter(c => c.items.length > 0 && c.destination);
     if (validOrders.length === 0) {
       toast.error('Please select customer destination and add items first');
       return;
     }
 
-    const groups: GOTCustomerGroup[] = validOrders.map(c => ({
-      customerName: destLabels[c.destination] || c.destination || 'Customer',
-      items: c.items.map(i => ({
-        name: getProductById(i.productId)?.name || 'Unknown',
-        quantity: i.quantity
-      }))
-    }));
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    setMultiGOTGroups(groups);
-    setShowMultiGOT(true);
+    try {
+      const groups: GOTCustomerGroup[] = validOrders.map(c => ({
+        customerName: destLabels[c.destination] || c.destination || 'Customer',
+        items: c.items.map(i => ({
+          name: getProductById(i.productId)?.name || 'Unknown',
+          quantity: i.quantity
+        }))
+      }));
 
-    for (const ord of validOrders) {
-      const isSale = !['branch_1', 'branch_2'].includes(ord.destination);
-      const cName = isSale ? (destLabels[ord.destination] || ord.destination) : undefined;
-      await createDispatch(
-        ord.destination,
-        ord.items,
-        'cash',
-        cName
-      );
+      setMultiGOTGroups(groups);
+      setShowMultiGOT(true);
+
+      for (const ord of validOrders) {
+        const isSale = !['branch_1', 'branch_2'].includes(ord.destination);
+        const cName = isSale ? (destLabels[ord.destination] || ord.destination) : undefined;
+        await createDispatch(
+          ord.destination,
+          ord.items,
+          'cash',
+          cName,
+          undefined,
+          undefined,
+          undefined,
+          ord.invoiceId || generateInvoiceId()
+        );
+      }
+
+      setCustomerOrders([
+        { id: 'cust-1', destination: '', items: [], invoiceId: generateInvoiceId() }
+      ]);
+      setActiveCustIdx(0);
+
+      toast.success(`Dispatched ${validOrders.length} customer order(s) in Single GOT!`);
+    } catch (err: any) {
+      console.error('Multi-GOT dispatch error:', err);
+      toast.error(err?.message || 'Error executing Single GOT dispatch');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
-
-    toast.success(`Dispatched ${validOrders.length} customer order(s) in Single GOT!`);
   };
 
   const [historyItems, setHistoryItems] = useState<{ name: string; quantity: number }[]>([]);
@@ -725,14 +771,19 @@ export default function DispatchPage() {
               <>
                 <Button 
                   onClick={handlePrintAllGOT}
-                  disabled={combinedTotalItems === 0}
+                  disabled={combinedTotalItems === 0 || isSubmitting}
                   className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 font-bold"
                 >
-                  <Printer className="h-4 w-4 mr-2" /> Print All (Single GOT)
+                  {isSubmitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+                  ) : (
+                    <><Printer className="h-4 w-4 mr-2" /> Print All (Single GOT)</>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleAddAnotherCustomer}
+                  disabled={isSubmitting}
                   className="flex-1 sm:flex-none text-xs font-bold"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Customer
@@ -741,12 +792,20 @@ export default function DispatchPage() {
             ) : (
               <>
                 {!['branch_1', 'branch_2'].includes(destination) ? (
-                  <Button onClick={handleWalkinDispatch} disabled={items.length === 0} className="flex-1 sm:flex-none bg-success hover:bg-success/90">
-                    <CreditCard className="h-4 w-4 mr-2" /> Complete Sale
+                  <Button onClick={handleWalkinDispatch} disabled={items.length === 0 || isSubmitting} className="flex-1 sm:flex-none bg-success hover:bg-success/90 font-bold">
+                    {isSubmitting ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+                    ) : (
+                      <><CreditCard className="h-4 w-4 mr-2" /> Complete Sale</>
+                    )}
                   </Button>
                 ) : (
-                  <Button onClick={() => handleDispatch()} disabled={!destination || items.length === 0} className="flex-1 sm:flex-none">
-                    Confirm Dispatch
+                  <Button onClick={() => handleDispatch()} disabled={!destination || items.length === 0 || isSubmitting} className="flex-1 sm:flex-none font-bold">
+                    {isSubmitting ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Confirming...</>
+                    ) : (
+                      'Confirm Dispatch'
+                    )}
                   </Button>
                 )}
                 
@@ -888,17 +947,20 @@ export default function DispatchPage() {
           
           {/* Footer - always visible */}
           <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-5 py-3 flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => setIsPaymentOpen(false)} className="rounded-lg px-4 text-xs">
+            <Button variant="outline" size="sm" onClick={() => setIsPaymentOpen(false)} disabled={isSubmitting} className="rounded-lg px-4 text-xs">
               Cancel
             </Button>
             <Button 
               size="sm"
               className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 text-xs font-bold gap-1.5" 
               onClick={() => handleDispatch(paymentMode)}
-              disabled={!custName}
+              disabled={!custName || isSubmitting}
             >
-              <Banknote className="h-3.5 w-3.5" />
-              Confirm & Print Bill
+              {isSubmitting ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Recording...</>
+              ) : (
+                <><Banknote className="h-3.5 w-3.5" /> Confirm & Print Bill</>
+              )}
             </Button>
           </div>
         </DialogContent>

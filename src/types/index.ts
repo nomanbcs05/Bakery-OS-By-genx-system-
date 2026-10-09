@@ -77,6 +77,8 @@ export interface Dispatch {
   items: DispatchItem[];
   tokenNumber?: number;
   syncStatus: 'synced' | 'pending';
+  invoiceId?: string;
+  _createdAt?: number;
 }
 
 export interface DispatchItem {

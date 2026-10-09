@@ -31,15 +31,11 @@ export default function DispatchItemSummaryModal({
         const name = product?.name || `Product (${item.productId})`;
         const unit = product?.unit || 'pc';
         const price = item.customPrice ?? product?.price ?? 0;
-        const isBranch = dispatch.destination === 'branch_1' || dispatch.destination === 'branch_2';
-
         if (!summary[item.productId]) {
           summary[item.productId] = { name, unit, quantity: 0, value: 0 };
         }
         summary[item.productId].quantity += item.quantity;
-        if (!isBranch) {
-          summary[item.productId].value += item.quantity * price;
-        }
+        summary[item.productId].value += item.quantity * price;
       });
     });
 
@@ -57,7 +53,7 @@ export default function DispatchItemSummaryModal({
     const printContent = printAreaRef.current?.innerHTML;
     if (!printContent) return;
 
-    const win = window.open('', '_blank', 'width=700,height=900');
+    const win = window.open('', '_blank', 'width=400,height=900');
     if (!win) return;
 
     win.document.write(`
@@ -67,73 +63,66 @@ export default function DispatchItemSummaryModal({
   <meta charset="UTF-8" />
   <title>Bakery Dispatch Summary</title>
   <style>
+    @page { size: 80mm auto; margin: 3mm 2mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Courier New', monospace;
-      font-size: 13px;
-      color: #111;
+      font-size: 9pt;
+      color: #000;
       background: #fff;
-      padding: 24px 32px;
+      width: 76mm;
     }
     .header {
       text-align: center;
-      border-bottom: 2px solid #111;
-      padding-bottom: 10px;
-      margin-bottom: 16px;
+      border-bottom: 1.5px solid #000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
     }
     .header h1 {
-      font-size: 20px;
+      font-size: 11pt;
       font-weight: 900;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       text-transform: uppercase;
     }
     .header .date-line {
-      font-size: 12px;
-      margin-top: 4px;
-      color: #444;
+      font-size: 7.5pt;
+      margin-top: 2px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 8px;
+      margin-top: 4px;
     }
     th {
       text-align: left;
-      font-size: 11px;
+      font-size: 7pt;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      border-bottom: 1px solid #111;
-      padding: 6px 4px;
+      border-bottom: 1px solid #000;
+      padding: 3px 2px;
     }
     th.right, td.right { text-align: right; }
     td {
-      padding: 7px 4px;
-      border-bottom: 1px dashed #ccc;
-      font-size: 13px;
+      padding: 3px 2px;
+      border-bottom: 1px dashed #aaa;
+      font-size: 8pt;
     }
     tr:last-child td { border-bottom: none; }
-    .product-name { font-weight: 600; }
-    .totals-row {
-      border-top: 2px solid #111;
-      margin-top: 12px;
-      padding-top: 10px;
-    }
-    .totals-table { margin-top: 14px; }
+    .product-name { font-weight: 700; font-size: 8pt; }
+    .totals-table { margin-top: 6px; border-top: 1.5px solid #000; }
     .totals-table td {
-      padding: 5px 4px;
+      padding: 3px 2px;
       border: none;
-      font-size: 14px;
+      font-size: 9pt;
       font-weight: 700;
     }
-    .grand-total { font-size: 15px; font-weight: 900; }
+    .grand-total { font-size: 10pt; font-weight: 900; }
     .footer {
-      margin-top: 24px;
+      margin-top: 8px;
       text-align: center;
-      font-size: 10px;
-      color: #999;
-      border-top: 1px solid #ddd;
-      padding-top: 8px;
+      font-size: 6.5pt;
+      border-top: 1px dashed #aaa;
+      padding-top: 4px;
     }
   </style>
 </head>

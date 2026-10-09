@@ -92,10 +92,43 @@ export default function DispatchHistoryBranches() {
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   // All dispatches sorted newest first
-  const allDispatches = useMemo(() =>
-    [...dispatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-    [dispatches]
-  );
+  // All dispatches sorted newest first, with automatic duplicate entry prevention
+  const allDispatches = useMemo(() => {
+    const sorted = [...dispatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const seenIds = new Set<string>();
+    const seenInvoices = new Set<string>();
+    const seenSignatures = new Set<string>();
+    const uniqueDispatches: Dispatch[] = [];
+
+    for (const d of sorted) {
+      if (!d.id || seenIds.has(d.id)) continue;
+      seenIds.add(d.id);
+
+      // Verify invoiceId uniqueness if present
+      const invoiceKey = (d as any).invoiceId;
+      if (invoiceKey && seenInvoices.has(invoiceKey)) {
+        continue;
+      }
+      if (invoiceKey) seenInvoices.add(invoiceKey);
+
+      // Verification by payload signature (date, destination, token, items)
+      const itemsSig = [...(d.items || [])]
+        .sort((a, b) => a.productId.localeCompare(b.productId))
+        .map(i => `${i.productId}:${i.quantity}`)
+        .join('|');
+      
+      const sig = `${d.date}_${d.destination}_${d.tokenNumber || ''}_${itemsSig}`;
+      if (itemsSig && seenSignatures.has(sig)) {
+        // Skip duplicate double entry
+        continue;
+      }
+      if (itemsSig) seenSignatures.add(sig);
+
+      uniqueDispatches.push(d);
+    }
+
+    return uniqueDispatches;
+  }, [dispatches]);
 
   const uniqueYears = useMemo(() =>
     Array.from(new Set(allDispatches.map(d => new Date(d.date).getFullYear().toString())))
@@ -164,10 +197,11 @@ export default function DispatchHistoryBranches() {
       
       d.items.forEach(item => {
         totalQty += item.quantity;
-        if (!isBranch) {
-          const product = getProductById(item.productId);
-          totalValue += item.quantity * (product?.price || 0);
-        }
+        const product = getProductById(item.productId);
+        const price = (item.customPrice !== undefined && item.customPrice !== null && item.customPrice > 0)
+          ? item.customPrice
+          : (product?.price || 0);
+        totalValue += item.quantity * price;
       });
     });
 
@@ -268,16 +302,18 @@ export default function DispatchHistoryBranches() {
       d.items.map((item, idx) => {
         const p = getProductById(item.productId);
         const isBranch = d.destination === 'branch_1' || d.destination === 'branch_2';
-        const price = p?.price || 0;
-        const total = isBranch ? 0 : item.quantity * price;
+        const price = (item.customPrice !== undefined && item.customPrice !== null && item.customPrice > 0)
+          ? item.customPrice
+          : (p?.price || 0);
+        const total = item.quantity * price;
         return {
           date: new Date(d.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }),
           token: d.tokenNumber || '-',
           destination: d.destination === 'branch_1' ? 'Branch 1' : d.destination === 'branch_2' ? 'Branch 2' : d.destination === 'walkin' ? 'Walk-in' : d.destination,
           product: p?.name || 'Unknown',
           quantity: item.quantity,
-          price: isBranch ? '-' : `Rs. ${price}`,
-          total: isBranch ? '-' : `Rs. ${total}`,
+          price: `Rs. ${price}`,
+          total: `Rs. ${total}`,
           type: isBranch ? 'Branch Transfer' : 'Customer Sale'
         };
       })

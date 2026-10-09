@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Store, Plus, Minus, Trash2, Banknote } from 'lucide-react';
+import { Store, Plus, Minus, Trash2, Banknote, Loader2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 export default function WalkInSales() {
@@ -12,6 +12,8 @@ export default function WalkInSales() {
 
   if (!currentUser) return <Navigate to="/login" replace />;
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const availableProducts = products.filter(p => (stock[p.id]?.production || 0) > 0);
 
@@ -134,18 +136,38 @@ export default function WalkInSales() {
   };
 
   const handleSale = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSubmittingRef.current) return;
     
-    const receiptItems = cart.map(i => {
-      const product = getProductById(i.productId);
-      return { name: product?.name || 'Unknown', quantity: i.quantity, unitPrice: product?.price || 0 };
-    });
-    const receiptTotal = total;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    const success = await createDispatch('walkin', cart.map(i => ({ productId: i.productId, quantity: i.quantity })));
-    if (success && typeof success === 'string') {
-      setCart([]);
-      printDirectly(receiptItems, receiptTotal, 'cash', success, new Date().toLocaleString());
+    try {
+      const receiptItems = cart.map(i => {
+        const product = getProductById(i.productId);
+        return { name: product?.name || 'Unknown', quantity: i.quantity, unitPrice: product?.price || 0 };
+      });
+      const receiptTotal = total;
+      const walkinInvoiceId = `INV-WALKIN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      const success = await createDispatch(
+        'walkin', 
+        cart.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        'cash',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        walkinInvoiceId
+      );
+      if (success && typeof success === 'string') {
+        setCart([]);
+        printDirectly(receiptItems, receiptTotal, 'cash', success, new Date().toLocaleString());
+      }
+    } catch (err: any) {
+      console.error('Walkin sale dispatch error:', err);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -203,7 +225,13 @@ export default function WalkInSales() {
                   <span>Total</span>
                   <span className="text-primary">Rs. {total.toFixed(2)}</span>
                 </div>
-                <Button onClick={handleSale} className="w-full"><Banknote className="h-4 w-4 mr-1" /> Complete Sale</Button>
+                <Button onClick={handleSale} disabled={isSubmitting} className="w-full font-bold">
+                  {isSubmitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing Sale...</>
+                  ) : (
+                    <><Banknote className="h-4 w-4 mr-1" /> Complete Sale</>
+                  )}
+                </Button>
               </>
             )}
           </CardContent>
